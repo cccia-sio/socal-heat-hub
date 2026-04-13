@@ -8,8 +8,6 @@ SSP5-8.5) apply downscaled LOCA2 CMIP6 deltas to temperature variables.
 
 **Live tool:** [main/diy_pca.html](main/diy_pca.html)
 
-**User guide (PDF):** [userguide/userguide.pdf](userguide/userguide.pdf)
-
 ## About
 
 This repository hosts the publicly accessible build of the viewer. The tool

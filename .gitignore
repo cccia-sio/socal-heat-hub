@@ -1,0 +1,26 @@
+# Local build workspace — source code and data live here but are NEVER committed.
+# Rebuild the viewer with:  python3 scripts/build_diy_pca_viewer.py
+scripts/
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# LaTeX auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Editor / OS cruft
+.DS_Store
+.vscode/
+.idea/
+*.swp

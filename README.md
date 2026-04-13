@@ -22,12 +22,6 @@ Data sources:
   Ahn et al. AC type prevalence, ACS demographics
 - **Climate projections:** LOCA2 CMIP6 ensemble (2035–2064 vs. 1985–2014)
 
-## Citation
-
-If you use this tool in published work, please cite:
-> Mack, C. J. (2026). San Diego Heat Risk Explorer. Interactive web tool.
-> https://connorjmack.github.io/heat-risk-viewer/
-
 ## Contact
 
 Issues and feedback welcome via GitHub issues.

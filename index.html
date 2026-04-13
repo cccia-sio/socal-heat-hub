@@ -2,10 +2,202 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=main/diy_pca.html">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>San Diego Heat Risk Explorer</title>
+  <meta name="description" content="Interactive tool for exploring heat risk across San Diego County. Build your own composite risk map from exposure, sensitivity, and adaptive-capacity variables.">
+  <meta property="og:title" content="San Diego Heat Risk Explorer">
+  <meta property="og:description" content="Interactive heat risk mapping for San Diego County — pick the variables that matter to you.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8C%A1%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <style>
+    :root{
+      --exposure:#c0392b;
+      --sensitivity:#d35400;
+      --adaptive:#16a085;
+      --ink:#1a1a1a;
+      --muted:#555;
+      --bg:#fafaf7;
+      --card:#fff;
+      --border:#e3e1dc;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,
+        "Helvetica Neue",Arial,sans-serif;
+      color:var(--ink);
+      background:var(--bg);
+      line-height:1.5;
+      -webkit-font-smoothing:antialiased;
+    }
+    .wrap{max-width:780px;margin:0 auto;padding:48px 24px 80px}
+    header{border-bottom:3px solid var(--exposure);padding-bottom:20px;margin-bottom:32px}
+    h1{
+      margin:0 0 8px;
+      font-size:38px;
+      font-weight:700;
+      letter-spacing:-0.02em;
+    }
+    .tagline{color:var(--muted);font-size:17px;margin:0}
+    .hero{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:28px;
+      margin:28px 0;
+      box-shadow:0 1px 3px rgba(0,0,0,0.04);
+    }
+    .launch{
+      display:inline-block;
+      background:var(--exposure);
+      color:#fff;
+      padding:14px 28px;
+      font-size:17px;
+      font-weight:600;
+      text-decoration:none;
+      border-radius:6px;
+      margin-top:8px;
+      transition:background 0.15s;
+    }
+    .launch:hover{background:#a93322}
+    .secondary{
+      display:inline-block;
+      color:var(--ink);
+      padding:14px 20px;
+      font-size:15px;
+      font-weight:500;
+      text-decoration:none;
+      border:1px solid var(--border);
+      border-radius:6px;
+      margin-top:8px;
+      margin-left:8px;
+      background:#fff;
+      transition:border-color 0.15s;
+    }
+    .secondary:hover{border-color:var(--muted)}
+    h2{
+      font-size:20px;
+      margin:40px 0 12px;
+      font-weight:600;
+      letter-spacing:-0.01em;
+    }
+    p{color:var(--ink)}
+    .pillars{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:14px;
+      margin:20px 0;
+    }
+    @media(max-width:620px){.pillars{grid-template-columns:1fr}}
+    .pillar{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-left:4px solid;
+      border-radius:6px;
+      padding:14px 16px;
+    }
+    .pillar.exp{border-left-color:var(--exposure)}
+    .pillar.sen{border-left-color:var(--sensitivity)}
+    .pillar.ada{border-left-color:var(--adaptive)}
+    .pillar h3{
+      margin:0 0 6px;
+      font-size:14px;
+      text-transform:uppercase;
+      letter-spacing:0.05em;
+    }
+    .pillar.exp h3{color:var(--exposure)}
+    .pillar.sen h3{color:var(--sensitivity)}
+    .pillar.ada h3{color:var(--adaptive)}
+    .pillar p{margin:0;font-size:13px;color:var(--muted);line-height:1.4}
+    ul{padding-left:22px;color:var(--muted);font-size:14px}
+    ul li{margin-bottom:4px}
+    footer{
+      margin-top:56px;
+      padding-top:24px;
+      border-top:1px solid var(--border);
+      font-size:13px;
+      color:var(--muted);
+    }
+    footer a{color:var(--muted)}
+    code{
+      background:#f0efea;
+      padding:1px 5px;
+      border-radius:3px;
+      font-size:0.9em;
+    }
+  </style>
 </head>
 <body>
-  <p><a href="main/diy_pca.html">San Diego Heat Risk Explorer</a></p>
+  <div class="wrap">
+    <header>
+      <h1>San Diego Heat Risk Explorer</h1>
+      <p class="tagline">Build your own composite heat-risk map for every census tract in San Diego County.</p>
+    </header>
+
+    <div class="hero">
+      <p style="margin-top:0">
+        Pick the variables that matter to you &mdash; temperatures, chronic
+        disease rates, tree canopy, AC access, poverty &mdash; and the tool
+        combines them into a neighborhood-level risk map. Toggle climate
+        scenarios to see how risk shifts under mid-century warming.
+      </p>
+      <a class="launch" href="main/diy_pca.html">Launch the Tool &rarr;</a>
+      <a class="secondary" href="userguide/userguide.pdf">User Guide (PDF)</a>
+    </div>
+
+    <h2>Three pillars of heat risk</h2>
+    <div class="pillars">
+      <div class="pillar exp">
+        <h3>Exposure</h3>
+        <p>How hot does it actually get? Temperature, humidity, extreme-heat-day fraction, Landsat surface temperature.</p>
+      </div>
+      <div class="pillar sen">
+        <h3>Sensitivity</h3>
+        <p>Who lives here? Age, chronic disease prevalence, social vulnerability, environmental health.</p>
+      </div>
+      <div class="pillar ada">
+        <h3>Adaptive Capacity</h3>
+        <p>What resources are available? AC access, tree canopy, income, healthcare, housing quality.</p>
+      </div>
+    </div>
+
+    <h2>Who is this for?</h2>
+    <ul>
+      <li>Public health staff identifying communities most at risk during a heat wave</li>
+      <li>City planners prioritizing tree planting, cooling centers, and cool-roof investment</li>
+      <li>Community advocates making the case for neighborhood-level investment</li>
+      <li>Students, journalists, and curious residents exploring how heat risk varies</li>
+    </ul>
+
+    <h2>How it works</h2>
+    <p>
+      For each pillar, the tool runs a principal component analysis on the
+      variables you selected, retains the components that meet the Kaiser
+      criterion (eigenvalue&nbsp;&gt;&nbsp;1), and combines them into a pillar
+      score. The three pillar scores combine into a single composite risk
+      score from 0 to 100. Full methodology is in the
+      <a href="userguide/userguide.pdf">user guide</a>.
+    </p>
+
+    <h2>Data sources</h2>
+    <ul>
+      <li>Weather stations: <a href="https://synopticdata.com/">MesoWest / Synoptic</a></li>
+      <li>Land surface temperature: <a href="https://www.usgs.gov/landsat-missions">USGS Landsat</a></li>
+      <li>Chronic disease: <a href="https://www.cdc.gov/places/index.html">CDC PLACES</a></li>
+      <li>Social vulnerability: <a href="https://www.atsdr.cdc.gov/place-health/php/svi/index.html">CDC SVI 2022</a></li>
+      <li>Healthy Places Index: <a href="https://www.healthyplacesindex.org/">HPI</a></li>
+      <li>AC prevalence: <a href="https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629">Romitti et&nbsp;al.&nbsp;2022</a>, <a href="https://doi.org/10.1038/s41597-025-06104-3">Ahn et&nbsp;al.&nbsp;2025</a></li>
+      <li>Climate projections: LOCA2 CMIP6 ensemble (2035&ndash;2064)</li>
+    </ul>
+
+    <footer>
+      <p>
+        Built by Connor&nbsp;Mack. The tool runs entirely in your browser &mdash;
+        no tracking, no server, no account. Source for the viewer bundle is in
+        this repository; the upstream analysis code is maintained privately.
+      </p>
+    </footer>
+  </div>
 </body>
 </html>

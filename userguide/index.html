@@ -4,67 +4,509 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>User Guide &mdash; San Diego Heat Risk Explorer</title>
+  <meta name="description" content="A plain-language guide to the San Diego Heat Risk Explorer: what it shows, how to use it, and how to interpret the maps.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8C%A1%EF%B8%8F%3C/text%3E%3C/svg%3E">
   <style>
+    :root{
+      --exposure:#c0392b;
+      --sensitivity:#d35400;
+      --adaptive:#16a085;
+      --ink:#1a1a1a;
+      --muted:#555;
+      --bg:#fafaf7;
+      --card:#fff;
+      --border:#e3e1dc;
+      --soft:#f0efea;
+      --note:#eef4fb;
+      --note-border:#c7dbef;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    html,body{margin:0;padding:0}
     body{
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,
         "Helvetica Neue",Arial,sans-serif;
-      background:#fafaf7;
-      color:#1a1a1a;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      min-height:100vh;
-      margin:0;
-      padding:24px;
-      text-align:center;
-      line-height:1.55;
+      color:var(--ink);
+      background:var(--bg);
+      line-height:1.6;
+      -webkit-font-smoothing:antialiased;
     }
-    .card{max-width:520px}
+    .wrap{max-width:780px;margin:0 auto;padding:48px 24px 80px}
+
+    /* ---------- header ---------- */
+    header{border-bottom:3px solid var(--exposure);padding-bottom:20px;margin-bottom:28px}
+    .crumbs{font-size:13px;color:var(--muted);margin:0 0 10px}
+    .crumbs a{color:var(--muted)}
     h1{
-      font-size:32px;
-      margin:0 0 12px;
+      margin:0 0 8px;
+      font-size:34px;
+      font-weight:700;
       letter-spacing:-0.02em;
     }
-    .badge{
-      display:inline-block;
-      background:#f0efea;
-      color:#555;
-      font-size:12px;
-      font-weight:600;
-      text-transform:uppercase;
-      letter-spacing:0.08em;
-      padding:4px 10px;
-      border-radius:999px;
-      margin-bottom:18px;
+    .tagline{color:var(--muted);font-size:17px;margin:0}
+
+    /* ---------- hero ---------- */
+    .hero{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:24px 28px;
+      margin:24px 0 28px;
+      box-shadow:0 1px 3px rgba(0,0,0,0.04);
     }
-    p{color:#555;font-size:16px;margin:0 0 12px}
-    a{
+    .hero p{margin:0 0 14px}
+    .hero p:last-child{margin-bottom:0}
+    .launch{
       display:inline-block;
-      margin-top:20px;
-      background:#c0392b;
+      background:var(--exposure);
       color:#fff;
-      padding:12px 24px;
+      padding:13px 24px;
+      font-size:16px;
+      font-weight:600;
       text-decoration:none;
       border-radius:6px;
+      margin-top:6px;
+      transition:background 0.15s;
+    }
+    .launch:hover{background:#a93322}
+
+    /* ---------- table of contents ---------- */
+    .toc{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:18px 22px;
+      margin:0 0 36px;
+    }
+    .toc h2{
+      margin:0 0 10px;
+      font-size:13px;
+      text-transform:uppercase;
+      letter-spacing:0.06em;
+      color:var(--muted);
       font-weight:600;
     }
-    a:hover{background:#a93322}
+    .toc ol{
+      columns:2;
+      column-gap:24px;
+      margin:0;
+      padding:0 0 0 22px;
+      font-size:14px;
+    }
+    .toc li{margin:3px 0;break-inside:avoid}
+    .toc a{color:var(--ink);text-decoration:none}
+    .toc a:hover{text-decoration:underline}
+    @media(max-width:560px){.toc ol{columns:1}}
+
+    /* ---------- body sections ---------- */
+    h2.section{
+      font-size:24px;
+      margin:48px 0 14px;
+      font-weight:700;
+      letter-spacing:-0.01em;
+      scroll-margin-top:16px;
+    }
+    h3{
+      font-size:17px;
+      margin:24px 0 8px;
+      font-weight:600;
+    }
+    p{color:var(--ink);margin:0 0 14px}
+    a{color:#1d4ed8}
+    a:hover{text-decoration:underline}
+    ul,ol{padding-left:22px;margin:0 0 14px}
+    li{margin-bottom:6px}
+    strong{font-weight:600}
+    em{color:var(--muted)}
+    code{
+      background:var(--soft);
+      padding:1px 5px;
+      border-radius:3px;
+      font-size:0.9em;
+    }
+
+    /* pillar sub-sections in "what goes into each piece" */
+    .pillar-section{
+      border-left:4px solid;
+      padding:4px 0 4px 16px;
+      margin:24px 0;
+    }
+    .pillar-section.exp{border-left-color:var(--exposure)}
+    .pillar-section.sen{border-left-color:var(--sensitivity)}
+    .pillar-section.ada{border-left-color:var(--adaptive)}
+    .pillar-section h3{margin-top:0}
+    .pillar-section.exp h3{color:var(--exposure)}
+    .pillar-section.sen h3{color:var(--sensitivity)}
+    .pillar-section.ada h3{color:var(--adaptive)}
+    .pillar-tag{
+      display:inline-block;
+      font-size:12px;
+      font-weight:500;
+      color:var(--muted);
+      margin-left:8px;
+      vertical-align:1px;
+    }
+
+    /* numbered workflow steps */
+    .workflow{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:18px 22px;
+      margin:18px 0;
+    }
+    .workflow h3{margin-top:0}
+
+    /* "for the curious" callout */
+    .aside{
+      background:var(--note);
+      border:1px solid var(--note-border);
+      border-radius:6px;
+      padding:14px 18px;
+      margin:18px 0;
+      font-size:14.5px;
+      color:#26425e;
+    }
+    .aside p{margin:0;color:inherit}
+    .aside a{color:#1d4ed8}
+
+    /* data sources table */
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin:14px 0 14px;
+      font-size:14.5px;
+    }
+    th,td{
+      text-align:left;
+      padding:10px 12px;
+      border-bottom:1px solid var(--border);
+      vertical-align:top;
+    }
+    th{
+      background:var(--soft);
+      font-weight:600;
+      font-size:13px;
+      text-transform:uppercase;
+      letter-spacing:0.04em;
+      color:var(--muted);
+    }
+    tr:last-child td{border-bottom:none}
+
+    /* glossary */
+    dl.glossary{margin:14px 0}
+    dl.glossary dt{
+      font-weight:600;
+      margin-top:14px;
+    }
+    dl.glossary dd{
+      margin:4px 0 0;
+      color:var(--muted);
+      font-size:15px;
+    }
+
+    /* footer */
+    footer{
+      margin-top:56px;
+      padding-top:24px;
+      border-top:1px solid var(--border);
+      font-size:13px;
+      color:var(--muted);
+    }
+    footer a{color:var(--muted)}
+    .back{
+      display:inline-block;
+      margin-top:8px;
+      color:var(--muted);
+      text-decoration:none;
+    }
+    .back:hover{text-decoration:underline}
+
+    /* ---------- print stylesheet ---------- */
+    @media print{
+      @page{size:letter;margin:0.75in}
+      :root{--bg:#fff;--card:#fff;--soft:#f5f4ef}
+      html,body{background:#fff;font-size:11pt;line-height:1.5}
+      .wrap{max-width:none;padding:0}
+      a{color:#1d4ed8;text-decoration:none}
+
+      /* hide screen-only chrome */
+      .launch,.crumbs,footer,.back{display:none !important}
+
+      /* keep header tighter on the body pages */
+      header{margin-top:0;padding-bottom:14px;margin-bottom:18px}
+      h1{font-size:26pt}
+      .tagline{font-size:13pt}
+      .hero{break-inside:avoid;padding:18px 22px;margin:14px 0 20px}
+
+      /* TOC: keep together; useful as a page-reference reader-aid */
+      .toc{break-inside:avoid;margin-bottom:24px}
+      .toc ol{columns:2}
+
+      /* don't break inside callouts, workflow boxes, pillars, tables, FAQ items */
+      .pillar-section,.workflow,.aside,table,dl.glossary{break-inside:avoid}
+      tr,li{break-inside:avoid}
+      h2.section,h3{break-after:avoid}
+      h2.section{margin-top:28px}
+
+      /* light page-bottom guard for short trailing widows */
+      p{orphans:3;widows:3}
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <span class="badge">Coming soon</span>
-    <h1>User Guide</h1>
-    <p>
-      A non-technical walkthrough of the Heat Risk Explorer &mdash; what each
-      variable means, how to interpret the composite map, and example
-      workflows for planners and public-health staff &mdash; is being finalized.
-    </p>
-    <p>
-      In the meantime, hover any variable checkbox in the tool itself to see
-      its data source, and click any tract for a per-pillar breakdown.
-    </p>
-    <a href="../">&larr; Back to the Explorer</a>
+  <div class="wrap">
+
+    <header>
+      <p class="crumbs"><a href="../">&larr; San Diego Heat Risk Explorer</a></p>
+      <h1>User Guide</h1>
+      <p class="tagline">A plain-language walkthrough of what the tool shows, how to use it, and how to read the maps responsibly.</p>
+    </header>
+
+    <!-- =================== Hero =================== -->
+    <section class="hero" id="what-is-this">
+      <p><strong>The Heat Risk Explorer is an interactive map that helps you see which San Diego neighborhoods face the most danger during extreme heat &mdash; and why.</strong></p>
+      <p>Pick the things you care about &mdash; temperature, AC access, tree cover, age, chronic illness, income, and more &mdash; and the tool builds a neighborhood-level risk map you can read at a glance.</p>
+      <p>You don&rsquo;t need to know statistics or mapping software to use it. Everything runs in your web browser. There&rsquo;s nothing to install and nothing to download.</p>
+      <a class="launch" href="../main/diy_pca.html">Open the map &rarr;</a>
+    </section>
+
+    <!-- =================== Table of contents =================== -->
+    <nav class="toc" aria-label="Table of contents">
+      <h2>On this page</h2>
+      <ol>
+        <li><a href="#try-it">Try it in 60 seconds</a></li>
+        <li><a href="#why-different">Why heat hits some neighborhoods harder</a></li>
+        <li><a href="#what-goes-in">What goes into each piece</a></li>
+        <li><a href="#how-it-combines">How the tool puts it all together</a></li>
+        <li><a href="#reading-the-map">Reading the map</a></li>
+        <li><a href="#future">Looking into the future</a></li>
+        <li><a href="#workflows">Three things you can do with this</a></li>
+        <li><a href="#what-it-isnt">What this tool is &mdash; and isn&rsquo;t</a></li>
+        <li><a href="#faq">Common questions</a></li>
+        <li><a href="#data">Where the data comes from</a></li>
+        <li><a href="#glossary">A few words you might see</a></li>
+      </ol>
+    </nav>
+
+    <!-- =================== 1. Try it in 60 seconds =================== -->
+    <h2 class="section" id="try-it">Try it in 60 seconds</h2>
+    <p>Want to skip ahead? Here&rsquo;s the fastest way to see what the tool does:</p>
+    <ol>
+      <li><strong>Open the map</strong> at <a href="https://connorjmack.github.io/heat-risk-viewer/">connorjmack.github.io/heat-risk-viewer</a>.</li>
+      <li><strong>Leave the default boxes checked.</strong> They&rsquo;re a reasonable starting place.</li>
+      <li><strong>Click &ldquo;Build Composite Risk Map.&rdquo;</strong> It&rsquo;s the big blue button on the left.</li>
+      <li><strong>Look for the dark red areas.</strong> Those are the neighborhoods with the highest overall risk.</li>
+      <li><strong>Click any neighborhood.</strong> A small box pops up with its scores and the biggest reason it scored that way.</li>
+    </ol>
+    <p>That&rsquo;s it. The rest of this guide explains what you&rsquo;re looking at and how to dig deeper.</p>
+
+    <!-- =================== 2. Why different =================== -->
+    <h2 class="section" id="why-different">Why heat hits some neighborhoods harder</h2>
+    <p>A 100&deg; day is not the same everywhere. A shaded apartment in Carlsbad with working AC and a healthy adult inside is one story. A second-floor unit in El Cajon with no AC, a 90-year-old resident, and a hot roof above is another story altogether.</p>
+    <p>To make sense of that, the tool breaks heat risk into three pieces:</p>
+    <ul>
+      <li><strong>How hot it gets</strong> &mdash; the actual heat the neighborhood experiences.</li>
+      <li><strong>Who lives there</strong> &mdash; how many people are likely to be harmed when temperatures spike.</li>
+      <li><strong>What helps people cope</strong> &mdash; the things in a neighborhood that protect people, like AC, tree shade, and nearby healthcare.</li>
+    </ul>
+    <p>Every neighborhood gets a score on each of these three pieces. The tool then blends them into one overall heat risk score from 0 (lowest risk) to 100 (highest risk).</p>
+
+    <!-- =================== 3. What goes in =================== -->
+    <h2 class="section" id="what-goes-in">What goes into each piece</h2>
+
+    <div class="pillar-section exp">
+      <h3>How hot it gets <span class="pillar-tag">shown in red</span></h3>
+      <p>This is the physical heat a neighborhood experiences. We measure it using weather stations across the county:</p>
+      <ul>
+        <li><strong>Daytime highs</strong> &mdash; average summer highs, the hottest days, and the single hottest day of the year. <em>Best when you&rsquo;re focused on peak heat events or short-term emergency planning, like deciding when to open cooling centers.</em></li>
+        <li><strong>Nighttime lows</strong> &mdash; how cool nights actually get. Bodies need cool nights to recover. When nights stay warm, heat illness goes up &mdash; especially for older adults. <em>Best when you&rsquo;re worried about multi-day heat waves or older-adult health, where the lack of overnight relief is what makes people sick.</em></li>
+        <li><strong>Humidity</strong> &mdash; how heavy and muggy the air is. High humidity makes the same temperature feel worse. <em>Best when you&rsquo;re comparing inland and coastal neighborhoods, where the same air temperature can feel very different.</em></li>
+      </ul>
+    </div>
+
+    <div class="pillar-section sen">
+      <h3>Who lives there <span class="pillar-tag">shown in orange</span></h3>
+      <p>This is about the people in a neighborhood. Some are more likely to be harmed by heat than others. The tool looks at:</p>
+      <ul>
+        <li><strong>Age</strong> &mdash; kids under 18 and adults over 65 are more vulnerable. <em>Best when you&rsquo;re trying to see where heat illness is most likely to land &mdash; senior housing, family neighborhoods, areas near schools.</em></li>
+        <li><strong>Health conditions</strong> &mdash; heart disease, asthma, COPD, diabetes, high blood pressure, and others get worse in heat. <em>Best when you&rsquo;re targeting healthcare partnerships, medication-safety messaging, or hospital-readiness planning.</em></li>
+        <li><strong>Daily life challenges</strong> &mdash; language barriers, disability, poverty, no car, housing cost stress, and other things that make hot days harder to navigate. <em>Best when you&rsquo;re planning heat communications, transit to cooling centers, or community navigator programs.</em></li>
+        <li><strong>Air quality and life expectancy</strong> &mdash; neighborhoods already living with worse air or shorter life expectancy tend to be hit harder. <em>Best when you&rsquo;re aligning heat work with broader environmental justice or health equity goals.</em></li>
+      </ul>
+    </div>
+
+    <div class="pillar-section ada">
+      <h3>What helps people cope <span class="pillar-tag">shown in teal</span></h3>
+      <p>This is the protective side of the equation &mdash; what a neighborhood has going for it:</p>
+      <ul>
+        <li><strong>AC at home</strong> &mdash; how likely a home is to have any AC, central AC, or none at all. <em>Best when you&rsquo;re prioritizing cooling-center locations, utility bill assistance, or home AC subsidy programs.</em></li>
+        <li><strong>The neighborhood itself</strong> &mdash; tree cover, parks, green space, and the age of the housing (older homes are usually less insulated). <em>Best when you&rsquo;re planning tree planting, park investment, cool-roof programs, or weatherization.</em></li>
+        <li><strong>Money and services</strong> &mdash; income, education, health insurance, healthcare access, food access, and how connected the community is. <em>Best when you want to braid heat work with other safety-net programs, or see where lack of resources amplifies the impact of a heat wave.</em></li>
+      </ul>
+      <p>More of these means lower heat risk. The tool flips the math automatically, so you don&rsquo;t have to think about it.</p>
+    </div>
+
+    <!-- =================== 4. How combined =================== -->
+    <h2 class="section" id="how-it-combines">How the tool puts it all together</h2>
+    <p>Once you&rsquo;ve picked your factors, the tool blends them into one easy-to-compare score for every neighborhood &mdash; from 0 (lowest risk) to 100 (highest risk).</p>
+    <p>Two things make this smarter than a simple average:</p>
+    <p><strong>It handles overlap.</strong> Many of these factors travel together. Lower-income neighborhoods often also have older housing, less tree cover, and higher rates of chronic illness. If we just added all those numbers up, we&rsquo;d be counting the same underlying pattern several times. The tool finds those overlapping patterns and counts them once.</p>
+    <p><strong>It gives credit where it&rsquo;s due.</strong> Things like AC, tree cover, and nearby healthcare protect people. The tool subtracts those from the risk total, so a neighborhood with strong protections ends up with a lower score even if it gets hot.</p>
+    <p>The result is one number per neighborhood &mdash; easy to see, click, and compare across the county.</p>
+
+    <div class="aside">
+      <p><strong>For the curious:</strong> the technique behind this is called Principal Component Analysis (PCA). You don&rsquo;t need to know how it works to use the tool, but if you&rsquo;d like a friendly visual explainer, <a href="https://setosa.io/ev/principal-component-analysis/" target="_blank" rel="noopener">this one from Setosa</a> is a good starting place.</p>
+    </div>
+
+    <!-- =================== 5. Reading the map =================== -->
+    <h2 class="section" id="reading-the-map">Reading the map</h2>
+
+    <h3>The colors</h3>
+    <p>Darker always means higher. On the overall composite map, dark red means a neighborhood is among the highest risk in the county. On the individual pillar maps, the color follows the pillar &mdash; red for heat, orange for population vulnerability, teal for protective resources.</p>
+
+    <h3>What a score actually means</h3>
+    <p>The scores are <em>relative</em>, not absolute. A neighborhood with a score of 75 is at higher risk than 75% of other neighborhoods in San Diego County. It does <strong>not</strong> mean 75% of residents will be harmed.</p>
+
+    <h3>Clicking a neighborhood</h3>
+    <p>Click any neighborhood and a small box appears with:</p>
+    <ul>
+      <li>Its score on each of the three pieces</li>
+      <li>Its overall composite score</li>
+      <li>Its <strong>dominant driver</strong> &mdash; the piece pushing its risk the highest. This answers the question, &ldquo;Why is this neighborhood in the red?&rdquo;</li>
+    </ul>
+
+    <h3>The map layers</h3>
+    <ul>
+      <li><strong>Composite Risk</strong> &mdash; the overall 0&ndash;100 score that combines everything. The default.</li>
+      <li><strong>Dominant Driver</strong> &mdash; colors each neighborhood by which of the three pieces matters most there. Helps you see whether a hotspot is hot because of physical heat, who lives there, or a lack of resources.</li>
+      <li><strong>Individual pillar views</strong> &mdash; show one piece (heat, who lives there, or what helps them cope) on its own.</li>
+    </ul>
+
+    <!-- =================== 6. Future =================== -->
+    <h2 class="section" id="future">Looking into the future</h2>
+    <p>At the top of the left panel, four buttons let you switch between time periods:</p>
+    <ul>
+      <li><strong>Present Day</strong> &mdash; what we measure today, using actual weather station readings.</li>
+      <li><strong>Moderate Emissions</strong> &mdash; a middle-of-the-road future where the world cuts emissions but not aggressively.</li>
+      <li><strong>High Emissions</strong> &mdash; a future where emissions stay high.</li>
+      <li><strong>Very High Emissions</strong> &mdash; a worst-case future of unchecked fossil fuel use.</li>
+    </ul>
+    <p>When you pick a future scenario, the tool shifts the temperature numbers using climate model projections for either 2050 or 2080. Everything else &mdash; who lives where, what resources are around &mdash; stays at today&rsquo;s values. We don&rsquo;t pretend to know who will live in each neighborhood thirty years from now.</p>
+
+    <!-- =================== 7. Workflows =================== -->
+    <h2 class="section" id="workflows">Three things you can do with this</h2>
+
+    <div class="workflow">
+      <h3>Find a good spot for the next cooling center</h3>
+      <ol>
+        <li>Start with the default selections.</li>
+        <li>Under <strong>What helps people cope</strong>, uncheck the AC variables. You want a view that penalizes the <em>lack</em> of AC instead of treating homes that have AC the same as ones that don&rsquo;t.</li>
+        <li>Click <strong>Build Composite Risk Map</strong>.</li>
+        <li>Look at the darkest red neighborhoods.</li>
+        <li>Click a few. If their dominant driver is the &ldquo;what helps people cope&rdquo; piece, they&rsquo;re strong cooling-center candidates. If it&rsquo;s something else, a cooling center alone won&rsquo;t fully solve the problem.</li>
+      </ol>
+    </div>
+
+    <div class="workflow">
+      <h3>See which neighborhoods will get hottest by mid-century</h3>
+      <ol>
+        <li>Click <strong>High Emissions</strong> at the top of the left panel.</li>
+        <li>Uncheck everything except the temperature variables.</li>
+        <li>Click <strong>Build Composite Risk Map</strong>.</li>
+        <li>Open the tool in a second browser tab on <strong>Present Day</strong> to compare side-by-side. The difference shows you where warming is concentrated.</li>
+      </ol>
+    </div>
+
+    <div class="workflow">
+      <h3>Make the case for tree planting in one neighborhood</h3>
+      <ol>
+        <li>Use the default selections and click <strong>Build Composite Risk Map</strong>.</li>
+        <li>Click the neighborhood you care about.</li>
+        <li>Note its overall score, its dominant driver, and how its tree cover compares to nearby neighborhoods.</li>
+        <li>Take a screenshot. The map plus this guide is your documentation.</li>
+      </ol>
+    </div>
+
+    <!-- =================== 8. Is / Isn't =================== -->
+    <h2 class="section" id="what-it-isnt">What this tool is &mdash; and isn&rsquo;t</h2>
+    <p><strong>It is:</strong></p>
+    <ul>
+      <li>A way to see patterns across San Diego at a neighborhood scale.</li>
+      <li>A starting point for conversations about where to focus heat preparation.</li>
+      <li>A tool that lets you decide which factors matter to your question.</li>
+    </ul>
+    <p><strong>It isn&rsquo;t:</strong></p>
+    <ul>
+      <li>A real-time heat warning. For active heat events, follow the National Weather Service.</li>
+      <li>A guarantee about any one person&rsquo;s risk. A neighborhood score can hide the single block that&rsquo;s most exposed.</li>
+      <li>A replacement for talking to communities. The neighborhoods showing the highest risk are the ones whose voices should shape what&rsquo;s done about it.</li>
+    </ul>
+
+    <!-- =================== 9. FAQ =================== -->
+    <h2 class="section" id="faq">Common questions</h2>
+
+    <h3>Why are some neighborhoods blank on the map?</h3>
+    <p>A neighborhood shows up blank when one of the variables you&rsquo;ve selected is missing for it. Try unchecking the variable with the spottiest coverage and the blanks should fill in.</p>
+
+    <h3>Can I save my map?</h3>
+    <p>Not yet. For now, take a screenshot. The tool runs entirely in your browser, so there&rsquo;s no account to log into and nothing saved on a server.</p>
+
+    <h3>Can I use this for a different county?</h3>
+    <p>Not as-is. Every variable comes from a national dataset, but someone would need to assemble the data for a different county. The method is portable; the prepared data isn&rsquo;t.</p>
+
+    <h3>What&rsquo;s the difference between &ldquo;Composite Risk&rdquo; and &ldquo;Dominant Driver&rdquo;?</h3>
+    <p>Composite Risk shows the overall score &mdash; how hot, how vulnerable, and how protected, all combined. Dominant Driver shows <em>which of those three pieces</em> is the biggest in each neighborhood. Composite tells you <em>where</em> to focus; Dominant Driver tells you <em>what kind of solution</em> might help.</p>
+
+    <h3>Who do I contact about this tool?</h3>
+    <p>Feedback, bug reports, and suggestions are welcome via <a href="https://github.com/connorjmack/heat-risk-viewer/issues" target="_blank" rel="noopener">GitHub issues</a>.</p>
+
+    <!-- =================== 10. Data =================== -->
+    <h2 class="section" id="data">Where the data comes from</h2>
+    <p>Every number in this tool comes from a public, trustworthy source.</p>
+    <table>
+      <thead>
+        <tr><th>What it measures</th><th>Source</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Weather observations</td><td>MesoWest / Synoptic Data weather station network</td></tr>
+        <tr><td>Future temperature projections</td><td>LOCA2 downscaled climate model output (CMIP6)</td></tr>
+        <tr><td>Land surface temperature</td><td>USGS Landsat satellite imagery</td></tr>
+        <tr><td>Chronic disease rates</td><td>CDC PLACES</td></tr>
+        <tr><td>Social vulnerability</td><td>CDC Social Vulnerability Index (SVI) 2022</td></tr>
+        <tr><td>Income, education, healthcare, housing</td><td>Healthy Places Index (HPI)</td></tr>
+        <tr><td>Demographics and housing</td><td>American Community Survey (5-year estimates)</td></tr>
+        <tr><td>Air conditioning prevalence</td><td>Modeled estimates from Romitti et&nbsp;al. and Ahn et&nbsp;al.</td></tr>
+      </tbody>
+    </table>
+    <p>Each variable in the tool also has a small <code>src</code> link next to its name that opens the original source in a new tab &mdash; so you can always trace a number back to where it came from.</p>
+
+    <!-- =================== 11. Glossary =================== -->
+    <h2 class="section" id="glossary">A few words you might see</h2>
+    <dl class="glossary">
+      <dt>Census tract</dt>
+      <dd>A small Census Bureau geography, usually around 4,000 people. San Diego County has roughly 630 of them.</dd>
+
+      <dt>Composite risk score</dt>
+      <dd>The tool&rsquo;s final 0&ndash;100 score combining all three pieces.</dd>
+
+      <dt>Dominant driver</dt>
+      <dd>The piece (heat, who lives there, or what helps them cope) that contributes the most to a neighborhood&rsquo;s score.</dd>
+
+      <dt>Percentile</dt>
+      <dd>A score from 0 to 100 telling you where a neighborhood sits compared to all others in the county. A score of 80 means higher than 80% of other neighborhoods.</dd>
+
+      <dt>Climate scenario / SSP</dt>
+      <dd>A &ldquo;what if&rdquo; path for future emissions used by climate scientists. Higher SSP numbers mean more warming.</dd>
+
+      <dt>Principal Component Analysis (PCA)</dt>
+      <dd>The math the tool uses to find the patterns hidden in many overlapping variables. You don&rsquo;t have to understand it to use the tool. (<a href="https://setosa.io/ev/principal-component-analysis/" target="_blank" rel="noopener">visual explainer</a>)</dd>
+    </dl>
+
+    <footer>
+      <a class="back" href="../">&larr; Back to the Explorer</a>
+    </footer>
+
   </div>
 </body>
 </html>

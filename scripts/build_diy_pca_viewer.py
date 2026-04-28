@@ -848,10 +848,8 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   <div id="overlay-toggles" style="display:none">
     <h3>Overlays</h3>
     <details class="subsec" id="juris-subsec" style="margin-top:2px"><summary>Jurisdictions</summary>
-      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-juris-San Diego" onchange="toggleJurisLayer('San Diego')"><span style="color:#2563eb;font-weight:600">San Diego</span></label></div>
-      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-juris-Chula Vista" onchange="toggleJurisLayer('Chula Vista')"><span style="color:#16a085;font-weight:600">Chula Vista</span></label></div>
-      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-juris-La Mesa" onchange="toggleJurisLayer('La Mesa')"><span style="color:#d35400;font-weight:600">La Mesa</span></label></div>
-      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-juris-_other" onchange="toggleJurisLayer('_other')">Other Cities</label></div>
+      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-juris-all" onchange="toggleJurisAll(this.checked)">Show all cities</label></div>
+      <div id="juris-items" style="margin-top:2px"></div>
     </details>
     <details class="subsec" id="tribal-subsec" style="margin-top:6px"><summary>Tribal Lands</summary>
       <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-tribal-all" onchange="toggleTribalAll(this.checked)"><span style="color:#8b5a2b;font-weight:600">Show all tribal lands</span></label></div>
@@ -1160,45 +1158,73 @@ var basemapLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/
 L.control.scale().addTo(map);
 var tLayer = null;
 
-// City jurisdiction boundary overlays — split into named cities + other
+// City jurisdiction boundary overlays — one layer per city, all rendered in black
 var jurisLayers={};
-var NAMED_CITIES=["San Diego","Chula Vista","La Mesa"];
-var CITY_COLORS={"San Diego":"#2563eb","Chula Vista":"#16a085","La Mesa":"#d35400","_other":"#4a6fa5"};
+var JURIS_COLOR="#000000";
+function jurisCheckboxId(name){return "cb-juris-"+name.replace(/\s+/g,"_");}
 if(JURIS){
-  function makeJurisStyle(city){
-    var c=CITY_COLORS[city]||CITY_COLORS._other;
-    return function(){return{fillColor:"transparent",color:c,weight:1.5,fillOpacity:0,dashArray:""}};
+  function makeJurisStyle(){
+    return function(){return{fillColor:"transparent",color:JURIS_COLOR,weight:1.5,fillOpacity:0,dashArray:""}};
   }
-  function makeJurisHL(layerKey){
+  function makeJurisHL(name){
     return function(f,lyr){
-      var c=CITY_COLORS[f.properties.NAME]||CITY_COLORS._other;
-      lyr.on("mouseover",function(e){e.target.setStyle({weight:3,color:c,fillOpacity:0.05})});
-      lyr.on("mouseout",function(e){if(jurisLayers[layerKey])jurisLayers[layerKey].resetStyle(e.target)});
+      lyr.on("mouseover",function(e){e.target.setStyle({weight:3,color:JURIS_COLOR,fillOpacity:0.05})});
+      lyr.on("mouseout",function(e){if(jurisLayers[name])jurisLayers[name].resetStyle(e.target)});
       lyr.bindTooltip(f.properties.NAME,{sticky:true,className:"juris-tip"});
     };
   }
-  // Create a layer per named city
-  NAMED_CITIES.forEach(function(city){
-    var feats=JURIS.features.filter(function(f){return f.properties.NAME===city;});
+  // One layer per city, alphabetically sorted
+  var jurisNames=JURIS.features.map(function(f){return f.properties.NAME;})
+    .filter(function(n,i,a){return n&&a.indexOf(n)===i;})
+    .sort(function(a,b){return a.localeCompare(b);});
+  jurisNames.forEach(function(name){
+    var feats=JURIS.features.filter(function(f){return f.properties.NAME===name;});
     if(feats.length===0)return;
     var gj={type:"FeatureCollection",features:feats};
-    jurisLayers[city]=L.geoJSON(gj,{style:makeJurisStyle(city),onEachFeature:makeJurisHL(city)});
+    jurisLayers[name]=L.geoJSON(gj,{style:makeJurisStyle(),onEachFeature:makeJurisHL(name)});
   });
-  // "Other Cities" layer — everything not in NAMED_CITIES
-  var otherFeats=JURIS.features.filter(function(f){return NAMED_CITIES.indexOf(f.properties.NAME)<0;});
-  if(otherFeats.length>0){
-    var gj={type:"FeatureCollection",features:otherFeats};
-    jurisLayers._other=L.geoJSON(gj,{style:makeJurisStyle("_other"),onEachFeature:makeJurisHL("_other")});
+  // Build per-city checkbox list
+  var itemsEl=document.getElementById("juris-items");
+  if(itemsEl){
+    itemsEl.innerHTML=jurisNames.map(function(name){
+      var id=jurisCheckboxId(name);
+      var nameAttr=name.replace(/"/g,"&quot;");
+      return '<div class="ov-row" style="margin-left:14px"><label>'+
+        '<input type="checkbox" id="'+id+'" data-juris-name="'+nameAttr+'" onchange="toggleJurisLayer(this.dataset.jurisName)">'+
+        name+
+        '</label></div>';
+    }).join("");
   }
   document.getElementById("overlay-toggles").style.display="block";
 }
 
-function toggleJurisLayer(key){
-  var cb=document.getElementById("cb-juris-"+key);
-  var lyr=jurisLayers[key];
+function toggleJurisLayer(name){
+  var lyr=jurisLayers[name];
   if(!lyr)return;
+  var cb=document.getElementById(jurisCheckboxId(name));
   if(cb&&cb.checked){lyr.addTo(map);lyr.bringToFront();}
   else{map.removeLayer(lyr);}
+  syncJurisAllCheckbox();
+}
+function toggleJurisAll(on){
+  Object.keys(jurisLayers).forEach(function(name){
+    var cb=document.getElementById(jurisCheckboxId(name));
+    if(cb)cb.checked=!!on;
+    var lyr=jurisLayers[name];
+    if(!lyr)return;
+    if(on){lyr.addTo(map);lyr.bringToFront();}
+    else{map.removeLayer(lyr);}
+  });
+}
+function syncJurisAllCheckbox(){
+  var all=document.getElementById("cb-juris-all");
+  if(!all)return;
+  var names=Object.keys(jurisLayers);
+  if(!names.length){all.checked=false;all.indeterminate=false;return;}
+  var n=0;
+  names.forEach(function(nm){if(map.hasLayer(jurisLayers[nm]))n++;});
+  all.checked=(n===names.length);
+  all.indeterminate=(n>0&&n<names.length);
 }
 
 // Tribal lands overlays — Census TIGER AIANNH 2024 (San Diego County)
@@ -2437,10 +2463,9 @@ function _captureStudyAreaMap(){
 
       var cityRows=[];
       if(typeof JURIS!=='undefined'&&JURIS&&typeof jurisLayers!=='undefined'){
-        Object.keys(jurisLayers).forEach(function(k){
+        Object.keys(jurisLayers).sort(function(a,b){return a.localeCompare(b);}).forEach(function(k){
           if(!map.hasLayer(jurisLayers[k]))return;
-          var c=CITY_COLORS[k]||CITY_COLORS._other;
-          cityRows.push({label:(k==='_other')?'Other cities':k, color:c});
+          cityRows.push({label:k, color:JURIS_COLOR});
         });
       }
       var tribalRows=[];
@@ -2600,11 +2625,8 @@ function _captureStudyAreaMap(){
       if(typeof JURIS!=='undefined'&&JURIS){
         Object.keys(jurisLayers).forEach(function(k){
           if(!map.hasLayer(jurisLayers[k]))return;
-          var c=CITY_COLORS[k]||CITY_COLORS._other;
-          var feats=(k==='_other')
-            ? JURIS.features.filter(function(f){return NAMED_CITIES.indexOf(f.properties.NAME)<0;})
-            : JURIS.features.filter(function(f){return f.properties.NAME===k;});
-          feats.forEach(function(f){drawFeature(f,null,c,1.8*SCALE,0);});
+          var feats=JURIS.features.filter(function(f){return f.properties.NAME===k;});
+          feats.forEach(function(f){drawFeature(f,null,JURIS_COLOR,1.8*SCALE,0);});
         });
       }
       // Replicate visible tribal land outlines

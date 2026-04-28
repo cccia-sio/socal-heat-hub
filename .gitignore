@@ -10,6 +10,9 @@ data/exposure/*
 !data/exposure/processed
 data/exposure/processed/*
 !data/exposure/processed/landsat
+!data/context
+data/context/*
+!data/context/sandag_landuse.pmtiles
 
 # Python
 __pycache__/

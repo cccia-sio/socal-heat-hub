@@ -1255,7 +1255,25 @@ if(JURIS){
     return function(f,lyr){
       lyr.on("mouseover",function(e){e.target.setStyle({weight:3,color:JURIS_COLOR,fillOpacity:0.05})});
       lyr.on("mouseout",function(e){if(jurisLayers[name])jurisLayers[name].resetStyle(e.target)});
-      lyr.bindTooltip(f.properties.NAME,{sticky:true,className:"juris-tip"});
+      lyr.on("click",function(e){
+        if(L.DomEvent)L.DomEvent.stopPropagation(e);
+        // If a tract-compare is in progress, juris polygons are sitting on top of
+        // the tract layer and would otherwise swallow the click. Forward to the
+        // tract beneath the click point.
+        if(compareMode==='awaiting'){
+          var pt=[e.latlng.lng,e.latlng.lat];
+          for(var i=0;i<GJ.features.length;i++){
+            if(_ptInGeometry(pt,GJ.features[i].geometry)){
+              var gid=GJ.features[i].properties.GEOID;
+              if(gid!==compareFirst)finishCompare(gid);
+              return;
+            }
+          }
+          return;
+        }
+        openCityCompareModal(name);
+      });
+      lyr.bindTooltip(f.properties.NAME+" \\u2014 click to compare",{sticky:true,className:"juris-tip"});
     };
   }
   // One layer per city, alphabetically sorted
@@ -1334,6 +1352,22 @@ if(typeof TRIBAL!=='undefined'&&TRIBAL&&TRIBAL.features&&TRIBAL.features.length)
       var c=TRIBAL_COLORS[t]||TRIBAL_COLORS.reservation;
       lyr.on("mouseover",function(e){e.target.setStyle({weight:3,color:c,fillOpacity:0.22})});
       lyr.on("mouseout",function(e){if(tribalLayers[name])tribalLayers[name].resetStyle(e.target)});
+      lyr.on("click",function(e){
+        if(L.DomEvent)L.DomEvent.stopPropagation(e);
+        // Forward to underlying tract during compare-awaiting (same reason as juris)
+        if(compareMode==='awaiting'){
+          var pt=[e.latlng.lng,e.latlng.lat];
+          for(var i=0;i<GJ.features.length;i++){
+            if(_ptInGeometry(pt,GJ.features[i].geometry)){
+              var gid=GJ.features[i].properties.GEOID;
+              if(gid!==compareFirst)finishCompare(gid);
+              return;
+            }
+          }
+          return;
+        }
+        showTribalNoData(e.latlng,f.properties.NAME,t);
+      });
       var label=f.properties.NAME+(t==='trust'?" (Trust Land)":"");
       lyr.bindTooltip(label,{sticky:true,className:"juris-tip"});
     };
@@ -1907,8 +1941,10 @@ function closeCompareModal(){
 
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
+    var cityModal=document.getElementById('city-compare-modal');
     if(document.getElementById('scn-compare-modal').classList.contains('open')){closeScnCompareModal();}
     else if(document.getElementById('compare-modal').classList.contains('open')){closeCompareModal();}
+    else if(cityModal&&cityModal.classList.contains('open')){closeCityCompareModal();}
     else if(compareMode==='awaiting'){cancelCompare();}
   }
 });
@@ -2033,12 +2069,19 @@ function buildMiniMap(elId,slot,feat){
   var m=L.map(elId,{zoomControl:false,attributionControl:false,
     scrollWheelZoom:true,dragging:true});
   L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{maxZoom:19}).addTo(m);
+  // Custom pane so the protomaps PMTiles canvas (a GridLayer) renders ABOVE
+  // the LST imageOverlay. Without this it lands in tilePane (z=200) under
+  // overlayPane (z=400) and the LST visually swamps the parcels.
+  if(!m.getPane('landusePane')){
+    m.createPane('landusePane');
+    m.getPane('landusePane').style.zIndex=450;
+  }
   // Landsat 100m LST overlay — clipped visually by zooming to the tract bounds.
-  // Opacity drops when the land-use overlay is on so both layers stay readable.
+  // Opacity drops when the land-use overlay is on so parcels stay legible.
   var lv=lstVariant();
   if(lv){
     var b=LST.bounds;
-    var initOp=_landuseShown?0.5:0.85;
+    var initOp=_landuseShown?0.25:0.85;
     _cmpLST[slot]=L.imageOverlay(lv.url,[[b.south,b.west],[b.north,b.east]],{opacity:initOp}).addTo(m);
   }
   // Tract outline (no fill, so the LST shows through)
@@ -2059,6 +2102,260 @@ function renderLstLegend(){
     '<span class="cmp-lst-bar" style="background:linear-gradient(to right,'+stops+')"></span>'+
     '<span class="cmp-lst-ticks">'+ticks+'</span>';
   el.style.display='flex';
+}
+
+/* ================================================================
+   COMPARE CITIES
+   Population-weighted aggregations across census tracts whose
+   centroid falls inside each city's polygon. Reservations are
+   intentionally excluded — see showTribalNoData() below.
+   ================================================================ */
+var cityCmpMaps={a:null,b:null};
+var cityCmpSel ={a:null,b:null};
+var _jurisTractCache=null;
+
+function _ensureJurisTractCache(){
+  if(_jurisTractCache)return;
+  _ensureTractJuris();
+  _jurisTractCache={};
+  for(var i=0;i<_tractJurisName.length;i++){
+    var n=_tractJurisName[i];
+    if(!n)continue;
+    (_jurisTractCache[n]=_jurisTractCache[n]||[]).push(i);
+  }
+}
+function _jurisTractIdxs(name){
+  _ensureJurisTractCache();
+  return _jurisTractCache[name]||[];
+}
+function _jurisTotalPop(name){
+  var idxs=_jurisTractIdxs(name),s=0;
+  for(var i=0;i<idxs.length;i++){s+=(+GJ.features[idxs[i]].properties.E_TOTPOP||0);}
+  return s;
+}
+function _jurisPopWMean(name,key,opts){
+  opts=opts||{};
+  var idxs=_jurisTractIdxs(name);
+  var dArr=opts.useDelta?getDeltaArr(key):null;
+  var wsum=0,vsum=0,n=0;
+  for(var i=0;i<idxs.length;i++){
+    var idx=idxs[i];
+    var pr=GJ.features[idx].properties;
+    var v=dArr?getAdj(key,idx):pr[key];
+    if(v==null||isNaN(v))continue;
+    var w=+pr.E_TOTPOP||0;
+    if(w<=0)continue;
+    wsum+=w;vsum+=w*(+v);n++;
+  }
+  if(wsum<=0||n===0)return null;
+  return {value:vsum/wsum,pop:wsum,n:n};
+}
+function _jurisDriverBreakdown(name){
+  if(!results)return null;
+  var idxs=_jurisTractIdxs(name);
+  var counts={exposure:0,sensitivity:0,adaptive:0};
+  for(var i=0;i<idxs.length;i++){
+    var d=GJ.features[idxs[i]].properties._drv;
+    if(d&&counts[d]!==undefined)counts[d]++;
+  }
+  return counts;
+}
+function _isRankVar(key){
+  return /_pctile$/.test(key) || /^RPL_/.test(key) || key==='cbsa_perc_rank_ac_prob';
+}
+
+function openCityCompareModal(initialName){
+  if(typeof JURIS==='undefined'||!JURIS){return;}
+  _ensureJurisTractCache();
+  var allNames=Object.keys(_jurisTractCache).sort(function(a,b){return a.localeCompare(b);});
+  if(!allNames.length){return;}
+  ['a','b'].forEach(function(s){
+    var sel=document.getElementById('city-cmp-sel-'+s);
+    sel.innerHTML='<option value="">\\u2014 Pick a city \\u2014</option>'+
+      allNames.map(function(n){
+        return '<option value="'+n.replace(/"/g,'&quot;')+'">'+n+'</option>';
+      }).join('');
+  });
+  cityCmpSel.a=(initialName&&_jurisTractCache[initialName])?initialName:'';
+  cityCmpSel.b='';
+  for(var i=0;i<allNames.length;i++){
+    if(allNames[i]!==cityCmpSel.a){cityCmpSel.b=allNames[i];break;}
+  }
+  document.getElementById('city-cmp-sel-a').value=cityCmpSel.a;
+  document.getElementById('city-cmp-sel-b').value=cityCmpSel.b;
+  var ctx='';
+  if(curScenario==='present'){ctx='Present Day';}
+  else{
+    var sl={'ssp245':'SSP2-4.5','ssp370':'SSP3-7.0','ssp585':'SSP5-8.5'};
+    ctx=sl[curScenario]+' \\u2022 '+(curPeriod==='2050'?'Mid-Century 2050':'End-of-Century 2080');
+  }
+  document.getElementById('city-cmp-context').textContent=ctx;
+  document.getElementById('city-compare-modal').classList.add('open');
+  setTimeout(function(){_renderCityCompareSide('a');_renderCityCompareSide('b');
+                        _renderCityCompareBody(cityCmpSel.a,cityCmpSel.b);},20);
+}
+
+function setCityCompare(side,name){
+  cityCmpSel[side]=name;
+  _renderCityCompareSide(side);
+  _renderCityCompareBody(cityCmpSel.a,cityCmpSel.b);
+}
+
+function _renderCityCompareSide(side){
+  var name=cityCmpSel[side];
+  var nameEl=document.getElementById('city-cmp-name-'+side);
+  var metaEl=document.getElementById('city-cmp-meta-'+side);
+  if(!name){
+    nameEl.textContent='\\u2014';
+    metaEl.textContent='';
+    if(cityCmpMaps[side]){cityCmpMaps[side].remove();cityCmpMaps[side]=null;}
+    return;
+  }
+  var idxs=_jurisTractIdxs(name);
+  var pop=_jurisTotalPop(name);
+  nameEl.textContent=name;
+  metaEl.textContent=idxs.length+' tract'+(idxs.length===1?'':'s')+' \\u2022 '+pop.toLocaleString()+' residents';
+  buildCityMiniMap('city-cmp-map-'+side,side,name);
+}
+
+function buildCityMiniMap(elId,slot,name){
+  if(cityCmpMaps[slot]){cityCmpMaps[slot].remove();}
+  var m=L.map(elId,{zoomControl:false,attributionControl:false,
+    scrollWheelZoom:true,dragging:true});
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{maxZoom:19}).addTo(m);
+  var idxs=_jurisTractIdxs(name);
+  if(idxs.length){
+    var feats=idxs.map(function(i){return GJ.features[i];});
+    L.geoJSON({type:'FeatureCollection',features:feats},{
+      style:{color:'#888',weight:0.5,fillColor:'#3b82f6',fillOpacity:0.15}
+    }).addTo(m);
+  }
+  var jurisFeats=JURIS.features.filter(function(f){return f.properties.NAME===name;});
+  var poly=L.geoJSON({type:'FeatureCollection',features:jurisFeats},{
+    style:{color:'#111',weight:2,fill:false}
+  }).addTo(m);
+  try{m.fitBounds(poly.getBounds(),{padding:[10,10]});}
+  catch(_){m.setView([32.85,-117.05],10);}
+  cityCmpMaps[slot]=m;
+}
+
+function _renderCityCompareBody(nameA,nameB){
+  var elA=document.getElementById('city-cmp-vars-a');
+  var elB=document.getElementById('city-cmp-vars-b');
+  if(!nameA||!nameB){
+    elA.innerHTML=nameA?'<div style="padding:20px;color:#888;font-style:italic">Pick a city on the right to compare</div>':'';
+    elB.innerHTML=nameB?'<div style="padding:20px;color:#888;font-style:italic">Pick a city on the left to compare</div>':'';
+    return;
+  }
+  var subsBy={};
+  VM.forEach(function(v){
+    var k=v.pillar+'||'+v.sub;
+    (subsBy[k]=subsBy[k]||[]).push(v);
+  });
+  var pillarOrder=['exposure','sensitivity','adaptive'];
+  var rowsA=[],rowsB=[];
+  pillarOrder.forEach(function(pid){
+    var pmHdr=PMETA[pid];
+    var pillarHasContent=false;
+    var aChunk='',bChunk='';
+    Object.keys(subsBy).forEach(function(k){
+      var pp=k.split('||')[0],ss=k.split('||')[1];
+      if(pp!==pid)return;
+      var vars=subsBy[k];
+      var aSubChunk='',bSubChunk='';
+      vars.forEach(function(v){
+        var dArr=getDeltaArr(v.key);
+        var aR=_jurisPopWMean(nameA,v.key,{useDelta:!!dArr});
+        var bR=_jurisPopWMean(nameB,v.key,{useDelta:!!dArr});
+        if(aR===null&&bR===null)return;
+        var rawA=aR?aR.value:null, rawB=bR?bR.value:null;
+        var dispA=(rawA!=null)?fmtCmpRaw(v.key,rawA):'\\u2014';
+        var dispB=(rawB!=null)?fmtCmpRaw(v.key,rawB):'\\u2014';
+        var noteSuffix=_isRankVar(v.key)?' <span style="font-size:10px;color:#999">(mean tract rank)</span>':'';
+        var label=v.label+noteSuffix;
+        var clsA='cmp-row',clsB='cmp-row';
+        if(rawA!=null&&rawB!=null&&rawA!==rawB){
+          var higherIsWorse=(POLARITY&&POLARITY[v.key]!==false);
+          var aIsWorse=higherIsWorse?(rawA>rawB):(rawA<rawB);
+          if(aIsWorse){clsA+=' cmp-higher';clsB+=' cmp-lower';}
+          else        {clsB+=' cmp-higher';clsA+=' cmp-lower';}
+        }
+        aSubChunk+='<div class="'+clsA+'"><span class="cmp-label">'+label+'</span><span class="cmp-val"><span class="cmp-val-raw">'+dispA+'</span></span></div>';
+        bSubChunk+='<div class="'+clsB+'"><span class="cmp-label">'+label+'</span><span class="cmp-val"><span class="cmp-val-raw">'+dispB+'</span></span></div>';
+      });
+      if(aSubChunk){
+        aChunk+='<div class="cmp-sub-hdr">'+ss+'</div>'+aSubChunk;
+        bChunk+='<div class="cmp-sub-hdr">'+ss+'</div>'+bSubChunk;
+        pillarHasContent=true;
+      }
+    });
+    if(pillarHasContent){
+      var hdr='<div class="cmp-pillar-hdr" style="border-color:'+pmHdr.color+';color:'+pmHdr.color+'">'+pmHdr.label+'</div>';
+      rowsA.push(hdr+aChunk);
+      rowsB.push(hdr+bChunk);
+    }
+  });
+  if(results){
+    var pcaA='<div class="cmp-pillar-hdr" style="border-color:#444;color:#444">PCA Scores</div>';
+    var pcaB=pcaA;
+    var rankNote=' <span style="font-size:10px;color:#999">(mean tract rank)</span>';
+    [['_comp','Composite Risk'],['_exposure','Exposure'],
+     ['_sensitivity','Sensitivity'],['_adaptive','Adaptive Capacity']].forEach(function(p){
+      var aR=_jurisPopWMean(nameA,p[0]);
+      var bR=_jurisPopWMean(nameB,p[0]);
+      if(aR===null||bR===null)return;
+      var clsA='cmp-row',clsB='cmp-row';
+      if(aR.value>bR.value){clsA+=' cmp-higher';clsB+=' cmp-lower';}
+      else if(bR.value>aR.value){clsB+=' cmp-higher';clsA+=' cmp-lower';}
+      pcaA+='<div class="'+clsA+'"><span class="cmp-label">'+p[1]+rankNote+'</span><span class="cmp-val"><span class="cmp-val-raw">'+aR.value.toFixed(1)+'</span></span></div>';
+      pcaB+='<div class="'+clsB+'"><span class="cmp-label">'+p[1]+rankNote+'</span><span class="cmp-val"><span class="cmp-val-raw">'+bR.value.toFixed(1)+'</span></span></div>';
+    });
+    var dA=_jurisDriverBreakdown(nameA), dB=_jurisDriverBreakdown(nameB);
+    if(dA&&dB){
+      var fmtDrv=function(d){return 'Exp '+d.exposure+' / Sens '+d.sensitivity+' / Adapt '+d.adaptive;};
+      pcaA+='<div class="cmp-row"><span class="cmp-label">Dominant Driver <span style="font-size:10px;color:#999">(tract count)</span></span><span class="cmp-val"><span class="cmp-val-raw" style="font-size:11px">'+fmtDrv(dA)+'</span></span></div>';
+      pcaB+='<div class="cmp-row"><span class="cmp-label">Dominant Driver <span style="font-size:10px;color:#999">(tract count)</span></span><span class="cmp-val"><span class="cmp-val-raw" style="font-size:11px">'+fmtDrv(dB)+'</span></span></div>';
+    }
+    rowsA.unshift(pcaA);rowsB.unshift(pcaB);
+  }
+  elA.innerHTML=rowsA.join('');
+  elB.innerHTML=rowsB.join('');
+}
+
+function closeCityCompareModal(){
+  document.getElementById('city-compare-modal').classList.remove('open');
+  ['a','b'].forEach(function(s){
+    if(cityCmpMaps[s]){cityCmpMaps[s].remove();cityCmpMaps[s]=null;}
+  });
+}
+
+// Soft popup shown when a user clicks a tribal-lands polygon. Census tract
+// demographics don't represent reservation-resident populations, so rather
+// than fabricate a number we offer to compare the surrounding tract or its
+// containing city instead.
+function showTribalNoData(latlng,fullName,type){
+  var pt=[latlng.lng,latlng.lat];
+  var hit=-1;
+  for(var i=0;i<GJ.features.length;i++){
+    if(_ptInGeometry(pt,GJ.features[i].geometry)){hit=i;break;}
+  }
+  _ensureTractJuris();
+  var jurisName=(hit>=0&&_tractJurisName[hit])?_tractJurisName[hit]:null;
+  var typeLabel=(type==='trust')?'off-reservation trust land':'reservation';
+  var html='<div style="font-size:12px;line-height:1.45;max-width:240px">'+
+    '<div style="font-weight:700;margin-bottom:4px">'+fullName+'</div>'+
+    '<div style="color:#666;margin-bottom:8px">Census tract demographics don\\u2019t represent populations on this '+typeLabel+', so we don\\u2019t aggregate stats here.</div>';
+  if(hit>=0){
+    var geoid=GJ.features[hit].properties.GEOID;
+    html+='<div style="font-size:11px;color:#666;margin-bottom:4px">Compare the surrounding tract instead:</div>'+
+      '<button class="popup-compare-btn" onclick="map.closePopup();startCompare(\\''+geoid+'\\')">Compare Tract '+geoid.slice(-6)+'</button>';
+  }
+  if(jurisName){
+    var safeName=jurisName.replace(/'/g,"\\\\'");
+    html+='<div style="margin-top:6px"><button class="popup-compare-btn" onclick="map.closePopup();openCityCompareModal(\\''+safeName+'\\')">Compare '+jurisName+'</button></div>';
+  }
+  html+='</div>';
+  L.popup({offset:[0,-4],className:'tribal-popup'}).setLatLng(latlng).setContent(html).openOn(map);
 }
 
 /* ----------------------------------------------------------------
@@ -2100,13 +2397,14 @@ function _buildLanduseLayer(){
   try{
     return protomapsL.leafletLayer({
       url:LANDUSE_URL,
+      pane:'landusePane',
       paintRules:[{
         dataLayer:'landuse',
         symbolizer:new protomapsL.PolygonSymbolizer({
           fill:function(z,f){return _luCategoryColor(f.props);},
-          opacity:0.65,
-          stroke:'#333',
-          width:0.3
+          opacity:0.78,
+          stroke:'#222',
+          width:0.5
         })
       }]
     });
@@ -2154,7 +2452,7 @@ function toggleLanduse(on){
   ['a','b'].forEach(function(s){
     var m=cmpMaps[s];
     if(!m)return;
-    if(_cmpLST[s])_cmpLST[s].setOpacity(_landuseShown?0.5:0.85);
+    if(_cmpLST[s])_cmpLST[s].setOpacity(_landuseShown?0.25:0.85);
     if(_landuseShown){_addLanduseToMap(s,m);}else{_removeLanduseFromMap(s,m);}
   });
   renderLanduseLegend();

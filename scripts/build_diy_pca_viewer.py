@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_PATH = ROOT / "main" / "diy_pca.html"
 TRACTS_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "tracts_sd.geojson"
 JURIS_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "jurisdictions_sd.geojson"
+TRIBAL_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "tribal_lands_sd.geojson"
 
 # ── CMIP6 / LOCA2 projection settings ──────────────────────────────────────
 LOCA2_DIR = ROOT / "data" / "exposure" / "raw" / "loca2"
@@ -508,6 +509,14 @@ def main():
     else:
         logger.warning("No jurisdictions file — city boundaries will not be shown")
 
+    # Load tribal lands (optional) — Census TIGER AIANNH 2024, SD County subset
+    tribal_str = "null"
+    if TRIBAL_PATH.exists():
+        tribal_str = TRIBAL_PATH.read_text().strip()
+        logger.info(f"Loaded tribal lands from {TRIBAL_PATH.name}")
+    else:
+        logger.warning("No tribal lands file — tribal overlay will not be shown")
+
     html = HTML_TEMPLATE
     html = html.replace("__GEOJSON_PLACEHOLDER__", geojson_str)
     html = html.replace("__VARMETA_PLACEHOLDER__", var_meta_str)
@@ -515,6 +524,7 @@ def main():
     html = html.replace("__DELTAS_PLACEHOLDER__", deltas_str)
     html = html.replace("__DELTAMAP_PLACEHOLDER__", delta_map_str)
     html = html.replace("__JURIS_PLACEHOLDER__", juris_str)
+    html = html.replace("__TRIBAL_PLACEHOLDER__", tribal_str)
     html = html.replace("__LST_PLACEHOLDER__", lst_str)
     html = html.replace("__POLARITY_PLACEHOLDER__", polarity_str)
 
@@ -618,7 +628,7 @@ details.subsec[open] summary::before{transform:rotate(90deg)}
   display:flex;flex-direction:row;align-items:center;gap:14px}
 #logos img{display:block;height:30px;width:auto}
 
-#legend{position:absolute;bottom:28px;right:14px;z-index:999;
+#legend{position:absolute;top:14px;left:60px;z-index:999;
   background:rgba(255,255,255,0.92);padding:10px 14px;border-radius:10px;
   box-shadow:0 2px 12px rgba(0,0,0,0.10);font-size:11px;
   backdrop-filter:blur(12px);display:none}
@@ -633,14 +643,14 @@ details.subsec[open] summary::before{transform:rotate(90deg)}
   user-select:none;vertical-align:middle;position:relative;line-height:1;
   box-shadow:0 1px 2px rgba(0,0,0,0.15)}
 .info-ic:hover,.info-ic:focus{background:#1d4ed8;outline:none}
-.info-pop{display:none;position:absolute;bottom:calc(100% + 8px);right:0;
+.info-pop{display:none;position:absolute;top:calc(100% + 8px);right:0;
   width:220px;background:#1f2937;color:#fff;font-size:11px;font-style:normal;
   font-weight:400;font-family:inherit;line-height:1.45;padding:8px 10px;
   border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,0.18);z-index:1500;
   text-align:left;pointer-events:none;letter-spacing:normal;white-space:normal}
 .info-ic:hover .info-pop,.info-ic:focus .info-pop{display:block}
-.info-pop::after{content:"";position:absolute;top:100%;right:5px;
-  border:5px solid transparent;border-top-color:#1f2937}
+.info-pop::after{content:"";position:absolute;bottom:100%;right:5px;
+  border:5px solid transparent;border-bottom-color:#1f2937}
 
 #prompt{position:absolute;inset:0;z-index:1000;
   display:flex;align-items:center;justify-content:center;
@@ -837,10 +847,16 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   </div>
   <div id="overlay-toggles" style="display:none">
     <h3>Overlays</h3>
-    <div class="ov-row"><label><input type="checkbox" id="cb-juris-San Diego" onchange="toggleJurisLayer('San Diego')"><span style="color:#2563eb;font-weight:600">San Diego</span></label></div>
-    <div class="ov-row"><label><input type="checkbox" id="cb-juris-Chula Vista" onchange="toggleJurisLayer('Chula Vista')"><span style="color:#16a085;font-weight:600">Chula Vista</span></label></div>
-    <div class="ov-row"><label><input type="checkbox" id="cb-juris-La Mesa" onchange="toggleJurisLayer('La Mesa')"><span style="color:#d35400;font-weight:600">La Mesa</span></label></div>
-    <div class="ov-row"><label><input type="checkbox" id="cb-juris-_other" onchange="toggleJurisLayer('_other')">Other Cities</label></div>
+    <details class="subsec" id="juris-subsec" style="margin-top:2px"><summary>Jurisdictions</summary>
+      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-juris-San Diego" onchange="toggleJurisLayer('San Diego')"><span style="color:#2563eb;font-weight:600">San Diego</span></label></div>
+      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-juris-Chula Vista" onchange="toggleJurisLayer('Chula Vista')"><span style="color:#16a085;font-weight:600">Chula Vista</span></label></div>
+      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-juris-La Mesa" onchange="toggleJurisLayer('La Mesa')"><span style="color:#d35400;font-weight:600">La Mesa</span></label></div>
+      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-juris-_other" onchange="toggleJurisLayer('_other')">Other Cities</label></div>
+    </details>
+    <details class="subsec" id="tribal-subsec" style="margin-top:6px"><summary>Tribal Lands</summary>
+      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-tribal-all" onchange="toggleTribalAll(this.checked)"><span style="color:#8b5a2b;font-weight:600">Show all tribal lands</span></label></div>
+      <div id="tribal-items" style="margin-top:2px"></div>
+    </details>
   </div>
   <div id="scenario-bar">
     <div class="scenario-label">Climate Scenario</div>
@@ -1003,6 +1019,7 @@ var VSRC = __VARSOURCES_PLACEHOLDER__;
 var DELTAS = __DELTAS_PLACEHOLDER__;         // {period:{ssp:{tasmax:[...],tasmin:[...]}}} or null
 var DELTA_MAP = __DELTAMAP_PLACEHOLDER__;    // {varKey:"tasmax"|"tasmin"}
 var JURIS = __JURIS_PLACEHOLDER__;           // city jurisdiction GeoJSON or null
+var TRIBAL = __TRIBAL_PLACEHOLDER__;         // tribal lands GeoJSON or null
 var LST   = __LST_PLACEHOLDER__;             // Landsat LST overlay meta or null
 var POLARITY = __POLARITY_PLACEHOLDER__;     // {varKey: true if higher=worse(red)}
 
@@ -1182,6 +1199,81 @@ function toggleJurisLayer(key){
   if(!lyr)return;
   if(cb&&cb.checked){lyr.addTo(map);lyr.bringToFront();}
   else{map.removeLayer(lyr);}
+}
+
+// Tribal lands overlays — Census TIGER AIANNH 2024 (San Diego County)
+var tribalLayers={};
+var TRIBAL_COLORS={reservation:"#8b5a2b",trust:"#b78050"};
+function tribalCheckboxId(name){return "cb-tribal-"+name.replace(/\s+/g,"_");}
+if(typeof TRIBAL!=='undefined'&&TRIBAL&&TRIBAL.features&&TRIBAL.features.length){
+  function makeTribalStyle(type){
+    var c=TRIBAL_COLORS[type]||TRIBAL_COLORS.reservation;
+    var dash=(type==='trust')?"5,4":"";
+    return function(){return{fillColor:c,color:c,weight:1.5,fillOpacity:0.10,dashArray:dash}};
+  }
+  function makeTribalHL(name){
+    return function(f,lyr){
+      var t=f.properties.TYPE||'reservation';
+      var c=TRIBAL_COLORS[t]||TRIBAL_COLORS.reservation;
+      lyr.on("mouseover",function(e){e.target.setStyle({weight:3,color:c,fillOpacity:0.22})});
+      lyr.on("mouseout",function(e){if(tribalLayers[name])tribalLayers[name].resetStyle(e.target)});
+      var label=f.properties.NAME+(t==='trust'?" (Trust Land)":"");
+      lyr.bindTooltip(label,{sticky:true,className:"juris-tip"});
+    };
+  }
+  TRIBAL.features.forEach(function(f){
+    var name=f.properties.NAME;
+    var gj={type:"FeatureCollection",features:[f]};
+    tribalLayers[name]=L.geoJSON(gj,{
+      style:makeTribalStyle(f.properties.TYPE),
+      onEachFeature:makeTribalHL(name)
+    });
+  });
+  // Build per-tribe checkbox list, sorted alphabetically by name
+  var tribalNames=Object.keys(tribalLayers).sort(function(a,b){return a.localeCompare(b);});
+  var itemsEl=document.getElementById("tribal-items");
+  if(itemsEl){
+    itemsEl.innerHTML=tribalNames.map(function(name){
+      var t=(TRIBAL.features.filter(function(f){return f.properties.NAME===name;})[0]||{}).properties.TYPE||'reservation';
+      var c=TRIBAL_COLORS[t]||TRIBAL_COLORS.reservation;
+      var id=tribalCheckboxId(name);
+      var disp=name.replace(/ Reservation$/,"").replace(/ Off-Reservation Trust Land$/," (Trust)");
+      var nameAttr=name.replace(/"/g,"&quot;");
+      return '<div class="ov-row" style="margin-left:14px"><label>'+
+        '<input type="checkbox" id="'+id+'" data-tribal-name="'+nameAttr+'" onchange="toggleTribalLayer(this.dataset.tribalName)">'+
+        '<span style="color:'+c+'">'+disp+'</span>'+
+        '</label></div>';
+    }).join("");
+  }
+  document.getElementById("overlay-toggles").style.display="block";
+}
+function toggleTribalLayer(name){
+  var lyr=tribalLayers[name];
+  if(!lyr)return;
+  var cb=document.getElementById(tribalCheckboxId(name));
+  if(cb&&cb.checked){lyr.addTo(map);lyr.bringToFront();}
+  else{map.removeLayer(lyr);}
+  syncTribalAllCheckbox();
+}
+function toggleTribalAll(on){
+  Object.keys(tribalLayers).forEach(function(name){
+    var cb=document.getElementById(tribalCheckboxId(name));
+    if(cb)cb.checked=!!on;
+    var lyr=tribalLayers[name];
+    if(!lyr)return;
+    if(on){lyr.addTo(map);lyr.bringToFront();}
+    else{map.removeLayer(lyr);}
+  });
+}
+function syncTribalAllCheckbox(){
+  var all=document.getElementById("cb-tribal-all");
+  if(!all)return;
+  var names=Object.keys(tribalLayers);
+  if(!names.length){all.checked=false;all.indeterminate=false;return;}
+  var n=0;
+  names.forEach(function(nm){if(map.hasLayer(tribalLayers[nm]))n++;});
+  all.checked=(n===names.length);
+  all.indeterminate=(n>0&&n<names.length);
 }
 
 /* ================================================================
@@ -1446,6 +1538,9 @@ function drawTracts(){
   }).addTo(map);
   // Keep jurisdiction boundaries on top of tracts
   Object.keys(jurisLayers).forEach(function(k){if(map.hasLayer(jurisLayers[k]))jurisLayers[k].bringToFront();});
+  if(typeof tribalLayers!=='undefined'){
+    Object.keys(tribalLayers).forEach(function(k){if(map.hasLayer(tribalLayers[k]))tribalLayers[k].bringToFront();});
+  }
   showLegend();
 }
 
@@ -2348,6 +2443,18 @@ function _captureStudyAreaMap(){
           cityRows.push({label:(k==='_other')?'Other cities':k, color:c});
         });
       }
+      var tribalRows=[];
+      if(typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalLayers!=='undefined'){
+        Object.keys(tribalLayers).forEach(function(k){
+          if(!map.hasLayer(tribalLayers[k]))return;
+          var f=TRIBAL.features.filter(function(x){return x.properties.NAME===k;})[0];
+          if(!f)return;
+          var t=f.properties.TYPE||'reservation';
+          var c=TRIBAL_COLORS[t]||TRIBAL_COLORS.reservation;
+          var disp=k.replace(/ Reservation$/,"").replace(/ Off-Reservation Trust Land$/," (Trust)");
+          tribalRows.push({label:disp,color:c,dashed:(t==='trust')});
+        });
+      }
 
       var pad=14, gradW=200, gradH=14, swW=22, swH=14, rowH=22;
       var titleSize=18, subSize=12, bodySize=14, sectionGap=10;
@@ -2363,6 +2470,7 @@ function _captureStudyAreaMap(){
       var maxLabelW=0;
       if(driverRows)driverRows.forEach(function(r){var w=tw(r.label,fonts.body);if(w>maxLabelW)maxLabelW=w;});
       cityRows.forEach(function(r){var w=tw(r.label,fonts.body);if(w>maxLabelW)maxLabelW=w;});
+      tribalRows.forEach(function(r){var w=tw(r.label,fonts.body);if(w>maxLabelW)maxLabelW=w;});
       var titleW=tw(title,fonts.title);
       var subW=subtitle?tw(subtitle,fonts.sub):0;
       var showSspLink=!!(subtitle && curScenario && curScenario!=='present');
@@ -2389,6 +2497,12 @@ function _captureStudyAreaMap(){
         plan.push({op:'sect',y:y,text:'Jurisdictions'});
         y+=bodySize+8;
         cityRows.forEach(function(r){plan.push({op:'crow',y:y,label:r.label,color:r.color});y+=rowH;});
+      }
+      if(tribalRows.length){
+        y+=sectionGap;
+        plan.push({op:'sect',y:y,text:'Tribal Lands'});
+        y+=bodySize+8;
+        tribalRows.forEach(function(r){plan.push({op:'crow',y:y,label:r.label,color:r.color,dashed:r.dashed});y+=rowH;});
       }
       var boxH=y+pad-4;
 
@@ -2447,8 +2561,11 @@ function _captureStudyAreaMap(){
           ctx.fillStyle='#0f172a'; ctx.font=fonts.sect;
           ctx.fillText(L.text, px*SCALE, py*SCALE);
         }else if(L.op==='crow'){
+          ctx.save();
           ctx.lineWidth=2*SCALE; ctx.strokeStyle=L.color;
+          if(L.dashed)ctx.setLineDash([5*SCALE,4*SCALE]);
           ctx.strokeRect(px*SCALE, py*SCALE, swW*SCALE, swH*SCALE);
+          ctx.restore();
           ctx.fillStyle='#0f172a'; ctx.font=fonts.body;
           ctx.fillText(L.label, (px+swW+10)*SCALE, py*SCALE);
         }
@@ -2488,6 +2605,20 @@ function _captureStudyAreaMap(){
             ? JURIS.features.filter(function(f){return NAMED_CITIES.indexOf(f.properties.NAME)<0;})
             : JURIS.features.filter(function(f){return f.properties.NAME===k;});
           feats.forEach(function(f){drawFeature(f,null,c,1.8*SCALE,0);});
+        });
+      }
+      // Replicate visible tribal land outlines
+      if(typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalLayers!=='undefined'){
+        Object.keys(tribalLayers).forEach(function(k){
+          if(!map.hasLayer(tribalLayers[k]))return;
+          var f=TRIBAL.features.filter(function(x){return x.properties.NAME===k;})[0];
+          if(!f)return;
+          var t=f.properties.TYPE||'reservation';
+          var c=TRIBAL_COLORS[t]||TRIBAL_COLORS.reservation;
+          var dashed=(t==='trust');
+          if(dashed){ctx.save();ctx.setLineDash([10*SCALE,8*SCALE]);}
+          drawFeature(f,c,c,1.8*SCALE,0.10);
+          if(dashed)ctx.restore();
         });
       }
       drawLegend();

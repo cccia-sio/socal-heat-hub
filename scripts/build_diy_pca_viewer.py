@@ -598,7 +598,10 @@ h1{font-size:17px;font-weight:700;letter-spacing:-0.3px}
 
 .pillar-section{margin-bottom:14px}
 .pillar-hdr{font-size:12px;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.5px;padding:6px 0 4px;margin-bottom:2px;border-bottom:2px solid}
+  letter-spacing:0.5px;padding:6px 0 4px;margin-bottom:2px;border-bottom:2px solid;
+  display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.pillar-hdr input[type=checkbox]{width:14px;height:14px;accent-color:currentColor;
+  cursor:pointer;flex-shrink:0;margin:0}
 details.subsec{margin:0 0 2px}
 details.subsec summary{font-size:11.5px;font-weight:600;color:#555;
   padding:4px 0 2px;cursor:pointer;user-select:none;list-style:none}
@@ -1794,7 +1797,9 @@ function buildUI(){
   ["exposure","sensitivity","adaptive"].forEach(function(pid){
     var pm=PMETA[pid];
     html+='<div class="pillar-section">';
-    html+='<div class="pillar-hdr" style="border-color:'+pm.color+';color:'+pm.color+'">'+pm.label+'</div>';
+    html+='<label class="pillar-hdr" style="border-color:'+pm.color+';color:'+pm.color+'" title="Toggle all variables in this pillar">'+
+      '<input type="checkbox" id="pcb_'+pid+'" onchange="togPillar(\\''+pid+'\\',this.checked)">'+
+      pm.label+'</label>';
     // Group vars by subsection, preserving order
     var subs=[],seen={};
     VM.forEach(function(v){
@@ -1819,6 +1824,7 @@ function buildUI(){
     html+='</div>';
   });
   el.innerHTML=html;
+  ["exposure","sensitivity","adaptive"].forEach(syncPillarCb);
 }
 
 function tog(key){
@@ -1845,6 +1851,52 @@ function tog(key){
         document.getElementById("prompt").textContent="Select variables and click Build Composite Risk Map";}
     }
   }
+  syncPillarCb(varPillar[key]);
+}
+
+// Set the pillar header checkbox to checked / unchecked / indeterminate
+// based on how many of its child variables are currently enabled.
+function syncPillarCb(pid){
+  var cb=document.getElementById("pcb_"+pid);if(!cb)return;
+  var n=0,on=0;
+  VM.forEach(function(v){if(v.pillar===pid){n++;if(enabled[v.key])on++;}});
+  cb.checked=(n>0&&on===n);
+  cb.indeterminate=(on>0&&on<n);
+}
+
+// Master checkbox handler: turn every variable in a pillar on or off in one
+// shot, then update the displayed raw layer the same way tog() does on a
+// single-variable change.
+function togPillar(pid,on){
+  VM.forEach(function(v){
+    if(v.pillar!==pid)return;
+    enabled[v.key]=on;
+    var row=document.getElementById("vr_"+v.key);
+    if(row){
+      var cb=row.querySelector('input[type=checkbox]');
+      if(cb)cb.checked=on;
+      if(on)row.classList.add("on");else row.classList.remove("on");
+    }
+  });
+  // Reconcile the displayed raw variable with the new enabled set.
+  if(!on && rawVar && varPillar[rawVar]===pid){
+    rawVar=null;
+    VM.forEach(function(v){if(enabled[v.key]&&!rawVar)rawVar=v.key;});
+    updateDeltaRange();
+    if(rawVar)drawTracts();
+    else if(tLayer){map.removeLayer(tLayer);tLayer=null;
+      document.getElementById("legend").style.display="none";
+      document.getElementById("prompt").style.display="flex";
+      document.getElementById("prompt").textContent="Select variables and click Build Composite Risk Map";}
+  }else if(on && !rawVar){
+    VM.forEach(function(v){if(enabled[v.key]&&!rawVar)rawVar=v.key;});
+    if(rawVar){
+      updateDeltaRange();
+      document.getElementById("prompt").style.display="none";
+      drawTracts();
+    }
+  }
+  syncPillarCb(pid);
 }
 
 function showResults(){

@@ -308,15 +308,18 @@ def load_data():
     places["GEOID"] = places["GEOID"].astype(str).str.zfill(11)
     tracts = _safe_merge(tracts, places, _PLACES_COLS)
 
-    # ── Sensitivity — SVI ──
+    # ── Sensitivity — SVI (also pull E_TOTPOP for population-weighted city aggregations) ──
     svi = pd.read_csv(ROOT / "data/sensitivity/cdc_svi_2022_sd.csv",
-                       usecols=lambda c: c in {"FIPS"} | set(_SVI_COLS)).copy()
+                       usecols=lambda c: c in {"FIPS", "E_TOTPOP"} | set(_SVI_COLS)).copy()
     svi["GEOID"] = svi["FIPS"].astype(str).str.zfill(11)
     for col in _SVI_COLS:
         if col in svi.columns:
             svi[col] = pd.to_numeric(svi[col], errors="coerce")
             svi.loc[svi[col] < 0, col] = np.nan
-    tracts = _safe_merge(tracts, svi, _SVI_COLS)
+    if "E_TOTPOP" in svi.columns:
+        svi["E_TOTPOP"] = pd.to_numeric(svi["E_TOTPOP"], errors="coerce")
+        svi.loc[svi["E_TOTPOP"] < 0, "E_TOTPOP"] = np.nan
+    tracts = _safe_merge(tracts, svi, _SVI_COLS + ["E_TOTPOP"])
 
     # ── Adaptive — AC prevalence ──
     ac = pd.read_csv(
@@ -374,10 +377,18 @@ def load_data():
     for col in loaded:
         tracts[col] = tracts[col].fillna(tracts[col].median()).round(2)
 
+    # Population field — used for population-weighted city aggregations in the
+    # compare-cities modal. Not a user-facing variable, so kept off VARIABLES.
+    if "E_TOTPOP" in tracts.columns:
+        tracts["E_TOTPOP"] = tracts["E_TOTPOP"].fillna(0).round().astype(int)
+        extra = ["E_TOTPOP"]
+    else:
+        extra = []
+
     tracts = tracts.to_crs(epsg=4326)
     tracts["geometry"] = tracts.geometry.simplify(0.0003)
 
-    keep = ["GEOID", "geometry"] + loaded
+    keep = ["GEOID", "geometry"] + loaded + extra
     tracts = tracts[keep]
     logger.info(f"Loaded {len(tracts)} tracts, {len(loaded)}/{len(var_cols)} variables")
     return tracts
@@ -630,6 +641,11 @@ details.subsec[open] summary::before{transform:rotate(90deg)}
 .lbtn-pct{color:#999;font-weight:500}
 .lbtn.active .lbtn-pct{color:#2563eb}
 .ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+/* Pattern-button info icon sits flush with the right edge of the sidebar; the
+   sidebar's overflow-y:auto clips horizontal overflow, so anchor the popup's
+   right edge to the icon and let it grow leftward into the sidebar. */
+.lbtn .info-pop{left:auto;right:0}
+.lbtn .info-pop::after{left:auto;right:5px}
 details.pc-group{margin-top:4px;border-top:1px dashed #e5e5e5;padding-top:4px}
 details.pc-group>summary{list-style:none;cursor:pointer;
   padding:6px 10px;border-radius:8px;font-size:11px;font-weight:600;
@@ -1711,9 +1727,13 @@ function drawTracts(){
   showLegend();
 }
 
+// Hover-tooltip helper. Used by showLegend AND showLayerBtns, so it must live
+// at module scope — when nested inside showLegend, calls from showLayerBtns
+// throw ReferenceError and silently nuke the PC dropdown render.
+function ic(t){return ' <span class="info-ic" tabindex="0">i<span class="info-pop">'+t+'</span></span>';}
+
 function showLegend(){
   var el=document.getElementById("legend");
-  function ic(t){return ' <span class="info-ic" tabindex="0">i<span class="info-pop">'+t+'</span></span>';}
   // Raw variable preview legend
   if(rawVar){
     // Future scenario + projectable var: delta legend

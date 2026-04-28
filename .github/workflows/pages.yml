@@ -37,6 +37,8 @@ jobs:
             --include='data/exposure/processed/' \
             --include='data/exposure/processed/landsat/' \
             --include='data/exposure/processed/landsat/**' \
+            --include='data/context/' \
+            --include='data/context/sandag_landuse.pmtiles' \
             --exclude='data/**' \
             --exclude='_site' \
             --exclude='.gitignore' \

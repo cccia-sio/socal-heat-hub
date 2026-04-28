@@ -32,7 +32,12 @@ jobs:
             --exclude='.git' \
             --exclude='.github' \
             --exclude='scripts' \
-            --exclude='data' \
+            --include='data/' \
+            --include='data/exposure/' \
+            --include='data/exposure/processed/' \
+            --include='data/exposure/processed/landsat/' \
+            --include='data/exposure/processed/landsat/**' \
+            --exclude='data/**' \
             --exclude='_site' \
             --exclude='.gitignore' \
             --exclude='README.md' \

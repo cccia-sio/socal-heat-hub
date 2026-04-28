@@ -1,7 +1,15 @@
-# Local build workspace — source code and data live here but are NEVER committed.
+# Local build workspace — source data lives here and is NEVER committed.
 # Rebuild the viewer with:  python3 scripts/build_diy_pca_viewer.py
-scripts/
-data/
+scripts/*
+!scripts/build_diy_pca_viewer.py
+!scripts/build_lst_overlay.py
+!scripts/build_userguide_pdf.sh
+data/*
+!data/exposure
+data/exposure/*
+!data/exposure/processed
+data/exposure/processed/*
+!data/exposure/processed/landsat
 
 # Python
 __pycache__/

@@ -1,0 +1,164 @@
+{
+  "url": "../data/exposure/processed/landsat/annual_lst_4326.png",
+  "colormap": "turbo",
+  "legend": [
+    {
+      "t": 0.0,
+      "value": 20.0,
+      "rgb": [
+        48,
+        18,
+        59
+      ]
+    },
+    {
+      "t": 0.25,
+      "value": 26.2,
+      "rgb": [
+        40,
+        187,
+        235
+      ]
+    },
+    {
+      "t": 0.5,
+      "value": 32.5,
+      "rgb": [
+        164,
+        252,
+        59
+      ]
+    },
+    {
+      "t": 0.75,
+      "value": 38.8,
+      "rgb": [
+        250,
+        125,
+        32
+      ]
+    },
+    {
+      "t": 1.0,
+      "value": 45.0,
+      "rgb": [
+        122,
+        4,
+        2
+      ]
+    }
+  ],
+  "variants": {
+    "default": {
+      "url": "../data/exposure/processed/landsat/annual_lst_4326.png",
+      "colormap": "turbo",
+      "legend": [
+        {
+          "t": 0.0,
+          "value": 20.0,
+          "rgb": [
+            48,
+            18,
+            59
+          ]
+        },
+        {
+          "t": 0.25,
+          "value": 26.2,
+          "rgb": [
+            40,
+            187,
+            235
+          ]
+        },
+        {
+          "t": 0.5,
+          "value": 32.5,
+          "rgb": [
+            164,
+            252,
+            59
+          ]
+        },
+        {
+          "t": 0.75,
+          "value": 38.8,
+          "rgb": [
+            250,
+            125,
+            32
+          ]
+        },
+        {
+          "t": 1.0,
+          "value": 45.0,
+          "rgb": [
+            122,
+            4,
+            2
+          ]
+        }
+      ]
+    },
+    "cb": {
+      "url": "../data/exposure/processed/landsat/annual_lst_4326_cb.png",
+      "colormap": "viridis",
+      "legend": [
+        {
+          "t": 0.0,
+          "value": 20.0,
+          "rgb": [
+            68,
+            1,
+            84
+          ]
+        },
+        {
+          "t": 0.25,
+          "value": 26.2,
+          "rgb": [
+            58,
+            82,
+            139
+          ]
+        },
+        {
+          "t": 0.5,
+          "value": 32.5,
+          "rgb": [
+            32,
+            144,
+            140
+          ]
+        },
+        {
+          "t": 0.75,
+          "value": 38.8,
+          "rgb": [
+            94,
+            201,
+            97
+          ]
+        },
+        {
+          "t": 1.0,
+          "value": 45.0,
+          "rgb": [
+            253,
+            231,
+            36
+          ]
+        }
+      ]
+    }
+  },
+  "bounds": {
+    "south": 32.48913861001455,
+    "west": -117.61372576267969,
+    "north": 33.511551211306056,
+    "east": -116.08514834299731
+  },
+  "vmin_c": 20.0,
+  "vmax_c": 45.0,
+  "source": "Landsat-derived annual mean LST, 100m (USGS/heat-risk-sd)"
+}

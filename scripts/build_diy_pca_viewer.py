@@ -548,6 +548,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <title>San Diego Heat Risk Explorer</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+<script src="https://unpkg.com/protomaps-leaflet@4.1.1/dist/protomaps-leaflet.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{display:flex;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -570,7 +571,15 @@ h1{font-size:17px;font-weight:700;letter-spacing:-0.3px}
   font-family:inherit;transition:all 0.15s;text-align:left;line-height:1.3}
 .scn-btn:hover{background:#f0f0f0}
 .scn-btn.active{background:#2563eb;color:#fff;border-color:#2563eb}
-.period-group{margin-top:12px}
+.scn-period-row{display:flex;gap:6px}
+.scn-period-btn{flex:1;padding:8px 6px;border:1px solid #ddd;border-radius:6px;
+  background:#fff;font-size:12px;font-weight:500;cursor:pointer;
+  font-family:inherit;transition:all 0.15s;text-align:center;line-height:1.2}
+.scn-period-btn:hover{background:#f0f0f0}
+.scn-period-btn.active{background:#2563eb;color:#fff;border-color:#2563eb}
+.scn-period-btn.expanded:not(.active){background:#eef2ff;border-color:#c7d2fe;color:#1e40af}
+.scn-ssp-panel{margin:8px 0 0;padding:8px;background:#f8f9fb;
+  border-radius:6px;border:1px solid #eef0f4}
 .period-group-label{font-size:10px;font-weight:700;text-transform:uppercase;
   letter-spacing:0.5px;color:#888;margin:0 0 5px 2px}
 .scenario-info{font-size:10px;color:#888;margin-top:8px;font-style:italic;min-height:14px}
@@ -626,7 +635,11 @@ details.subsec[open] summary::before{transform:rotate(90deg)}
   background:rgba(255,255,255,0.92);padding:8px 14px;border-radius:10px;
   box-shadow:0 2px 12px rgba(0,0,0,0.10);backdrop-filter:blur(12px);
   display:flex;flex-direction:row;align-items:center;gap:14px}
-#logos img{display:block;height:30px;width:auto}
+#logo-sio{position:absolute;bottom:30px;right:14px;z-index:999;
+  background:rgba(255,255,255,0.92);padding:8px 14px;border-radius:10px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.10);backdrop-filter:blur(12px);
+  display:flex;align-items:center}
+#logos img,#logo-sio img{display:block;height:30px;width:auto}
 
 #legend{position:absolute;top:14px;left:60px;z-index:999;
   background:rgba(255,255,255,0.92);padding:10px 14px;border-radius:10px;
@@ -643,13 +656,13 @@ details.subsec[open] summary::before{transform:rotate(90deg)}
   user-select:none;vertical-align:middle;position:relative;line-height:1;
   box-shadow:0 1px 2px rgba(0,0,0,0.15)}
 .info-ic:hover,.info-ic:focus{background:#1d4ed8;outline:none}
-.info-pop{display:none;position:absolute;top:calc(100% + 8px);right:0;
+.info-pop{display:none;position:absolute;top:calc(100% + 8px);left:0;
   width:220px;background:#1f2937;color:#fff;font-size:11px;font-style:normal;
   font-weight:400;font-family:inherit;line-height:1.45;padding:8px 10px;
   border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,0.18);z-index:1500;
   text-align:left;pointer-events:none;letter-spacing:normal;white-space:normal}
 .info-ic:hover .info-pop,.info-ic:focus .info-pop{display:block}
-.info-pop::after{content:"";position:absolute;bottom:100%;right:5px;
+.info-pop::after{content:"";position:absolute;bottom:100%;left:5px;
   border:5px solid transparent;border-bottom-color:#1f2937}
 
 #prompt{position:absolute;inset:0;z-index:1000;
@@ -788,6 +801,19 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   min-width:120px;max-width:280px}
 .cmp-lst-ticks{display:flex;justify-content:space-between;flex:1;
   max-width:280px;color:#888;font-variant-numeric:tabular-nums}
+.cmp-toggle-row{display:flex;align-items:center;gap:14px;padding:6px 18px;
+  border-bottom:1px solid #e5e7eb;background:#fafafa;font-size:11px;color:#555;
+  flex-wrap:wrap}
+.cmp-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;
+  font-weight:600;color:#333;user-select:none}
+.cmp-toggle input{width:13px;height:13px;accent-color:#4a6fa5;cursor:pointer}
+.cmp-toggle-hint{color:#888;font-weight:400}
+.cmp-landuse-legend{display:none;flex-wrap:wrap;gap:6px 12px;padding:6px 18px;
+  border-bottom:1px solid #e5e7eb;background:#fafafa;font-size:11px;color:#555}
+.cmp-landuse-legend.open{display:flex}
+.cmp-lu-item{display:flex;align-items:center;gap:5px}
+.cmp-lu-swatch{width:11px;height:11px;border-radius:2px;border:1px solid rgba(0,0,0,0.18);
+  flex-shrink:0}
 
 #overlay-toggles{border-top:1px solid #e0e0e0;padding-top:10px;margin-top:10px}
 #overlay-toggles h3{font-size:12px;font-weight:700;text-transform:uppercase;
@@ -846,8 +872,8 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     <div id="layer-buttons"></div>
   </div>
   <div id="overlay-toggles" style="display:none">
-    <h3>Overlays</h3>
-    <details class="subsec" id="juris-subsec" style="margin-top:2px"><summary>Jurisdictions</summary>
+    <h3>Jurisdictions</h3>
+    <details class="subsec" id="juris-subsec" style="margin-top:2px"><summary>Cities</summary>
       <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-juris-all" onchange="toggleJurisAll(this.checked)">Show all cities</label></div>
       <div id="juris-items" style="margin-top:2px"></div>
     </details>
@@ -858,19 +884,21 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   </div>
   <div id="scenario-bar">
     <div class="scenario-label">Climate Scenario</div>
-    <div class="scenario-btns">
-      <button class="scn-btn active" data-scn="present" data-period="" onclick="setScenario('present','')">Present Day</button>
+    <div class="scn-period-row">
+      <button class="scn-period-btn active" data-scn-period="present" onclick="selectScnPeriod('present')">Present Day</button>
+      <button class="scn-period-btn" data-scn-period="2050" data-period-block="2050" onclick="selectScnPeriod('2050')">2050</button>
+      <button class="scn-period-btn" data-scn-period="2080" data-period-block="2080" onclick="selectScnPeriod('2080')">2080</button>
     </div>
-    <div class="period-group" data-period-block="2050">
-      <div class="period-group-label">Mid-Century (2050, 2035&ndash;2064 mean)</div>
+    <div class="scn-ssp-panel" data-ssp-panel="2050" data-period-block="2050" style="display:none">
+      <div class="period-group-label">Mid-Century (2035&ndash;2064 mean)</div>
       <div class="scenario-btns">
         <button class="scn-btn" data-scn="ssp245" data-period="2050" onclick="setScenario('ssp245','2050')">Moderate Emissions (SSP 2-4.5)</button>
         <button class="scn-btn" data-scn="ssp370" data-period="2050" onclick="setScenario('ssp370','2050')">High Emissions (SSP 3-7.0)</button>
         <button class="scn-btn" data-scn="ssp585" data-period="2050" onclick="setScenario('ssp585','2050')">Very High Emissions (SSP 5-8.5)</button>
       </div>
     </div>
-    <div class="period-group" data-period-block="2080">
-      <div class="period-group-label">End-of-Century (2080, 2065&ndash;2094 mean)</div>
+    <div class="scn-ssp-panel" data-ssp-panel="2080" data-period-block="2080" style="display:none">
+      <div class="period-group-label">End-of-Century (2065&ndash;2094 mean)</div>
       <div class="scenario-btns">
         <button class="scn-btn" data-scn="ssp245" data-period="2080" onclick="setScenario('ssp245','2080')">Moderate Emissions (SSP 2-4.5)</button>
         <button class="scn-btn" data-scn="ssp370" data-period="2080" onclick="setScenario('ssp370','2080')">High Emissions (SSP 3-7.0)</button>
@@ -894,9 +922,11 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 <div id="map-wrap">
   <div id="map"></div>
   <div id="logos">
-    <img src="../assets/sio_logo.png" alt="UC San Diego — Scripps Institution of Oceanography">
     <img src="../assets/usd-logo-horizontal.png" alt="University of San Diego">
     <img src="../assets/ccsd_logo.png" alt="Climate Collaborative — San Diego Region">
+  </div>
+  <div id="logo-sio">
+    <img src="../assets/sio_logo.png" alt="UC San Diego — Scripps Institution of Oceanography">
   </div>
   <div id="legend"></div>
   <div id="prompt">Select variables and click Build Composite Risk Map</div>
@@ -958,6 +988,11 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <button class="cmp-close" onclick="closeCompareModal()" title="Close (ESC)">&times;</button>
     </div>
     <div id="cmp-lst-legend" class="cmp-lst-legend"></div>
+    <div class="cmp-toggle-row">
+      <label class="cmp-toggle"><input type="checkbox" id="cmp-toggle-landuse" onchange="toggleLanduse(this.checked)">Show SANDAG land use parcels</label>
+      <span class="cmp-toggle-hint">click any parcel for category</span>
+    </div>
+    <div id="cmp-landuse-legend" class="cmp-landuse-legend"></div>
     <div class="cmp-body">
       <div class="cmp-col">
         <div class="cmp-col-hdr">
@@ -1069,6 +1104,27 @@ if(DELTAS){
 /* ================================================================
    SCENARIO
    ================================================================ */
+// Top-level period buttons: Present Day applies immediately; 2050/2080 just
+// expand their SSP picker (user picks an SSP, which calls setScenario directly).
+function selectScnPeriod(period){
+  if(period==='present'){
+    setScenario('present','');
+    return;
+  }
+  var panel=document.querySelector('[data-ssp-panel="'+period+'"]');
+  var btn=document.querySelector('.scn-period-btn[data-scn-period="'+period+'"]');
+  if(!panel||!btn)return;
+  document.querySelectorAll('.scn-ssp-panel').forEach(function(p){
+    if(p!==panel)p.style.display='none';
+  });
+  document.querySelectorAll('.scn-period-btn').forEach(function(b){
+    if(b!==btn)b.classList.remove('expanded');
+  });
+  var open=panel.style.display==='block';
+  panel.style.display=open?'none':'block';
+  btn.classList.toggle('expanded',!open);
+}
+
 function setScenario(ssp,period){
   curScenario=ssp;
   curPeriod=(ssp==='present')?'':(period||'');
@@ -1077,6 +1133,14 @@ function setScenario(ssp,period){
     var match=(b.getAttribute('data-scn')===ssp)&&
               ((b.getAttribute('data-period')||'')===curPeriod);
     b.classList.toggle('active',match);
+  });
+  var activeKey=(ssp==='present')?'present':curPeriod;
+  document.querySelectorAll('.scn-period-btn').forEach(function(b){
+    b.classList.toggle('active',b.getAttribute('data-scn-period')===activeKey);
+    b.classList.remove('expanded');
+  });
+  document.querySelectorAll('.scn-ssp-panel').forEach(function(p){
+    p.style.display=(p.getAttribute('data-ssp-panel')===activeKey)?'block':'none';
   });
   var labels={'ssp245':'SSP2-4.5','ssp370':'SSP3-7.0','ssp585':'SSP5-8.5'};
   var pwin={'2050':'2035\\u20132064','2080':'2065\\u20132094'};
@@ -1228,9 +1292,15 @@ function syncJurisAllCheckbox(){
 }
 
 // Tribal lands overlays — Census TIGER AIANNH 2024 (San Diego County)
-var tribalLayers={};
+// Reservations and off-reservation trust lands are paired under one tribe entry;
+// the map distinguishes them with a solid (reservation) vs dashed (trust) outline.
+var tribalLayers={};      // keyed by full feature name (each polygon)
+var tribalGroups={};      // tribeKey -> [feature names]
 var TRIBAL_COLORS={reservation:"#8b5a2b",trust:"#b78050"};
-function tribalCheckboxId(name){return "cb-tribal-"+name.replace(/\s+/g,"_");}
+function tribalGroupKey(name){
+  return name.replace(/ Reservation$/,"").replace(/ Off-Reservation Trust Land$/,"");
+}
+function tribalCheckboxId(groupKey){return "cb-tribal-"+groupKey.replace(/\s+/g,"_");}
 if(typeof TRIBAL!=='undefined'&&TRIBAL&&TRIBAL.features&&TRIBAL.features.length){
   function makeTribalStyle(type){
     var c=TRIBAL_COLORS[type]||TRIBAL_COLORS.reservation;
@@ -1254,52 +1324,62 @@ if(typeof TRIBAL!=='undefined'&&TRIBAL&&TRIBAL.features&&TRIBAL.features.length)
       style:makeTribalStyle(f.properties.TYPE),
       onEachFeature:makeTribalHL(name)
     });
+    var gk=tribalGroupKey(name);
+    if(!tribalGroups[gk])tribalGroups[gk]=[];
+    tribalGroups[gk].push(name);
   });
-  // Build per-tribe checkbox list, sorted alphabetically by name
-  var tribalNames=Object.keys(tribalLayers).sort(function(a,b){return a.localeCompare(b);});
+  // Build one checkbox per tribe (group), sorted alphabetically
+  var tribalGroupKeys=Object.keys(tribalGroups).sort(function(a,b){return a.localeCompare(b);});
   var itemsEl=document.getElementById("tribal-items");
   if(itemsEl){
-    itemsEl.innerHTML=tribalNames.map(function(name){
-      var t=(TRIBAL.features.filter(function(f){return f.properties.NAME===name;})[0]||{}).properties.TYPE||'reservation';
-      var c=TRIBAL_COLORS[t]||TRIBAL_COLORS.reservation;
-      var id=tribalCheckboxId(name);
-      var disp=name.replace(/ Reservation$/,"").replace(/ Off-Reservation Trust Land$/," (Trust)");
-      var nameAttr=name.replace(/"/g,"&quot;");
+    itemsEl.innerHTML=tribalGroupKeys.map(function(gk){
+      var id=tribalCheckboxId(gk);
+      var keyAttr=gk.replace(/"/g,"&quot;");
       return '<div class="ov-row" style="margin-left:14px"><label>'+
-        '<input type="checkbox" id="'+id+'" data-tribal-name="'+nameAttr+'" onchange="toggleTribalLayer(this.dataset.tribalName)">'+
-        '<span style="color:'+c+'">'+disp+'</span>'+
+        '<input type="checkbox" id="'+id+'" data-tribal-key="'+keyAttr+'" onchange="toggleTribalLayer(this.dataset.tribalKey)">'+
+        '<span style="color:'+TRIBAL_COLORS.reservation+'">'+gk+'</span>'+
         '</label></div>';
     }).join("");
   }
   document.getElementById("overlay-toggles").style.display="block";
 }
-function toggleTribalLayer(name){
-  var lyr=tribalLayers[name];
-  if(!lyr)return;
-  var cb=document.getElementById(tribalCheckboxId(name));
-  if(cb&&cb.checked){lyr.addTo(map);lyr.bringToFront();}
-  else{map.removeLayer(lyr);}
-  syncTribalAllCheckbox();
-}
-function toggleTribalAll(on){
-  Object.keys(tribalLayers).forEach(function(name){
-    var cb=document.getElementById(tribalCheckboxId(name));
-    if(cb)cb.checked=!!on;
+function toggleTribalLayer(groupKey){
+  var feats=tribalGroups[groupKey];
+  if(!feats)return;
+  var cb=document.getElementById(tribalCheckboxId(groupKey));
+  var on=!!(cb&&cb.checked);
+  feats.forEach(function(name){
     var lyr=tribalLayers[name];
     if(!lyr)return;
     if(on){lyr.addTo(map);lyr.bringToFront();}
     else{map.removeLayer(lyr);}
   });
+  syncTribalAllCheckbox();
+}
+function toggleTribalAll(on){
+  Object.keys(tribalGroups).forEach(function(gk){
+    var cb=document.getElementById(tribalCheckboxId(gk));
+    if(cb)cb.checked=!!on;
+    tribalGroups[gk].forEach(function(name){
+      var lyr=tribalLayers[name];
+      if(!lyr)return;
+      if(on){lyr.addTo(map);lyr.bringToFront();}
+      else{map.removeLayer(lyr);}
+    });
+  });
 }
 function syncTribalAllCheckbox(){
   var all=document.getElementById("cb-tribal-all");
   if(!all)return;
-  var names=Object.keys(tribalLayers);
-  if(!names.length){all.checked=false;all.indeterminate=false;return;}
+  var keys=Object.keys(tribalGroups);
+  if(!keys.length){all.checked=false;all.indeterminate=false;return;}
   var n=0;
-  names.forEach(function(nm){if(map.hasLayer(tribalLayers[nm]))n++;});
-  all.checked=(n===names.length);
-  all.indeterminate=(n>0&&n<names.length);
+  keys.forEach(function(gk){
+    var anyOn=tribalGroups[gk].some(function(name){return map.hasLayer(tribalLayers[name]);});
+    if(anyOn)n++;
+  });
+  all.checked=(n===keys.length);
+  all.indeterminate=(n>0&&n<keys.length);
 }
 
 /* ================================================================
@@ -1588,21 +1668,21 @@ function showLegend(){
     }
     var cs=pal('PCC')[varPillar[rawVar]]||pal('CR');
     var stops=cs.map(function(c){return"rgb("+c.join(",")+")"}).join(",");
-    el.innerHTML='<div style="font-weight:600;margin-bottom:2px">'+varLabel[rawVar]+ic('Each tract is colored by its percentile rank for this variable across all California census tracts. Low = bottom of the distribution, High = top.')+'</div>'+
+    el.innerHTML='<div style="font-weight:600;margin-bottom:2px">'+varLabel[rawVar]+ic('Each tract is colored by its percentile rank for this variable across all San Diego County tracts. Low = bottom of the distribution, High = top.')+'</div>'+
       '<div class="grad" style="background:linear-gradient(to right,'+stops+')"></div>'+
       '<div class="labels"><span>Low</span><span>High</span></div>';
     el.style.display="block";return;
   }
   if(curLayer==="composite"){
     var cstops=pal('CR').map(function(c){return"rgb("+c.join(",")+")"}).join(",");
-    el.innerHTML='<div style="font-weight:600;margin-bottom:2px">Composite Risk'+ic('Mean of the three pillar scores: Exposure, Sensitivity, and (100 - Adaptive Capacity). Each pillar is a PCA-weighted composite of the variables you turned on, percentile-ranked across CA tracts. Higher = greater overall heat risk.')+'</div>'+
+    el.innerHTML='<div style="font-weight:600;margin-bottom:2px">Composite Risk'+ic('Mean of the three pillar scores: Exposure, Sensitivity, and low Adaptive Capacity. Each pillar is a PCA-weighted composite of the variables you turned on, percentile-ranked across San Diego County tracts. Higher = greater overall heat risk.')+'</div>'+
       '<div class="grad" style="background:linear-gradient(to right,'+cstops+')"></div>'+
       '<div class="labels"><span>Low</span><span>High</span></div>';
     el.style.display="block";
   }else if(curLayer==="driver"){
     var dr=pal('DRGB');
     var rgb=function(arr){return"rgb("+arr.join(",")+")"};
-    el.innerHTML='<div style="font-weight:600;margin-bottom:4px">Dominant Driver'+ic('Each tract is colored by whichever pillar contributes most to its risk: Exposure, Sensitivity, or (100 - Adaptive Capacity). Identifies the leading driver of heat risk for each tract.')+'</div>'+
+    el.innerHTML='<div style="font-weight:600;margin-bottom:4px">Dominant Driver'+ic('Each tract is colored by whichever pillar contributes most to its risk: Exposure, Sensitivity, or low Adaptive Capacity. This identifies the leading driver of heat risk for each tract.')+'</div>'+
       '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.exposure)+'"></div>Exposure</div>'+
       '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.sensitivity)+'"></div>Sensitivity</div>'+
       '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.adaptive)+'"></div>Adaptive Capacity</div>'+
@@ -1748,6 +1828,7 @@ function closeCompareModal(){
   document.getElementById('compare-modal').classList.remove('open');
   ['a','b'].forEach(function(s){
     if(cmpMaps[s]){cmpMaps[s].remove();cmpMaps[s]=null;}
+    _landuseLayers[s]=null; _cmpLST[s]=null;
   });
   compareMode="off";compareFirst=null;compareSecond=null;
 }
@@ -1861,6 +1942,9 @@ function openCompareModal(geoidA,geoidB){
   // Show modal first so the map containers have layout (Leaflet needs sizes)
   document.getElementById('compare-modal').classList.add('open');
   renderLstLegend();
+  var _luCb=document.getElementById('cmp-toggle-landuse');
+  if(_luCb)_luCb.checked=_landuseShown;
+  renderLanduseLegend();
   setTimeout(function(){buildMiniMap('cmp-map-a','a',fA);
                         buildMiniMap('cmp-map-b','b',fB);},20);
 }
@@ -1873,19 +1957,23 @@ function lstVariant(){
 
 function buildMiniMap(elId,slot,feat){
   if(cmpMaps[slot]){cmpMaps[slot].remove();}
+  _landuseLayers[slot]=null; _cmpLST[slot]=null;
   var m=L.map(elId,{zoomControl:false,attributionControl:false,
     scrollWheelZoom:true,dragging:true});
   L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{maxZoom:19}).addTo(m);
-  // Landsat 100m LST overlay — clipped visually by zooming to the tract bounds
+  // Landsat 100m LST overlay — clipped visually by zooming to the tract bounds.
+  // Opacity drops when the land-use overlay is on so both layers stay readable.
   var lv=lstVariant();
   if(lv){
     var b=LST.bounds;
-    L.imageOverlay(lv.url,[[b.south,b.west],[b.north,b.east]],{opacity:0.85}).addTo(m);
+    var initOp=_landuseShown?0.5:0.85;
+    _cmpLST[slot]=L.imageOverlay(lv.url,[[b.south,b.west],[b.north,b.east]],{opacity:initOp}).addTo(m);
   }
   // Tract outline (no fill, so the LST shows through)
   var poly=L.geoJSON(feat,{style:{color:'#111',weight:2,fill:false}}).addTo(m);
   m.fitBounds(poly.getBounds(),{padding:[18,18]});
   cmpMaps[slot]=m;
+  if(_landuseShown)_addLanduseToMap(slot,m);
 }
 
 function renderLstLegend(){
@@ -1899,6 +1987,116 @@ function renderLstLegend(){
     '<span class="cmp-lst-bar" style="background:linear-gradient(to right,'+stops+')"></span>'+
     '<span class="cmp-lst-ticks">'+ticks+'</span>';
   el.style.display='flex';
+}
+
+/* ----------------------------------------------------------------
+   SANDAG land-use parcels (PMTiles overlay in compare-modal mini-maps)
+   ---------------------------------------------------------------- */
+var LANDUSE_URL="../data/context/sandag_landuse.pmtiles";
+var LU_CATS=[
+  {code:'1',name:'Residential',color:'#f4a460'},
+  {code:'2',name:'Industrial',color:'#8b4513'},
+  {code:'4',name:'Transportation / Utilities',color:'#888888'},
+  {code:'5',name:'Commercial / Retail',color:'#e8442a'},
+  {code:'6',name:'Public / Institutional',color:'#2166ac'},
+  {code:'7',name:'Recreation / Open Space',color:'#1a7a1a'},
+  {code:'8',name:'Agriculture',color:'#8fbc00'},
+  {code:'9',name:'Vacant / Other',color:'#cccccc'}
+];
+var LU_WATER_NAMES={'Water':1,'Lake/Reservoir/Large Pond':1,'Bay or Lagoon':1};
+var LU_WATER_CAT={name:'Water',color:'#1e90ff'};
+var LU_DEFAULT_COLOR='#cccccc';
+
+function _luLookup(props){
+  if(!props)return null;
+  if(props.Landuse&&LU_WATER_NAMES[props.Landuse])return LU_WATER_CAT;
+  var lu=(props.lu||'').toString().replace(/[^0-9]/g,'');
+  if(!lu)return null;
+  var prefix=lu.charAt(0);
+  for(var i=0;i<LU_CATS.length;i++){if(LU_CATS[i].code===prefix)return LU_CATS[i];}
+  return null;
+}
+function _luCategoryColor(props){var c=_luLookup(props);return c?c.color:LU_DEFAULT_COLOR;}
+function _luCategoryName(props){var c=_luLookup(props);return c?c.name:'Other';}
+
+var _landuseShown=false;
+var _landuseLayers={a:null,b:null};
+var _cmpLST={a:null,b:null};
+
+function _buildLanduseLayer(){
+  if(!window.protomapsL)return null;
+  try{
+    return protomapsL.leafletLayer({
+      url:LANDUSE_URL,
+      paintRules:[{
+        dataLayer:'landuse',
+        symbolizer:new protomapsL.PolygonSymbolizer({
+          fill:function(z,f){return _luCategoryColor(f.props);},
+          opacity:0.65,
+          stroke:'#333',
+          width:0.3
+        })
+      }]
+    });
+  }catch(e){console.warn('protomaps-leaflet init failed',e);return null;}
+}
+
+function _addLanduseToMap(slot,map){
+  if(_landuseLayers[slot])return;
+  var layer=_buildLanduseLayer();
+  if(!layer)return;
+  layer.addTo(map);
+  _landuseLayers[slot]=layer;
+  // Click → popup with the parcel's land-use category. protomaps-leaflet v4
+  // exposes queryTileFeaturesDebug(lng,lat,brushPx); returns Map<source, [{feature,layerName}]>.
+  map.on('click',function(e){
+    if(!_landuseShown)return;
+    var L_=_landuseLayers[slot];
+    if(!L_||typeof L_.queryTileFeaturesDebug!=='function')return;
+    var hits=null;
+    try{hits=L_.queryTileFeaturesDebug(e.latlng.lng,e.latlng.lat,16);}catch(err){return;}
+    if(!hits||!hits.size)return;
+    var feats=null;
+    hits.forEach(function(arr){if(!feats&&arr&&arr.length)feats=arr;});
+    if(!feats||!feats.length)return;
+    var p=(feats[0].feature&&feats[0].feature.props)||{};
+    var cat=_luCategoryName(p);
+    var label=p.Landuse||cat;
+    var lu=p.lu||'';
+    L.popup({offset:[0,-4]}).setLatLng(e.latlng)
+      .setContent('<div style="font-size:11px;line-height:1.35"><b>'+label+'</b><br>'+
+        '<span style="color:#888">'+cat+(lu?' &middot; LU '+lu:'')+'</span></div>')
+      .openOn(map);
+  });
+}
+
+function _removeLanduseFromMap(slot,map){
+  if(_landuseLayers[slot]){
+    try{map.removeLayer(_landuseLayers[slot]);}catch(e){}
+    _landuseLayers[slot]=null;
+  }
+}
+
+function toggleLanduse(on){
+  _landuseShown=!!on;
+  ['a','b'].forEach(function(s){
+    var m=cmpMaps[s];
+    if(!m)return;
+    if(_cmpLST[s])_cmpLST[s].setOpacity(_landuseShown?0.5:0.85);
+    if(_landuseShown){_addLanduseToMap(s,m);}else{_removeLanduseFromMap(s,m);}
+  });
+  renderLanduseLegend();
+}
+
+function renderLanduseLegend(){
+  var el=document.getElementById('cmp-landuse-legend');
+  if(!el)return;
+  if(!_landuseShown){el.classList.remove('open');el.innerHTML='';return;}
+  var cats=LU_CATS.concat([LU_WATER_CAT]);
+  el.innerHTML=cats.map(function(c){
+    return '<span class="cmp-lu-item"><span class="cmp-lu-swatch" style="background:'+c.color+'"></span>'+c.name+'</span>';
+  }).join('');
+  el.classList.add('open');
 }
 
 /* ================================================================
@@ -2469,15 +2667,11 @@ function _captureStudyAreaMap(){
         });
       }
       var tribalRows=[];
-      if(typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalLayers!=='undefined'){
-        Object.keys(tribalLayers).forEach(function(k){
-          if(!map.hasLayer(tribalLayers[k]))return;
-          var f=TRIBAL.features.filter(function(x){return x.properties.NAME===k;})[0];
-          if(!f)return;
-          var t=f.properties.TYPE||'reservation';
-          var c=TRIBAL_COLORS[t]||TRIBAL_COLORS.reservation;
-          var disp=k.replace(/ Reservation$/,"").replace(/ Off-Reservation Trust Land$/," (Trust)");
-          tribalRows.push({label:disp,color:c,dashed:(t==='trust')});
+      if(typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalGroups!=='undefined'){
+        Object.keys(tribalGroups).sort(function(a,b){return a.localeCompare(b);}).forEach(function(gk){
+          var anyOn=tribalGroups[gk].some(function(name){return map.hasLayer(tribalLayers[name]);});
+          if(!anyOn)return;
+          tribalRows.push({label:gk,color:TRIBAL_COLORS.reservation,dashed:false});
         });
       }
 

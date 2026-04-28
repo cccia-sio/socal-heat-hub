@@ -626,7 +626,28 @@ details.subsec[open] summary::before{transform:rotate(90deg)}
   font-family:inherit;text-align:left;transition:background 0.15s}
 .lbtn:hover{background:#eee}
 .lbtn.active{background:#e8eeff;color:#2563eb;font-weight:600}
+.lbtn-txt{flex:1;min-width:0}
+.lbtn-pct{color:#999;font-weight:500}
+.lbtn.active .lbtn-pct{color:#2563eb}
 .ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+details.pc-group{margin-top:4px;border-top:1px dashed #e5e5e5;padding-top:4px}
+details.pc-group>summary{list-style:none;cursor:pointer;
+  padding:6px 10px;border-radius:8px;font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:0.4px;color:#555;
+  display:flex;align-items:center;gap:6px;user-select:none;
+  transition:background 0.15s}
+details.pc-group>summary:hover{background:#eee}
+details.pc-group>summary::-webkit-details-marker{display:none}
+details.pc-group>summary::before{content:"\\25B8";font-size:10px;color:#999;
+  transition:transform 0.15s;display:inline-block}
+details.pc-group[open]>summary::before{transform:rotate(90deg)}
+.pc-help{font-size:10.5px;color:#888;line-height:1.4;
+  padding:2px 10px 4px 10px;font-style:italic}
+.pc-help .info-ic-mini{display:inline-flex;align-items:center;
+  justify-content:center;width:11px;height:11px;border-radius:50%;
+  background:#2563eb;color:#fff;font-size:9px;font-weight:700;font-style:italic;
+  font-family:Georgia,'Times New Roman',serif;line-height:1;
+  vertical-align:middle}
 
 #map-wrap{flex:1;position:relative;height:100vh}
 #map{width:100%;height:100%}
@@ -1448,7 +1469,7 @@ function pillarPCA(pid,keys){
     sd[j]=Math.sqrt(sd[j]/(N-1));if(sd[j]<1e-10)sd[j]=1;
     for(i=0;i<N;i++)X[i][j]=(X[i][j]-mu[j])/sd[j];}
   if(P===1){var raw=[];for(i=0;i<N;i++)raw.push(X[i][0]);
-    return{scores:pctRank(raw),pcs:[{scores:pctRank(raw),pct:100}],nret:1,totvar:100};}
+    return{scores:pctRank(raw),pcs:[{scores:pctRank(raw),pct:100,loadings:[1]}],nret:1,totvar:100,keys:keys};}
   // cov — init all rows first so C[j][i] works when j>i
   var C=[];for(i=0;i<P;i++){C[i]=[];for(j=0;j<P;j++)C[i][j]=0;}
   for(i=0;i<P;i++)for(j=i;j<P;j++){var s=0;for(k=0;k<N;k++)s+=X[k][i]*X[k][j];C[i][j]=C[j][i]=s/(N-1);}
@@ -1470,13 +1491,19 @@ function pillarPCA(pid,keys){
   var wts=vr.slice(0,nret),ws=0;for(i=0;i<wts.length;i++)ws+=wts[i];
   var w=new Array(N);for(i=0;i<N;i++){w[i]=0;for(k=0;k<nret;k++)w[i]+=sc[i][k]*wts[k]/ws;}
   if(corrXY(rc,w)<0)for(i=0;i<N;i++)w[i]=-w[i];
-  // individual PCs
+  // individual PCs (also capture loadings, sign-aligned with scores)
   var nex=Math.min(Math.max(3,nret),P),pcs=[];
-  for(k=0;k<nex;k++){var raw=[];for(i=0;i<N;i++)raw.push(sc[i][k]);
-    if(corrXY(rc,raw)<0)for(i=0;i<N;i++)raw[i]=-raw[i];
-    pcs.push({scores:pctRank(raw),pct:Math.round(vr[k]*1000)/10});}
+  for(k=0;k<nex;k++){
+    var raw=[];for(i=0;i<N;i++)raw.push(sc[i][k]);
+    var ld=[];for(j=0;j<P;j++)ld.push(eig.V[j][ord[k]]);
+    if(corrXY(rc,raw)<0){
+      for(i=0;i<N;i++)raw[i]=-raw[i];
+      for(j=0;j<P;j++)ld[j]=-ld[j];
+    }
+    pcs.push({scores:pctRank(raw),pct:Math.round(vr[k]*1000)/10,loadings:ld});
+  }
   var tv=0;for(i=0;i<nret;i++)tv+=vr[i];
-  return{scores:pctRank(w),pcs:pcs,nret:nret,totvar:Math.round(tv*1000)/10};
+  return{scores:pctRank(w),pcs:pcs,nret:nret,totvar:Math.round(tv*1000)/10,keys:keys};
 }
 
 /* ================================================================
@@ -1692,7 +1719,12 @@ function showLegend(){
     var m=curLayer.match(/^(exposure|sensitivity|adaptive)_pc(\\d+)$/);
     if(m){var cs=pal('PCC')[m[1]]||pal('CR');
       var stops=cs.map(function(c){return"rgb("+c.join(",")+")"}).join(",");
-      el.innerHTML='<div style="font-weight:600;margin-bottom:2px">'+PMETA[m[1]].label+' PC'+m[2]+ic('Principal component from PCA on the enabled variables in this pillar. PC1 captures the largest pattern of variance across tracts; later PCs capture the next-largest orthogonal patterns. Sign-aligned so higher = higher risk.')+'</div>'+
+      var pidM=m[1],kM=parseInt(m[2],10)-1;
+      var rM=results&&results[pidM];
+      var blurbM=(rM&&rM.pcs&&rM.pcs[kM])?_patternBlurb(rM,kM):'';
+      var subM=blurbM?'<div style="font-size:10px;color:#666;margin-top:2px;line-height:1.35">'+blurbM+'</div>':'';
+      el.innerHTML='<div style="font-weight:600;margin-bottom:2px">'+PMETA[pidM].label+' &mdash; Pattern '+m[2]+ic('A primary spatial pattern from PCA on the enabled variables in this pillar. Pattern 1 captures the largest shared pattern of variance across tracts; later patterns capture the next-largest, mutually independent patterns. Sign-aligned so higher = higher risk.')+'</div>'+
+        subM+
         '<div class="grad" style="background:linear-gradient(to right,'+stops+')"></div>'+
         '<div class="labels"><span>Low</span><span>High</span></div>';
       el.style.display="block";
@@ -1774,6 +1806,28 @@ function showResults(){
   el.innerHTML=html;
 }
 
+// Look up a variable's pretty label from its key.
+function _vmLabel(key){
+  for(var i=0;i<VM.length;i++)if(VM[i].key===key)return VM[i].label;
+  return key;
+}
+
+// Build a "driven by ..." string for one PC: top 3 vars by |loading|, with
+// signs that indicate whether higher values of that variable push the
+// pattern up (+) or down (-).
+function _patternBlurb(r,k){
+  var pc=r.pcs[k],ld=pc.loadings,keys=r.keys;
+  if(!ld||!keys)return"";
+  var idx=[];for(var j=0;j<keys.length;j++)idx.push(j);
+  idx.sort(function(a,b){return Math.abs(ld[b])-Math.abs(ld[a])});
+  var top=idx.slice(0,Math.min(3,idx.length));
+  var parts=top.map(function(j){
+    var sign=ld[j]>=0?'+':'−';
+    return sign+' '+_vmLabel(keys[j]);
+  });
+  return 'Driven by: '+parts.join(', ')+'.';
+}
+
 function showLayerBtns(){
   var el=document.getElementById("layer-buttons"),html="";
   [{id:"composite",label:"Composite Risk",dot:"#bd0026"},
@@ -1781,14 +1835,32 @@ function showLayerBtns(){
     html+='<button class="lbtn'+(curLayer===b.id?" active":"")+'" onclick="setLyr(\\''+b.id+'\\')">'+
       '<span class="ldot" style="background:'+b.dot+'"></span>'+b.label+'</button>';});
   if(results){
-    var ab={exposure:"Exp",sensitivity:"Sens",adaptive:"AC"};
+    var anyPC=false;
     ["exposure","sensitivity","adaptive"].forEach(function(pid){
-      var r=results[pid];if(!r)return;var pm=PMETA[pid];
-      for(var k=0;k<r.pcs.length;k++){var lid=pid+"_pc"+(k+1);
-        html+='<button class="lbtn'+(curLayer===lid?" active":"")+'" onclick="setLyr(\\''+lid+'\\')">'+
-          '<span class="ldot" style="background:'+pm.color+'"></span>'+
-          ab[pid]+' PC'+(k+1)+' ('+r.pcs[k].pct+'%)</button>';}
-    });
+      if(results[pid]&&results[pid].pcs&&results[pid].pcs.length)anyPC=true;});
+    if(anyPC){
+      // Inner active flag controls open-state so the dropdown stays expanded
+      // when the active layer is one of the PCs.
+      var pcOpen=/^(exposure|sensitivity|adaptive)_pc\\d+$/.test(curLayer);
+      html+='<details class="pc-group"'+(pcOpen?' open':'')+'>'+
+        '<summary>Primary Spatial Patterns</summary>'+
+        '<div class="pc-help">Underlying patterns from PCA on the variables in each pillar. Hover the <span class="info-ic-mini">i</span> for top contributors.</div>';
+      ["exposure","sensitivity","adaptive"].forEach(function(pid){
+        var r=results[pid];if(!r||!r.pcs||!r.pcs.length)return;
+        var pm=PMETA[pid];
+        for(var k=0;k<r.pcs.length;k++){
+          var lid=pid+"_pc"+(k+1);
+          var blurb=_patternBlurb(r,k).replace(/"/g,'&quot;');
+          var info=blurb?ic(blurb):'';
+          html+='<button class="lbtn'+(curLayer===lid?" active":"")+'" onclick="setLyr(\\''+lid+'\\')">'+
+            '<span class="ldot" style="background:'+pm.color+'"></span>'+
+            '<span class="lbtn-txt">'+pm.label+' &mdash; Pattern '+(k+1)+
+            ' <span class="lbtn-pct">('+r.pcs[k].pct+'% var)</span></span>'+
+            info+'</button>';
+        }
+      });
+      html+='</details>';
+    }
   }
   el.innerHTML=html;
 }
@@ -2424,7 +2496,7 @@ function _layerLabel(){
   if(curLayer==='composite')return'Composite Risk';
   if(curLayer==='driver')return'Dominant Driver';
   var m=curLayer.match(/^(exposure|sensitivity|adaptive)_pc(\\d+)$/);
-  if(m)return PMETA[m[1]].label+' PC'+m[2];
+  if(m)return PMETA[m[1]].label+' — Pattern '+m[2];
   return curLayer;
 }
 function _scenarioLabel(){
@@ -2652,7 +2724,7 @@ function _captureStudyAreaMap(){
       }else{
         var m=curLayer.match(/^(exposure|sensitivity|adaptive)_pc(\\d+)$/);
         if(m){
-          title=PMETA[m[1]].label+' PC'+m[2];
+          title=PMETA[m[1]].label+' — Pattern '+m[2];
           subtitle=_scenarioLabel();
           stops=pal('PCC')[m[1]]||pal('CR');
         }

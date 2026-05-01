@@ -920,8 +920,10 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:#fafafa}
 .wlc-btn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;
   cursor:pointer;font-family:inherit;border:1px solid #2563eb;
-  background:#2563eb;color:#fff}
+  background:#2563eb;color:#fff;text-decoration:none;display:inline-block}
 .wlc-btn:hover{background:#1d4ed8;border-color:#1d4ed8}
+.wlc-btn.secondary{background:#fff;color:#2563eb}
+.wlc-btn.secondary:hover{background:#eff6ff;color:#1d4ed8}
 </style>
 </head>
 <body>
@@ -1127,6 +1129,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       </ul>
     </div>
     <div class="wlc-footer">
+      <a class="wlc-btn secondary" href="../userguide/index.html" target="_blank" rel="noopener noreferrer">User Guide</a>
       <button class="wlc-btn" id="wlc-got-it">Got it</button>
     </div>
   </div>

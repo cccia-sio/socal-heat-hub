@@ -1115,15 +1115,15 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <button class="wlc-close" id="wlc-close-btn" title="Close (ESC)">&times;</button>
     </div>
     <div class="wlc-body">
-      <p>The left panel is where you build your map. Each section:</p>
+      <p>Use the left panel to build your map. Here&rsquo;s what each section does:</p>
       <ul>
-        <li><b>Heat Exposure / Population Sensitivity / Adaptive Capacity</b> &mdash; three pillars of variables. Toggle any on or off to include them in the risk score.</li>
-        <li><b>Build Composite Risk Map</b> &mdash; runs a per-pillar PCA on the variables you selected and produces a composite risk score for every census tract.</li>
-        <li><b>Map Layer</b> &mdash; switch the map between the composite score, each pillar, or any individual variable.</li>
-        <li><b>Jurisdictions</b> &mdash; overlay city or tribal-land boundaries.</li>
-        <li><b>Climate Scenario</b> &mdash; apply mid-century (2035&ndash;2064) or end-of-century (2065&ndash;2094) projected temperature changes under SSP2-4.5, SSP3-7.0, or SSP5-8.5.</li>
-        <li><b>Accessibility</b> &mdash; switch to colorblind-friendly palettes.</li>
-        <li><b>Export</b> &mdash; download the current map as a PDF, or the underlying data as CSV/GeoJSON.</li>
+        <li><b>Heat Exposure / Population Sensitivity / Adaptive Capacity</b> &mdash; three groups of factors that shape heat risk. Turn any on or off to include them in your map.</li>
+        <li><b>Build Composite Risk Map</b> &mdash; combines the factors you picked into a single risk score for every neighborhood.</li>
+        <li><b>Map Layer</b> &mdash; switch between the combined risk score, each group on its own, or any single factor.</li>
+        <li><b>Jurisdictions</b> &mdash; show city or tribal-land boundaries on the map.</li>
+        <li><b>Climate Scenario</b> &mdash; see how risk shifts under future warming, for the year 2050 or 2080.</li>
+        <li><b>Accessibility</b> &mdash; switch to colorblind-friendly colors.</li>
+        <li><b>Export</b> &mdash; save the current map as a PDF or download the data.</li>
       </ul>
     </div>
     <div class="wlc-footer">

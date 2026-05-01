@@ -1,6 +1,6 @@
 # Project conventions
 
-Static GitHub Pages site for an LA County heat-risk viewer. See `ARCHITECTURE.md` for the full repo map.
+Static GitHub Pages site for a San Diego County heat-risk viewer. See `ARCHITECTURE.md` for the full repo map.
 
 ## `main/diy_pca.html` is generated — never edit it directly
 

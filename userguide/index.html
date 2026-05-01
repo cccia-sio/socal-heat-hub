@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>User Guide &mdash; San Diego Heat Risk Explorer</title>
-  <meta name="description" content="A plain-language guide to the San Diego Heat Risk Explorer: what it shows, how to use it, and how to interpret the maps.">
+  <meta name="description" content="User guide for the San Diego Heat Risk Explorer: variables, methodology, and how to interpret the maps.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8C%A1%EF%B8%8F%3C/text%3E%3C/svg%3E">
   <style>
     :root{
@@ -260,13 +260,12 @@
     <header>
       <p class="crumbs"><a href="../">&larr; San Diego Heat Risk Explorer</a></p>
       <h1>User Guide</h1>
-      <p class="tagline">What the tool shows, how to use it, and how to read the maps.</p>
+      <p class="tagline">Variables, methods, and map interpretation.</p>
     </header>
 
     <!-- =================== Hero =================== -->
-    <section class="hero" id="what-is-this">
-      <p><strong>The Heat Risk Explorer is an interactive map of heat risk across San Diego County, broken down by neighborhood and by what is driving the risk in each one.</strong></p>
-      <p>Choose which factors to include (temperature, AC access, tree cover, age, chronic illness, income, and others) and the tool builds a neighborhood-level risk map.</p>
+    <section class="hero" id="overview">
+      <p><strong>The Heat Risk Explorer is an interactive heat-risk map of San Diego County, computed at the census-tract level.</strong> Select the variables you want included (heat exposure, demographics, chronic illness, AC access, tree cover, income, and others) and the tool returns a composite score and the dominant driver for each tract.</p>
       <p>The tool runs entirely in the browser. Nothing is installed; nothing is sent to a server.</p>
       <a class="launch" href="../main/diy_pca.html">Open the map &rarr;</a>
     </section>
@@ -275,225 +274,148 @@
     <nav class="toc" aria-label="Table of contents">
       <h2>On this page</h2>
       <ol>
-        <li><a href="#try-it">Try it in 60 seconds</a></li>
-        <li><a href="#why-different">Why heat hits some neighborhoods harder</a></li>
-        <li><a href="#what-goes-in">What goes into each piece</a></li>
-        <li><a href="#how-it-combines">How the tool puts it all together</a></li>
-        <li><a href="#reading-the-map">Reading the map</a></li>
-        <li><a href="#future">Looking into the future</a></li>
-        <li><a href="#workflows">Example workflows</a></li>
-        <li><a href="#what-it-isnt">Limits</a></li>
-        <li><a href="#faq">Common questions</a></li>
-        <li><a href="#data">Where the data comes from</a></li>
-        <li><a href="#glossary">Glossary</a></li>
+        <li><a href="#quickstart">Quickstart</a></li>
+        <li><a href="#what-goes-in">What goes into the score</a></li>
+        <li><a href="#reading">Reading the map</a></li>
+        <li><a href="#examples">Examples</a></li>
+        <li><a href="#limits">Limits</a></li>
+        <li><a href="#data">Data sources</a></li>
       </ol>
     </nav>
 
-    <!-- =================== 1. Try it in 60 seconds =================== -->
-    <h2 class="section" id="try-it">Try it in 60 seconds</h2>
+    <!-- =================== 1. Quickstart =================== -->
+    <h2 class="section" id="quickstart">Quickstart</h2>
     <ol>
-      <li><strong>Open the map</strong> at <a href="https://connorjmack.github.io/heat-risk-viewer/">connorjmack.github.io/heat-risk-viewer</a>.</li>
-      <li>Leave the default variable boxes checked.</li>
+      <li>Open the map at <a href="https://connorjmack.github.io/heat-risk-viewer/">connorjmack.github.io/heat-risk-viewer</a>.</li>
+      <li>Leave the default variable selections.</li>
       <li>Click <strong>Build Composite Risk Map</strong>.</li>
-      <li>Dark red neighborhoods have the highest overall risk.</li>
-      <li>Click any neighborhood to see its scores and dominant driver.</li>
+      <li>Dark red tracts have the highest composite risk. Click any tract for its scores and dominant driver.</li>
     </ol>
-    <p>The rest of the guide covers what is on the map, how the score is built, and how to use the time-period and variable controls.</p>
 
-    <!-- =================== 2. Why different =================== -->
-    <h2 class="section" id="why-different">Why heat hits some neighborhoods harder</h2>
-    <p>A 100&deg; day plays out differently across the county. A shaded apartment in Carlsbad with working AC and a healthy adult is one situation. A second-floor unit in El Cajon with no AC, a 90-year-old resident, and a hot roof above is another.</p>
-    <p>The tool breaks heat risk into three pieces:</p>
-    <ul>
-      <li><strong>How hot it gets:</strong> the physical heat the neighborhood receives.</li>
-      <li><strong>Who lives there:</strong> how many residents are likely to be harmed when temperatures spike.</li>
-      <li><strong>What helps people cope:</strong> resources in the neighborhood that protect people, including AC, tree shade, and nearby healthcare.</li>
-    </ul>
-    <p>Every neighborhood gets a score on each piece. The tool combines them into one overall heat risk score from 0 (lowest) to 100 (highest).</p>
-
-    <!-- =================== 3. What goes in =================== -->
-    <h2 class="section" id="what-goes-in">What goes into each piece</h2>
+    <!-- =================== 2. What goes into the score =================== -->
+    <h2 class="section" id="what-goes-in">What goes into the score</h2>
+    <p>The score combines three components: heat <strong>exposure</strong> (the physical heat a tract receives), population <strong>sensitivity</strong> (who lives there and how susceptible they are), and <strong>adaptive capacity</strong> (resources that reduce harm). Each component draws on multiple variables, and you choose which variables to include.</p>
 
     <div class="pillar-section exp">
-      <h3>How hot it gets <span class="pillar-tag">shown in red</span></h3>
-      <p>The physical heat a neighborhood receives, measured at weather stations across the county:</p>
+      <h3>Exposure <span class="pillar-tag">red</span></h3>
       <ul>
-        <li><strong>Daytime highs:</strong> average summer highs, the hottest days, and the single hottest day of the year. <em>Best for peak heat events and short-term emergency planning, including cooling-center activation.</em></li>
-        <li><strong>Nighttime lows:</strong> how cool nights get. Bodies need cool nights to recover; when nights stay warm, heat illness rises, especially in older adults. <em>Best for multi-day heat waves and older-adult health, where the lack of overnight relief is what makes people sick.</em></li>
-        <li><strong>Humidity:</strong> how heavy the air is. High humidity makes the same temperature feel hotter. <em>Best for comparing inland and coastal neighborhoods, where the same air temperature can feel very different.</em></li>
+        <li><strong>Daytime highs:</strong> summer mean, hottest 10% of summer days, annual maximum.</li>
+        <li><strong>Nighttime lows:</strong> summer minimum. Warm nights are associated with elevated heat-illness risk in older adults.</li>
+        <li><strong>Humidity:</strong> summer humidity. High humidity reduces evaporative cooling and raises apparent temperature.</li>
       </ul>
     </div>
 
     <div class="pillar-section sen">
-      <h3>Who lives there <span class="pillar-tag">shown in orange</span></h3>
-      <p>Some residents are more likely to be harmed by heat than others. The tool considers:</p>
+      <h3>Sensitivity <span class="pillar-tag">orange</span></h3>
       <ul>
-        <li><strong>Age:</strong> children under 18 and adults over 65. <em>Best for locating where heat illness will land first: senior housing, family neighborhoods, areas near schools.</em></li>
-        <li><strong>Health conditions:</strong> heart disease, asthma, COPD, diabetes, high blood pressure, and other conditions that worsen in heat. <em>Best for healthcare partnerships, medication-safety messaging, and hospital-readiness planning.</em></li>
-        <li><strong>Daily-life challenges:</strong> language barriers, disability, poverty, lack of a car, and housing-cost burden. <em>Best for heat communications, transit to cooling centers, and community-navigator programs.</em></li>
-        <li><strong>Air quality and life expectancy:</strong> neighborhoods already living with worse air or shorter life expectancy tend to be hit harder. <em>Best for aligning heat work with environmental-justice or health-equity goals.</em></li>
+        <li><strong>Age:</strong> share of residents under 18 and over 65.</li>
+        <li><strong>Chronic conditions:</strong> heart disease, asthma, COPD, diabetes, hypertension, and other heat-aggravated conditions (CDC PLACES).</li>
+        <li><strong>Social vulnerability:</strong> language barrier, disability, poverty, vehicle access, housing-cost burden.</li>
+        <li><strong>Air quality and life expectancy:</strong> baseline environmental and health context.</li>
       </ul>
     </div>
 
     <div class="pillar-section ada">
-      <h3>What helps people cope <span class="pillar-tag">shown in teal</span></h3>
-      <p>Resources in the neighborhood that reduce harm during a heat event:</p>
+      <h3>Adaptive capacity <span class="pillar-tag">teal</span></h3>
       <ul>
-        <li><strong>AC at home:</strong> the share of homes with any AC, with central AC, or with none. <em>Best for cooling-center siting, utility-bill assistance, and home-AC subsidy programs.</em></li>
-        <li><strong>The neighborhood itself:</strong> tree cover, parks, green space, and housing age (older homes are usually less insulated). <em>Best for tree-planting, park investment, cool-roof programs, and weatherization.</em></li>
-        <li><strong>Money and services:</strong> income, education, health insurance, healthcare access, food access, and community connectedness. <em>Best for combining heat work with other safety-net programs, or for finding neighborhoods where lack of resources amplifies a heat wave's impact.</em></li>
+        <li><strong>Air conditioning:</strong> share of homes with any AC, with central AC, or with none.</li>
+        <li><strong>Built environment:</strong> tree cover, park access, green space, housing age.</li>
+        <li><strong>Resources and services:</strong> income, education, health insurance, healthcare access, food access, community connectedness.</li>
       </ul>
-      <p>More of these means lower heat risk. The tool accounts for that when computing the score.</p>
+      <p>Higher adaptive capacity lowers the composite score.</p>
     </div>
 
-    <!-- =================== 4. How combined =================== -->
-    <h2 class="section" id="how-it-combines">How the tool puts it all together</h2>
-    <p>Once you have selected your factors, the tool combines them into one score per neighborhood, scaled from 0 (lowest risk) to 100 (highest).</p>
-    <p>Two things separate this from a straight average:</p>
-    <p><strong>Overlap is handled.</strong> Many of these factors travel together. Lower-income neighborhoods often also have older housing, less tree cover, and higher rates of chronic illness. Adding the variables directly would count the same underlying pattern several times. The tool identifies overlapping patterns and counts them once.</p>
-    <p><strong>Protective factors reduce the score.</strong> AC, tree cover, and nearby healthcare reduce harm during a heat event. The tool subtracts those from the risk total, so a neighborhood with strong protections receives a lower score even when it gets hot.</p>
+    <h3>How the components combine</h3>
+    <p>The three components are combined into a single 0&ndash;100 percentile score per tract.</p>
+    <p><strong>Correlated variables are not double-counted.</strong> Lower-income tracts tend to have older housing, less tree cover, and higher chronic-illness rates. A direct sum would weight that shared pattern multiple times. The tool uses Principal Component Analysis (PCA) to identify the underlying patterns and weight each one once.</p>
+    <p><strong>Adaptive-capacity variables enter the score with the opposite sign.</strong> A tract with strong protective resources receives a lower composite score even when its exposure is high.</p>
 
     <div class="aside">
-      <p><strong>Method:</strong> the combination is done with Principal Component Analysis (PCA), a standard technique for handling overlapping variables. For a visual walkthrough of how PCA works, see <a href="https://setosa.io/ev/principal-component-analysis/" target="_blank" rel="noopener">this Setosa interactive</a>.</p>
+      <p>For a visual walkthrough of PCA, see <a href="https://setosa.io/ev/principal-component-analysis/" target="_blank" rel="noopener">this Setosa interactive</a>.</p>
     </div>
 
-    <!-- =================== 5. Reading the map =================== -->
-    <h2 class="section" id="reading-the-map">Reading the map</h2>
+    <!-- =================== 3. Reading the map =================== -->
+    <h2 class="section" id="reading">Reading the map</h2>
 
-    <h3>The colors</h3>
-    <p>Darker always means higher. On the composite map, dark red means a neighborhood is among the highest risk in the county. On the individual pillar maps, the color follows the pillar: red for heat, orange for population vulnerability, teal for protective resources.</p>
+    <h3>Colors</h3>
+    <p>Darker is higher. The composite map uses red (highest = darkest red). Single-pillar views use the pillar's color: red for exposure, orange for sensitivity, teal for adaptive capacity.</p>
 
-    <h3>What a score means</h3>
-    <p>Scores are <em>relative</em>, not absolute. A score of 75 means the neighborhood is at higher risk than 75% of other neighborhoods in San Diego County. It does <strong>not</strong> mean 75% of residents will be harmed.</p>
+    <h3>Score interpretation</h3>
+    <p>Scores are <em>relative percentiles</em>, not absolute risk. A score of 75 means the tract is at higher risk than 75% of San Diego County tracts. It does not mean 75% of residents will be harmed.</p>
 
-    <h3>Clicking a neighborhood</h3>
-    <p>Click any neighborhood and a panel appears with:</p>
+    <h3>Map layers</h3>
     <ul>
-      <li>Its score on each of the three pieces.</li>
-      <li>Its overall composite score.</li>
-      <li>Its <strong>dominant driver:</strong> the piece pushing its risk the highest.</li>
+      <li><strong>Composite Risk:</strong> the 0&ndash;100 score combining all three pillars (default view).</li>
+      <li><strong>Dominant Driver:</strong> tracts colored by which pillar contributes most to the score. Distinguishes hotspots driven by exposure from those driven by sensitivity or low adaptive capacity.</li>
+      <li><strong>Pillar views:</strong> a single pillar shown alone.</li>
     </ul>
 
-    <h3>The map layers</h3>
-    <ul>
-      <li><strong>Composite Risk:</strong> the overall 0&ndash;100 score combining all three pieces. The default view.</li>
-      <li><strong>Dominant Driver:</strong> each neighborhood colored by which of the three pieces matters most there. Useful for distinguishing hotspots driven by heat from those driven by population vulnerability or resource scarcity.</li>
-      <li><strong>Individual pillar views:</strong> one piece (heat, who lives there, or what helps them cope) shown on its own.</li>
-    </ul>
+    <h3>Tract panel</h3>
+    <p>Click a tract for its three pillar scores, its composite score, and its dominant driver.</p>
 
-    <!-- =================== 6. Future =================== -->
-    <h2 class="section" id="future">Looking into the future</h2>
-    <p>Four buttons at the top of the left panel switch between time periods:</p>
+    <h3>Future scenarios</h3>
+    <p>Four buttons at the top of the left panel switch the temperature variables between time periods:</p>
     <ul>
-      <li><strong>Present Day:</strong> what we measure today from weather stations.</li>
-      <li><strong>Moderate Emissions:</strong> a future where emissions are cut, but not aggressively (SSP2-4.5).</li>
-      <li><strong>High Emissions:</strong> a future where emissions stay high (SSP3-7.0).</li>
-      <li><strong>Very High Emissions:</strong> a worst-case path of unchecked fossil-fuel use (SSP5-8.5).</li>
+      <li><strong>Present Day:</strong> observed weather-station data.</li>
+      <li><strong>Moderate Emissions (SSP2-4.5):</strong> emissions decline but not aggressively.</li>
+      <li><strong>High Emissions (SSP3-7.0):</strong> emissions remain high.</li>
+      <li><strong>Very High Emissions (SSP5-8.5):</strong> unchecked fossil-fuel use.</li>
     </ul>
-    <p>Selecting a future scenario shifts the temperature variables using climate-model projections for 2050 or 2080. Demographics and resources stay at today's values; we do not project who will live in each neighborhood thirty years from now.</p>
+    <p>Future scenarios use LOCA2-downscaled CMIP6 projections for 2050 or 2080. Sensitivity and adaptive-capacity variables are held at present-day values; the tool does not project future population composition.</p>
 
-    <!-- =================== 7. Workflows =================== -->
-    <h2 class="section" id="workflows">Example workflows</h2>
+    <!-- =================== 4. Examples =================== -->
+    <h2 class="section" id="examples">Examples</h2>
 
     <div class="workflow">
-      <h3>Find a good spot for the next cooling center</h3>
+      <h3>Identify candidate cooling-center locations</h3>
       <ol>
         <li>Start with the default selections.</li>
-        <li>Under <strong>What helps people cope</strong>, uncheck the AC variables, so the score does not credit neighborhoods that already have AC.</li>
+        <li>Under <strong>Adaptive capacity</strong>, uncheck the AC variables so the score does not credit tracts that already have AC.</li>
         <li>Click <strong>Build Composite Risk Map</strong>.</li>
-        <li>Look at the darkest red neighborhoods.</li>
-        <li>Click a few. If their dominant driver is &ldquo;what helps people cope&rdquo;, they are strong cooling-center candidates. If not, a cooling center alone will not address the main driver.</li>
+        <li>Inspect the darkest red tracts. Tracts whose dominant driver is adaptive capacity are the strongest candidates; tracts driven by exposure or sensitivity may need a different intervention.</li>
       </ol>
     </div>
 
     <div class="workflow">
-      <h3>See which neighborhoods will get hottest by mid-century</h3>
+      <h3>Compare present-day and mid-century heat exposure</h3>
       <ol>
         <li>Click <strong>High Emissions</strong> at the top of the left panel.</li>
         <li>Uncheck everything except the temperature variables.</li>
         <li>Click <strong>Build Composite Risk Map</strong>.</li>
-        <li>Open the tool in a second browser tab on <strong>Present Day</strong> to compare side-by-side. The difference shows you where warming is concentrated.</li>
+        <li>Open a second tab on <strong>Present Day</strong> with the same variable selection. Differences in tract color show where projected warming is concentrated.</li>
       </ol>
     </div>
 
-    <div class="workflow">
-      <h3>Make the case for tree planting in one neighborhood</h3>
-      <ol>
-        <li>Use the default selections and click <strong>Build Composite Risk Map</strong>.</li>
-        <li>Click the neighborhood of interest.</li>
-        <li>Note its overall score, its dominant driver, and its tree cover relative to nearby neighborhoods.</li>
-        <li>Screenshot the result for documentation.</li>
-      </ol>
-    </div>
-
-    <!-- =================== 8. Is / Isn't =================== -->
-    <h2 class="section" id="what-it-isnt">Limits</h2>
-    <p>The tool is not:</p>
+    <!-- =================== 5. Limits =================== -->
+    <h2 class="section" id="limits">Limits</h2>
     <ul>
-      <li>A real-time heat warning. For active heat events, follow the National Weather Service.</li>
-      <li>A statement about any individual's risk. A neighborhood score can hide the single block or household most exposed.</li>
-      <li>A substitute for community input. The neighborhoods at highest risk are the ones whose residents should shape the response.</li>
+      <li><strong>Not a real-time warning.</strong> For active heat events, use the National Weather Service.</li>
+      <li><strong>Not individual risk.</strong> A tract score averages over residents and can hide the single block or household most exposed.</li>
+      <li><strong>Quantitative only.</strong> The score describes data patterns; it does not capture local knowledge from residents.</li>
+      <li><strong>San Diego County only.</strong> The variables come from national datasets, but the inputs must be reassembled per county. The method generalizes; the prepared data does not.</li>
+      <li><strong>No save state.</strong> The tool runs entirely in the browser with no account. Use a screenshot to capture a configuration.</li>
+      <li><strong>Blank tracts indicate missing data.</strong> A tract appears blank when one of the selected variables is missing for it. Unchecking the variable with the spottiest coverage usually fills the gaps.</li>
     </ul>
+    <p>To report a bug or request a feature, open an issue at <a href="https://github.com/connorjmack/heat-risk-viewer/issues" target="_blank" rel="noopener">github.com/connorjmack/heat-risk-viewer/issues</a>.</p>
 
-    <!-- =================== 9. FAQ =================== -->
-    <h2 class="section" id="faq">Common questions</h2>
-
-    <h3>Why are some neighborhoods blank on the map?</h3>
-    <p>A neighborhood shows blank when one of the variables you have selected is missing for it. Unchecking the variable with the spottiest coverage will usually fill in the gaps.</p>
-
-    <h3>Can I save my map?</h3>
-    <p>Not currently; take a screenshot. The tool runs entirely in the browser, with no account and no server-side state.</p>
-
-    <h3>Can I use this for a different county?</h3>
-    <p>Not as-is. Every variable comes from a national dataset, but the data has to be assembled for each county. The method is portable; the prepared data is not.</p>
-
-    <h3>What is the difference between &ldquo;Composite Risk&rdquo; and &ldquo;Dominant Driver&rdquo;?</h3>
-    <p>Composite Risk is the overall score combining all three pieces. Dominant Driver is which of the three pieces contributes the most in a given neighborhood. Composite tells you <em>where</em> to focus; Dominant Driver tells you <em>what kind of solution</em> might help.</p>
-
-    <h3>Who do I contact about this tool?</h3>
-    <p>Open an issue at <a href="https://github.com/connorjmack/heat-risk-viewer/issues" target="_blank" rel="noopener">github.com/connorjmack/heat-risk-viewer/issues</a>.</p>
-
-    <!-- =================== 10. Data =================== -->
-    <h2 class="section" id="data">Where the data comes from</h2>
-    <p>Every variable in the tool comes from a public source:</p>
+    <!-- =================== 6. Data sources =================== -->
+    <h2 class="section" id="data">Data sources</h2>
     <table>
       <thead>
-        <tr><th>What it measures</th><th>Source</th></tr>
+        <tr><th>Variable</th><th>Source</th></tr>
       </thead>
       <tbody>
-        <tr><td>Weather observations</td><td>MesoWest / Synoptic Data weather station network</td></tr>
-        <tr><td>Future temperature projections</td><td>LOCA2 downscaled climate model output (CMIP6)</td></tr>
-        <tr><td>Land surface temperature</td><td>USGS Landsat satellite imagery</td></tr>
-        <tr><td>Chronic disease rates</td><td>CDC PLACES</td></tr>
-        <tr><td>Social vulnerability</td><td>CDC Social Vulnerability Index (SVI) 2022</td></tr>
+        <tr><td>Weather observations</td><td>MesoWest / Synoptic Data</td></tr>
+        <tr><td>Future temperature projections</td><td>LOCA2 downscaled CMIP6</td></tr>
+        <tr><td>Land surface temperature</td><td>USGS Landsat</td></tr>
+        <tr><td>Chronic disease prevalence</td><td>CDC PLACES</td></tr>
+        <tr><td>Social vulnerability</td><td>CDC SVI 2022</td></tr>
         <tr><td>Income, education, healthcare, housing</td><td>Healthy Places Index (HPI)</td></tr>
-        <tr><td>Demographics and housing</td><td>American Community Survey (5-year estimates)</td></tr>
-        <tr><td>Air conditioning prevalence</td><td>Modeled estimates from Romitti et&nbsp;al. and Ahn et&nbsp;al.</td></tr>
+        <tr><td>Demographics and housing</td><td>ACS 5-year estimates</td></tr>
+        <tr><td>Air conditioning prevalence</td><td>Romitti et&nbsp;al.; Ahn et&nbsp;al. (modeled)</td></tr>
       </tbody>
     </table>
-    <p>A small <code>src</code> link next to each variable name in the tool opens the original source in a new tab.</p>
-
-    <!-- =================== 11. Glossary =================== -->
-    <h2 class="section" id="glossary">Glossary</h2>
-    <dl class="glossary">
-      <dt>Census tract</dt>
-      <dd>A small Census Bureau geography, usually around 4,000 people. San Diego County has roughly 630 of them.</dd>
-
-      <dt>Composite risk score</dt>
-      <dd>The tool&rsquo;s final 0&ndash;100 score combining all three pieces.</dd>
-
-      <dt>Dominant driver</dt>
-      <dd>The piece (heat, who lives there, or what helps them cope) that contributes the most to a neighborhood&rsquo;s score.</dd>
-
-      <dt>Percentile</dt>
-      <dd>A score from 0 to 100 indicating where a neighborhood sits relative to all others in the county. A score of 80 means higher than 80% of the others.</dd>
-
-      <dt>Climate scenario / SSP</dt>
-      <dd>A &ldquo;what if&rdquo; pathway for future emissions used in climate modeling. Higher SSP numbers mean more warming.</dd>
-
-      <dt>Principal Component Analysis (PCA)</dt>
-      <dd>The statistical method the tool uses to combine overlapping variables into a single score. (<a href="https://setosa.io/ev/principal-component-analysis/" target="_blank" rel="noopener">visual explainer</a>)</dd>
-    </dl>
+    <p>Each variable name in the tool has a small <code>src</code> link that opens the original source.</p>
 
     <footer>
       <a class="back" href="../">&larr; Back to the Explorer</a>

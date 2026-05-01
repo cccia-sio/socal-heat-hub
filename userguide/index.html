@@ -138,14 +138,6 @@
     .pillar-section.exp h3{color:var(--exposure)}
     .pillar-section.sen h3{color:var(--sensitivity)}
     .pillar-section.ada h3{color:var(--adaptive)}
-    .pillar-tag{
-      display:inline-block;
-      font-size:12px;
-      font-weight:500;
-      color:var(--muted);
-      margin-left:8px;
-      vertical-align:1px;
-    }
 
     /* numbered workflow steps */
     .workflow{
@@ -301,7 +293,6 @@
     <nav class="toc" aria-label="Table of contents">
       <h2>On this page</h2>
       <ol>
-        <li><a href="#quickstart">Quickstart</a></li>
         <li><a href="#what-goes-in">What goes into the score</a></li>
         <li><a href="#reading">Reading the map</a></li>
         <li><a href="#examples">Examples</a></li>
@@ -309,21 +300,12 @@
       </ol>
     </nav>
 
-    <!-- =================== 1. Quickstart =================== -->
-    <h2 class="section" id="quickstart">Quickstart</h2>
-    <ol>
-      <li>Open the map <a href="../main/diy_pca.html" target="_blank" rel="noopener noreferrer">here</a>.</li>
-      <li>Leave the default variable selections.</li>
-      <li>Click <strong>Build Composite Risk Map</strong>.</li>
-      <li>Darker red tracts have the highest composite risk. Click any tract for its risk score, dominant driver, and to compare against other census tracts. Click 'dominant driver' in the left-hand panel to see what drives risk.</li>
-    </ol>
-
-    <!-- =================== 2. What goes into the score =================== -->
+    <!-- =================== 1. What goes into the score =================== -->
     <h2 class="section" id="what-goes-in">What goes into the score</h2>
     <p>The score combines three components: <strong>heat exposure</strong> (the physical heat experienced in a given census tract), <strong>population sensitivity</strong> (who lives there and how susceptible they are), and <strong>adaptive capacity</strong> (the ability of residents to cope with heat stress). Each component draws on multiple variables, selected by the user of the tool.</p>
 
     <div class="pillar-section exp">
-      <h3>Heat Exposure <span class="pillar-tag">red</span></h3>
+      <h3>Heat Exposure</h3>
       <ul>
         <li><strong>Daytime highs:</strong> mean daily maximum, 85th and 99th percentile of daily maximums (the hottest 15% and 1% of days), annual maximum, and Landsat-derived land surface temperature.</li>
         <li><strong>Heat stress:</strong> 85th and 99th percentile Wet-Bulb Globe Temperature, which combines temperature, humidity, sun, and wind into a single heat-safety index.</li>
@@ -333,7 +315,7 @@
     </div>
 
     <div class="pillar-section sen">
-      <h3>Population Sensitivity <span class="pillar-tag">yellow</span></h3>
+      <h3>Population Sensitivity</h3>
       <ul>
         <li><strong>Age:</strong> share of residents under 18 and over 65.</li>
         <li><strong>Chronic conditions:</strong> heart disease, asthma, COPD, diabetes, hypertension, depression, cognitive difficulty, and other heat-aggravated conditions (CDC PLACES Data).</li>
@@ -344,7 +326,7 @@
     </div>
 
     <div class="pillar-section ada">
-      <h3>Adaptive capacity <span class="pillar-tag">green</span></h3>
+      <h3>Adaptive capacity</h3>
       <ul>
         <li><strong>Air conditioning:</strong> share of homes with any AC, with central AC, or with no AC.</li>
         <li><strong>Built environment:</strong> tree canopy, park access, green space, housing age (pre-1980 and pre-1960 share), and renter share.</li>
@@ -358,11 +340,12 @@
     <p><strong>Correlated variables are not double-counted.</strong> Lower-income tracts tend to have older housing, less tree cover, and higher chronic-illness rates. A direct sum would weight that shared pattern multiple times. The tool uses Principal Component Analysis (PCA) to identify the underlying patterns and weight each one once.</p>
     <p><strong>Adaptive-capacity variables enter the score with the opposite sign.</strong> A tract with strong protective resources receives a lower composite score even when its exposure is high.</p>
 
-    <!-- =================== 3. Reading the map =================== -->
+
+    <!-- =================== 2. Reading the map =================== -->
     <h2 class="section" id="reading">Reading the map</h2>
 
     <h3>Colors</h3>
-    <p>Darker means higher risk. The composite map uses red (highest = darkest red). Single-pillar views use the pillar's color: red for heat exposure, yellow for population sensitivity, teal for adaptive capacity.</p>
+    <p>Darker color means higher risk. The composite map uses red (highest = darkest red). Single-pillar views use the pillar's color: red for heat exposure, yellow for population sensitivity, teal for adaptive capacity.</p>
 
     <h3>Score interpretation</h3>
     <p>Scores are <em>relative percentiles</em>, not absolute risk. A score of 75 means the tract is at higher risk than 75% of San Diego County tracts. It does not mean 75% of residents will be harmed.</p>
@@ -393,7 +376,8 @@
     <p><strong>Compare Scenarios Side-by-Side</strong> (button below the picker) opens a paired view: the composite-risk map under one scenario on the left, and the change in heat-exposure pillar rank between two chosen scenarios on the right (B minus A). The two scenarios on either side can be set independently.</p>
     <p>Population sensitivity and adaptive-capacity variables are held at present-day values; the tool does not project future changes to these variables.</p>
 
-    <!-- =================== 4. Examples =================== -->
+
+    <!-- =================== 3. Examples =================== -->
     <h2 class="section" id="examples">Examples</h2>
 
     <p>Each example narrows one pillar to a single question, then leaves the other two pillars alone (all variables remain on by default) so the composite still reflects who is hot, who is vulnerable, and who can cope.</p>
@@ -431,7 +415,7 @@
 
     <p>To report a bug or request a feature, open an issue <a href="https://github.com/connorjmack/heat-risk-viewer/issues" target="_blank" rel="noopener">here</a>.</p>
 
-    <!-- =================== 6. Data sources =================== -->
+    <!-- =================== 4. Data sources =================== -->
     <h2 class="section" id="data">Data sources</h2>
     <table>
       <thead>

@@ -913,9 +913,15 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 .wlc-body{padding:14px 18px;overflow-y:auto;font-size:13px;color:#333;
   flex:1;line-height:1.55}
 .wlc-body p{margin:0 0 10px}
-.wlc-body ul{margin:0;padding-left:18px}
+.wlc-body ul,.wlc-body ol{margin:0 0 12px;padding-left:18px}
+.wlc-body ul:last-child,.wlc-body ol:last-child{margin-bottom:0}
 .wlc-body li{margin-bottom:7px}
 .wlc-body li b{color:#111}
+.wlc-body .wlc-quickstart{background:#f5f7fb;border-left:3px solid #2563eb;
+  border-radius:6px;padding:10px 12px 4px 14px;margin:0 0 14px}
+.wlc-body .wlc-quickstart p{margin:0 0 6px;font-weight:600;color:#1d4ed8;
+  font-size:12px;text-transform:uppercase;letter-spacing:0.04em}
+.wlc-body .wlc-quickstart ol{margin:0;padding-left:20px}
 .wlc-footer{padding:12px 18px;border-top:1px solid #e5e7eb;
   display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:#fafafa}
 .wlc-btn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;
@@ -1117,7 +1123,15 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <button class="wlc-close" id="wlc-close-btn" title="Close (ESC)">&times;</button>
     </div>
     <div class="wlc-body">
-      <p>Use the left panel to build your map. Here&rsquo;s what each section does:</p>
+      <div class="wlc-quickstart">
+        <p>Quick start</p>
+        <ol>
+          <li>Defaults are already selected &mdash; click <b>Build Composite Risk Map</b>.</li>
+          <li>Click any tract to see its risk score and dominant driver.</li>
+          <li>Under <b>Map Layer</b>, switch to <b>Dominant Driver</b> to see what drives risk countywide.</li>
+        </ol>
+      </div>
+      <p>Or use the left panel to customize your map. Here&rsquo;s what each section does:</p>
       <ul>
         <li><b>Heat Exposure / Population Sensitivity / Adaptive Capacity</b> &mdash; three groups of factors that shape heat risk. Turn any on or off to include them in your map.</li>
         <li><b>Build Composite Risk Map</b> &mdash; combines the factors you picked into a single risk score for every census tract.</li>

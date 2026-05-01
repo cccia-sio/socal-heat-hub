@@ -1108,6 +1108,30 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   </div>
 </div>
 
+<div id="welcome-modal" onclick="if(event.target===this)closeWelcome()">
+  <div class="wlc-panel">
+    <div class="wlc-hdr">
+      <h2>Welcome to the San Diego Heat Risk Explorer</h2>
+      <button class="wlc-close" id="wlc-close-btn" title="Close (ESC)">&times;</button>
+    </div>
+    <div class="wlc-body">
+      <p>The left panel is where you build your map. Each section:</p>
+      <ul>
+        <li><b>Heat Exposure / Population Sensitivity / Adaptive Capacity</b> &mdash; three pillars of variables. Toggle any on or off to include them in the risk score.</li>
+        <li><b>Build Composite Risk Map</b> &mdash; runs a per-pillar PCA on the variables you selected and produces a composite risk score for every census tract.</li>
+        <li><b>Map Layer</b> &mdash; switch the map between the composite score, each pillar, or any individual variable.</li>
+        <li><b>Jurisdictions</b> &mdash; overlay city or tribal-land boundaries.</li>
+        <li><b>Climate Scenario</b> &mdash; apply mid-century (2035&ndash;2064) or end-of-century (2065&ndash;2094) projected temperature changes under SSP2-4.5, SSP3-7.0, or SSP5-8.5.</li>
+        <li><b>Accessibility</b> &mdash; switch to colorblind-friendly palettes.</li>
+        <li><b>Export</b> &mdash; download the current map as a PDF, or the underlying data as CSV/GeoJSON.</li>
+      </ul>
+    </div>
+    <div class="wlc-footer">
+      <button class="wlc-btn" id="wlc-got-it">Got it</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ================================================================
    DATA  (injected by build script)
@@ -3768,6 +3792,29 @@ if(cbMode){
   var cbBox=document.getElementById('cb-cbmode');
   if(cbBox)cbBox.checked=true;
 }
+
+/* Welcome popup — shows once on first visit, dismissed forever via localStorage */
+function closeWelcome(){
+  var m=document.getElementById('welcome-modal');
+  if(!m)return;
+  m.classList.remove('open');
+  try{localStorage.setItem('hrv-welcome-seen','1');}catch(e){}
+}
+(function(){
+  var seen=false;
+  try{seen=localStorage.getItem('hrv-welcome-seen')==='1';}catch(e){}
+  var m=document.getElementById('welcome-modal');
+  if(!m)return;
+  if(!seen)m.classList.add('open');
+  var ok=document.getElementById('wlc-got-it');
+  if(ok)ok.addEventListener('click',closeWelcome);
+  var x=document.getElementById('wlc-close-btn');
+  if(x)x.addEventListener('click',closeWelcome);
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape'&&m.classList.contains('open'))closeWelcome();
+  });
+})();
+
 console.log("DIY PCA loaded. Features:",GJ.features.length,"Vars:",VM.length);
 </script>
 </body>

@@ -1108,7 +1108,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   </div>
 </div>
 
-<div id="welcome-modal" onclick="if(event.target===this)closeWelcome()">
+<div id="welcome-modal" class="open" onclick="if(event.target===this)closeWelcome()">
   <div class="wlc-panel">
     <div class="wlc-hdr">
       <h2>Welcome to the San Diego Heat Risk Explorer</h2>

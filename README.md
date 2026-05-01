@@ -1,6 +1,6 @@
 # San Diego Heat Risk Explorer
 
-### [**Launch the tool &rarr;**](https://connorjmack.github.io/heat-risk-viewer/)
+### [**Landing Page &rarr;**](https://connorjmack.github.io/heat-risk-viewer/)
 
 Custom composite heat-risk map for every census tract in San Diego County.
 

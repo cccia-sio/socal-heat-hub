@@ -132,7 +132,6 @@ VARIABLES = [
     # ── Adaptive Capacity ────────────────────────────────────────────────
     # Air Conditioning
     ("ac_prob", "AC Prevalence", "adaptive", "Air Conditioning"),
-    ("cbsa_perc_rank_ac_prob", "AC Prevalence (CBSA Rank)", "adaptive", "Air Conditioning"),
     ("prob_NoAC", "Prob. No AC", "adaptive", "Air Conditioning"),
     ("prob_Central", "Prob. Central AC", "adaptive", "Air Conditioning"),
     # Built Environment
@@ -207,7 +206,7 @@ VAR_SOURCES = {
     "RPL_THEMES": _SRC_SVI, "RPL_THEME1": _SRC_SVI, "RPL_THEME2": _SRC_SVI,
     "RPL_THEME3": _SRC_SVI, "RPL_THEME4": _SRC_SVI,
     # Adaptive — Romitti et al. (2022)
-    "ac_prob": _SRC_ROMITTI, "cbsa_perc_rank_ac_prob": _SRC_ROMITTI,
+    "ac_prob": _SRC_ROMITTI,
     # Adaptive — Ahn & Uejio / COMBUST PLUS
     "prob_NoAC": _SRC_AHN, "prob_Central": _SRC_AHN,
     # Adaptive — ACS
@@ -326,7 +325,7 @@ def load_data():
         ROOT / "data/adaptive_capacity/aircon/tract_ac_prevalence_sd_summary.csv"
     )
     ac["GEOID"] = ac["GEOID"].astype(str).str.zfill(11)
-    tracts = _safe_merge(tracts, ac, ["ac_prob", "cbsa_perc_rank_ac_prob"])
+    tracts = _safe_merge(tracts, ac, ["ac_prob"])
 
     # ── Adaptive — AC type probabilities (Ahn et al.) ──
     ac_type_path = (ROOT / "data/adaptive_capacity/aircon/ahn_etal"
@@ -1231,7 +1230,7 @@ var _CMP_TEMP_KEYS={mean_tmax:1,p85_tmax:1,p99_tmax:1,max_tmax:1,
   mean_lst:1,p85_wbgt:1,p99_wbgt:1,
   mean_tmin_overnight:1,p90_tmin_overnight:1,p95_dewpoint:1};
 var _CMP_FRAC_KEYS={no_relief_fraction:1,ac_prob:1,prob_NoAC:1,
-  prob_Central:1,cbsa_perc_rank_ac_prob:1};
+  prob_Central:1};
 function fmtCmpRaw(key,val){
   if(val==null||isNaN(val))return '\\u2014';
   var v=+val;
@@ -2253,7 +2252,7 @@ function _jurisDriverBreakdown(name){
   return counts;
 }
 function _isRankVar(key){
-  return /_pctile$/.test(key) || /^RPL_/.test(key) || key==='cbsa_perc_rank_ac_prob';
+  return /_pctile$/.test(key) || /^RPL_/.test(key);
 }
 
 function openCityCompareModal(initialName){

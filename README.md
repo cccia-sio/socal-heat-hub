@@ -2,18 +2,44 @@
 
 ### [**Launch the tool &rarr;**](https://connorjmack.github.io/heat-risk-viewer/)
 
-Interactive web tool for exploring heat risk across San Diego County census
-tracts. Users select which exposure, sensitivity, and adaptive-capacity
-variables to include, then build a composite risk map using per-pillar
-principal component analysis. Climate scenarios (SSP2-4.5, SSP3-7.0,
-SSP5-8.5) apply downscaled LOCA2 CMIP6 deltas to temperature variables.
+Custom composite heat-risk map for every census tract in San Diego County.
 
-The tool runs entirely in the browser — no server, no tracking, no account
-needed.
+Pick the variables that matter to you — temperatures, chronic disease rates,
+tree canopy, AC access, poverty — and the tool combines them into a
+neighborhood-level risk map. Toggle climate scenarios to see how risk shifts
+under mid-century and end-of-century warming. The tool runs entirely in the
+browser — no server, no tracking, no account needed.
 
-Data sources: MesoWest/Synoptic weather stations, NASA Landsat LST, CDC
-PLACES, CDC Social Vulnerability Index, Healthy Places Index, Romitti et al.
-and Ahn et al. AC prevalence, ACS demographics, and the LOCA2 CMIP6
-ensemble (2035–2064 vs. 1985–2014).
+See the [User Guide](https://connorjmack.github.io/heat-risk-viewer/userguide/)
+for variables, methodology, and map interpretation.
+
+## Three pillars of heat risk
+
+- **Exposure** — How hot does it actually get? Temperature, humidity,
+  extreme-heat-day fraction, Landsat surface temperature.
+- **Sensitivity** — Who lives here? Age, chronic disease prevalence, social
+  vulnerability, environmental health.
+- **Adaptive Capacity** — What resources are available? AC access, tree canopy,
+  income, healthcare, housing quality.
+
+## Data sources
+
+- Weather stations: [MesoWest / Synoptic](https://synopticdata.com/)
+- Land surface temperature: [USGS Landsat](https://www.usgs.gov/landsat-missions)
+- Chronic disease: [CDC PLACES](https://www.cdc.gov/places/index.html)
+- Social vulnerability: [CDC SVI 2022](https://www.atsdr.cdc.gov/place-health/php/svi/index.html)
+- Healthy Places Index: [HPI](https://www.healthyplacesindex.org/)
+- AC prevalence: [Romitti et al. 2022](https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629), [Ahn et al. 2025](https://doi.org/10.1038/s41597-025-06104-3)
+- Demographics & housing: [ACS 5-year estimates](https://www.census.gov/programs-surveys/acs)
+- Climate projections: [LOCA2](https://loca.ucsd.edu/) downscaled CMIP6 (mid-century 2035–2064 and end-of-century 2065–2094)
+
+## Acknowledgments
+
+This tool was created through a joint research program between the
+[Southern California Extreme Heat Research Hub](https://socalheathub.ucsd.edu/)
+and the
+[San Diego Regional Climate Collaborative](https://www.sandiego.edu/soles/centers-and-institutes/nonprofit-institute/signature-programs/climate-collaborative/).
+Funding was provided through the
+[NSF CoPe program](https://www.nsf.gov/funding/opportunities/cope-coastlines-people-hubs-research-broadening-participation).
 
 Issues and feedback welcome via GitHub issues.

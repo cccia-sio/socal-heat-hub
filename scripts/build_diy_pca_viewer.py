@@ -895,6 +895,33 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   min-width:120px;max-width:280px}
 .scn-leg-block .cmp-lst-ticks{display:flex;justify-content:space-between;flex:1;
   max-width:280px;color:#888;font-variant-numeric:tabular-nums}
+
+/* --- welcome popup --- */
+#welcome-modal{position:fixed;inset:0;z-index:2300;background:rgba(20,25,40,0.55);
+  display:none;align-items:center;justify-content:center;
+  backdrop-filter:blur(2px);font-family:inherit}
+#welcome-modal.open{display:flex}
+.wlc-panel{background:#fff;width:min(520px,94vw);max-height:90vh;
+  border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.30);
+  display:flex;flex-direction:column;overflow:hidden}
+.wlc-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid #e5e7eb;flex-shrink:0}
+.wlc-hdr h2{font-size:15px;font-weight:700;margin:0;color:#111}
+.wlc-close{background:none;border:none;font-size:22px;color:#666;cursor:pointer;
+  padding:0 4px;line-height:1;font-family:inherit}
+.wlc-close:hover{color:#111}
+.wlc-body{padding:14px 18px;overflow-y:auto;font-size:13px;color:#333;
+  flex:1;line-height:1.55}
+.wlc-body p{margin:0 0 10px}
+.wlc-body ul{margin:0;padding-left:18px}
+.wlc-body li{margin-bottom:7px}
+.wlc-body li b{color:#111}
+.wlc-footer{padding:12px 18px;border-top:1px solid #e5e7eb;
+  display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:#fafafa}
+.wlc-btn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;
+  cursor:pointer;font-family:inherit;border:1px solid #2563eb;
+  background:#2563eb;color:#fff}
+.wlc-btn:hover{background:#1d4ed8;border-color:#1d4ed8}
 </style>
 </head>
 <body>

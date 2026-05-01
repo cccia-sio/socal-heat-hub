@@ -3793,22 +3793,18 @@ if(cbMode){
   if(cbBox)cbBox.checked=true;
 }
 
-/* Welcome popup — shows once on first visit, dismissed forever via localStorage.
-   Bump the version suffix on the storage key whenever the popup copy changes
-   so returning users see the updated content. */
-var WELCOME_KEY='hrv-welcome-seen-v3';
+/* Welcome popup — shows on every page load. Dismissal is per-session
+   (closing/refreshing brings it back) so the framing message lands every
+   time someone opens the tool. */
 function closeWelcome(){
   var m=document.getElementById('welcome-modal');
   if(!m)return;
   m.classList.remove('open');
-  try{localStorage.setItem(WELCOME_KEY,'1');}catch(e){}
 }
 (function(){
-  var seen=false;
-  try{seen=localStorage.getItem(WELCOME_KEY)==='1';}catch(e){}
   var m=document.getElementById('welcome-modal');
   if(!m)return;
-  if(!seen)m.classList.add('open');
+  m.classList.add('open');
   var ok=document.getElementById('wlc-got-it');
   if(ok)ok.addEventListener('click',closeWelcome);
   var x=document.getElementById('wlc-close-btn');

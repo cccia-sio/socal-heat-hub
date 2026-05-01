@@ -148,6 +148,40 @@
       border-radius:3px;
       font-size:0.9em;
     }
+
+    /* ---------- print stylesheet ---------- */
+    @media print{
+      @page{size:letter;margin:0.6in}
+      :root{--bg:#fff}
+      *,*::before,*::after{
+        -webkit-print-color-adjust:exact !important;
+        print-color-adjust:exact !important;
+      }
+      html,body{background:#fff;font-size:11pt;line-height:1.5}
+      .wrap{max-width:none;padding:0}
+      a{color:#1d4ed8;text-decoration:none}
+
+      header{padding-bottom:14px;margin-bottom:18px}
+      h1{font-size:26pt}
+      .tagline{font-size:13pt}
+
+      .hero{break-inside:avoid;padding:18px 22px;margin:14px 0 20px;box-shadow:none}
+      .launch,.secondary{box-shadow:none}
+
+      h2{margin-top:24px}
+      .pillars{grid-template-columns:repeat(3,1fr);break-inside:avoid;gap:10px}
+      .pillar{break-inside:avoid;padding:12px 14px}
+      .pillar h3{font-size:12pt}
+      .pillar p{font-size:10pt}
+
+      ul{font-size:11pt}
+      ul li{break-inside:avoid}
+
+      .partners{break-inside:avoid;margin-top:24px;padding-top:14px}
+      .partners img{height:32px;opacity:1}
+
+      footer{font-size:9pt;margin-top:18px}
+    }
   </style>
 </head>
 <body>

@@ -15,12 +15,13 @@ for variables, methodology, and map interpretation.
 
 ## Three pillars of heat risk
 
-- **Exposure** — How hot does it actually get? Temperature, humidity,
-  extreme-heat-day fraction, Landsat surface temperature.
-- **Sensitivity** — Who lives here? Age, chronic disease prevalence, social
-  vulnerability, environmental health.
-- **Adaptive Capacity** — What resources are available? AC access, tree canopy,
-  income, healthcare, housing quality.
+- **Exposure** — How much heat does this area face? Air temperature, humidity,
+  number of extreme-heat days, and satellite-measured land surface temperature.
+- **Sensitivity** — How vulnerable are the people living here? Age, chronic
+  disease rates, social vulnerability, and environmental health.
+- **Adaptive Capacity** — What resources help residents cope with heat? Air
+  conditioning access, tree canopy, income, healthcare access, and housing
+  quality.
 
 ## Data sources
 

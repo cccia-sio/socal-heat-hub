@@ -112,10 +112,32 @@
     .pillar p{margin:0;font-size:13px;color:var(--muted);line-height:1.4}
     ul{padding-left:22px;color:var(--muted);font-size:14px}
     ul li{margin-bottom:4px}
-    footer{
+    .partners{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:24px;
       margin-top:56px;
-      padding-top:24px;
+      padding-top:28px;
       border-top:1px solid var(--border);
+    }
+    .partners-right{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+    .partners img{
+      height:42px;
+      width:auto;
+      display:block;
+      opacity:0.85;
+      transition:opacity 0.15s;
+    }
+    .partners a:hover img{opacity:1}
+    @media(max-width:520px){
+      .partners{justify-content:center}
+      .partners-right{justify-content:center}
+    }
+    footer{
+      margin-top:28px;
+      padding-top:0;
       font-size:13px;
       color:var(--muted);
     }
@@ -150,15 +172,15 @@
     <div class="pillars">
       <div class="pillar exp">
         <h3>Exposure</h3>
-        <p>How hot does it actually get? Temperature, humidity, extreme-heat-day fraction, Landsat surface temperature.</p>
+        <p>How much heat does this area face? Air temperature, humidity, number of extreme-heat days, and satellite-measured land surface temperature.</p>
       </div>
       <div class="pillar sen">
         <h3>Sensitivity</h3>
-        <p>Who lives here? Age, chronic disease prevalence, social vulnerability, environmental health.</p>
+        <p>How vulnerable are the people living here? Age, chronic disease rates, social vulnerability, and environmental health.</p>
       </div>
       <div class="pillar ada">
         <h3>Adaptive Capacity</h3>
-        <p>What resources are available? AC access, tree canopy, income, healthcare, housing quality.</p>
+        <p>What resources help residents cope with heat? Air conditioning access, tree canopy, income, healthcare access, and housing quality.</p>
       </div>
     </div>
 
@@ -173,6 +195,20 @@
       <li>Demographics &amp; housing: <a href="https://www.census.gov/programs-surveys/acs">ACS 5-year estimates</a></li>
       <li>Climate projections: <a href="https://loca.ucsd.edu/">LOCA2</a> downscaled CMIP6 (mid-century 2035&ndash;2064 and end-of-century 2065&ndash;2094)</li>
     </ul>
+
+    <div class="partners">
+      <a href="https://socalheathub.ucsd.edu/" aria-label="UC San Diego — Scripps Institution of Oceanography">
+        <img src="assets/sio_logo.png" alt="UC San Diego — Scripps Institution of Oceanography">
+      </a>
+      <div class="partners-right">
+        <a href="https://www.sandiego.edu/" aria-label="University of San Diego">
+          <img src="assets/usd-logo-horizontal.png" alt="University of San Diego">
+        </a>
+        <a href="https://www.sandiego.edu/soles/centers-and-institutes/nonprofit-institute/signature-programs/climate-collaborative/" aria-label="San Diego Regional Climate Collaborative">
+          <img src="assets/ccsd_logo.png" alt="San Diego Regional Climate Collaborative">
+        </a>
+      </div>
+    </div>
 
     <footer>
       <p>

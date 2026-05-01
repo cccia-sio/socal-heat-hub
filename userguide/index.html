@@ -205,11 +205,35 @@
       font-size:15px;
     }
 
+    /* partner logos */
+    .partners{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:24px;
+      margin-top:56px;
+      padding-top:28px;
+      border-top:1px solid var(--border);
+    }
+    .partners-right{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+    .partners img{
+      height:42px;
+      width:auto;
+      display:block;
+      opacity:0.85;
+      transition:opacity 0.15s;
+    }
+    .partners a:hover img{opacity:1}
+    @media(max-width:520px){
+      .partners{justify-content:center}
+      .partners-right{justify-content:center}
+    }
+
     /* footer */
     footer{
-      margin-top:56px;
-      padding-top:24px;
-      border-top:1px solid var(--border);
+      margin-top:28px;
+      padding-top:0;
       font-size:13px;
       color:var(--muted);
     }
@@ -251,6 +275,10 @@
 
       /* light page-bottom guard for short trailing widows */
       p{orphans:3;widows:3}
+
+      /* partner logos at end of guide */
+      .partners{break-inside:avoid;margin-top:32px;padding-top:14px}
+      .partners img{height:32px;opacity:1}
     }
   </style>
 </head>
@@ -422,6 +450,20 @@
       </tbody>
     </table>
     <p>Each variable name in the tool has a small <code>src</code> link that opens the original source.</p>
+
+    <div class="partners">
+      <a href="https://socalheathub.ucsd.edu/" aria-label="UC San Diego — Scripps Institution of Oceanography">
+        <img src="../assets/sio_logo.png" alt="UC San Diego — Scripps Institution of Oceanography">
+      </a>
+      <div class="partners-right">
+        <a href="https://www.sandiego.edu/" aria-label="University of San Diego">
+          <img src="../assets/usd-logo-horizontal.png" alt="University of San Diego">
+        </a>
+        <a href="https://www.sandiego.edu/soles/centers-and-institutes/nonprofit-institute/signature-programs/climate-collaborative/" aria-label="San Diego Regional Climate Collaborative">
+          <img src="../assets/ccsd_logo.png" alt="San Diego Regional Climate Collaborative">
+        </a>
+      </div>
+    </div>
 
     <footer>
       <a class="back" href="../index.html">&larr; Return to landing page</a>

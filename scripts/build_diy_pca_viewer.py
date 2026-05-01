@@ -1118,7 +1118,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <p>Use the left panel to build your map. Here&rsquo;s what each section does:</p>
       <ul>
         <li><b>Heat Exposure / Population Sensitivity / Adaptive Capacity</b> &mdash; three groups of factors that shape heat risk. Turn any on or off to include them in your map.</li>
-        <li><b>Build Composite Risk Map</b> &mdash; combines the factors you picked into a single risk score for every neighborhood.</li>
+        <li><b>Build Composite Risk Map</b> &mdash; combines the factors you picked into a single risk score for every census tract.</li>
         <li><b>Map Layer</b> &mdash; switch between the combined risk score, each group on its own, or any single factor.</li>
         <li><b>Jurisdictions</b> &mdash; show city or tribal-land boundaries on the map.</li>
         <li><b>Climate Scenario</b> &mdash; see how risk shifts under future warming, for the year 2050 or 2080.</li>
@@ -3793,16 +3793,19 @@ if(cbMode){
   if(cbBox)cbBox.checked=true;
 }
 
-/* Welcome popup — shows once on first visit, dismissed forever via localStorage */
+/* Welcome popup — shows once on first visit, dismissed forever via localStorage.
+   Bump the version suffix on the storage key whenever the popup copy changes
+   so returning users see the updated content. */
+var WELCOME_KEY='hrv-welcome-seen-v3';
 function closeWelcome(){
   var m=document.getElementById('welcome-modal');
   if(!m)return;
   m.classList.remove('open');
-  try{localStorage.setItem('hrv-welcome-seen','1');}catch(e){}
+  try{localStorage.setItem(WELCOME_KEY,'1');}catch(e){}
 }
 (function(){
   var seen=false;
-  try{seen=localStorage.getItem('hrv-welcome-seen')==='1';}catch(e){}
+  try{seen=localStorage.getItem(WELCOME_KEY)==='1';}catch(e){}
   var m=document.getElementById('welcome-modal');
   if(!m)return;
   if(!seen)m.classList.add('open');

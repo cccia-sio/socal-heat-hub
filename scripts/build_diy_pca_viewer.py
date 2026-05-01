@@ -946,7 +946,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       </div>
     </div>
     <div id="scenario-info" class="scenario-info"></div>
-    <button id="scn-cmp-btn" onclick="openScnCompareModal()" title="Open a side-by-side composite-risk map (left) plus heat-exposure change (right) under two climate scenarios">Compare Scenarios Side-by-Side</button>
+    <button id="scn-cmp-btn" onclick="openScnCompareModal()" title="Open a side-by-side composite-risk map (left) plus Heat Exposure change (right) under two climate scenarios">Compare Scenarios Side-by-Side</button>
   </div>
   <div id="accessibility" style="border-top:1px solid #e0e0e0;padding-top:10px;margin-top:14px">
     <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;color:#666">Accessibility</h3>
@@ -1097,8 +1097,8 @@ var LST   = __LST_PLACEHOLDER__;             // Landsat LST overlay meta or null
 var POLARITY = __POLARITY_PLACEHOLDER__;     // {varKey: true if higher=worse(red)}
 
 var PMETA = {
-  exposure:    {label:"Exposure",          color:"#c0392b"},
-  sensitivity: {label:"Sensitivity",       color:"#d35400"},
+  exposure:    {label:"Heat Exposure",     color:"#c0392b"},
+  sensitivity: {label:"Population Sensitivity", color:"#d4a017"},
   adaptive:    {label:"Adaptive Capacity", color:"#16a085"}
 };
 var SREF = {exposure:"mean_tmax", sensitivity:"bphigh_prev", adaptive:"income_pctile"};
@@ -1113,7 +1113,7 @@ var results  = null;
 var curScenario = "present"; // "present" | "ssp245" | "ssp370" | "ssp585"
 var curPeriod   = "";        // "" (present) | "2050" | "2080"
 var cbMode = (function(){try{return localStorage.getItem('hrv-cb-mode')==='1';}catch(e){return false;}})();
-VM.forEach(function(v){ enabled[v.key] = false; });
+VM.forEach(function(v){ enabled[v.key] = true; });
 
 // Pre-compute percentile ranks for every raw variable (for preview rendering)
 var rawPct = {}; // varKey -> array of percentile values (0-100), indexed by feature
@@ -1521,8 +1521,25 @@ function pillarPCA(pid,keys){
     sd[j]=0;for(i=0;i<N;i++)sd[j]+=(X[i][j]-mu[j])*(X[i][j]-mu[j]);
     sd[j]=Math.sqrt(sd[j]/(N-1));if(sd[j]<1e-10)sd[j]=1;
     for(i=0;i<N;i++)X[i][j]=(X[i][j]-mu[j])/sd[j];}
+  // Sign-align each column to its pillar's risk semantics so vulnerability
+  // variables (INVERTED_VARS) point the same way as their peers. Without this,
+  // a P=1 selection of e.g. prob_NoAC would skip alignment and end up with the
+  // 100-s adaptive inversion applied to an already-inverted score. flip[j] is
+  // ±1 — used later to convert PCA loadings back to original-variable space
+  // for tooltip readability.
+  var pillarHigherIsRisk=(pid==="exposure"||pid==="sensitivity");
+  var flip=[];
+  for(j=0;j<P;j++){
+    var keyHigherIsRisk=POLARITY[keys[j]];
+    if(keyHigherIsRisk!==pillarHigherIsRisk){
+      flip.push(-1);
+      for(i=0;i<N;i++)X[i][j]=-X[i][j];
+    }else{
+      flip.push(1);
+    }
+  }
   if(P===1){var raw=[];for(i=0;i<N;i++)raw.push(X[i][0]);
-    return{scores:pctRank(raw),pcs:[{scores:pctRank(raw),pct:100,loadings:[1]}],nret:1,totvar:100,keys:keys};}
+    return{scores:pctRank(raw),pcs:[{scores:pctRank(raw),pct:100,loadings:[flip[0]]}],nret:1,totvar:100,keys:keys};}
   // cov — init all rows first so C[j][i] works when j>i
   var C=[];for(i=0;i<P;i++){C[i]=[];for(j=0;j<P;j++)C[i][j]=0;}
   for(i=0;i<P;i++)for(j=i;j<P;j++){var s=0;for(k=0;k<N;k++)s+=X[k][i]*X[k][j];C[i][j]=C[j][i]=s/(N-1);}
@@ -1553,7 +1570,10 @@ function pillarPCA(pid,keys){
       for(i=0;i<N;i++)raw[i]=-raw[i];
       for(j=0;j<P;j++)ld[j]=-ld[j];
     }
-    pcs.push({scores:pctRank(raw),pct:Math.round(vr[k]*1000)/10,loadings:ld});
+    // Convert loadings back to original-variable space for the "Driven by" tooltip:
+    // a + sign should mean "high original value pushes the pattern up."
+    var ldOrig=[];for(j=0;j<P;j++)ldOrig.push(ld[j]*flip[j]);
+    pcs.push({scores:pctRank(raw),pct:Math.round(vr[k]*1000)/10,loadings:ldOrig});
   }
   var tv=0;for(i=0;i<nret;i++)tv+=vr[i];
   return{scores:pctRank(w),pcs:pcs,nret:nret,totvar:Math.round(tv*1000)/10,keys:keys};
@@ -1626,7 +1646,7 @@ var CE=[[254,229,217],[252,174,145],[251,106,74],[203,24,29]];
 var CS=[[242,240,247],[203,201,226],[158,154,200],[106,81,163]];
 var CA=[[229,245,224],[161,217,155],[65,171,93],[0,109,44]];
 var CD=[[255,255,204],[255,237,160],[254,178,76],[253,141,60],[252,78,42],[227,26,28],[177,0,38]];
-var DRGB={exposure:[192,57,43],sensitivity:[211,84,0],adaptive:[22,160,82]};
+var DRGB={exposure:[192,57,43],sensitivity:[212,160,23],adaptive:[22,160,82]};
 
 // ── Colorblind-friendly palettes ─────────────────────────────────────────
 // Composite + delta: viridis (perceptually uniform, CB-safe across all forms)
@@ -1713,8 +1733,8 @@ function drawTracts(){
         }
       }else{
         if(p._comp!=null) h+='Composite: '+p._comp.toFixed(1)+'<br>';
-        if(p._exposure!=null) h+='Exposure: '+p._exposure.toFixed(1)+'<br>';
-        if(p._sensitivity!=null) h+='Sensitivity: '+p._sensitivity.toFixed(1)+'<br>';
+        if(p._exposure!=null) h+='Heat Exposure: '+p._exposure.toFixed(1)+'<br>';
+        if(p._sensitivity!=null) h+='Population Sensitivity: '+p._sensitivity.toFixed(1)+'<br>';
         if(p._adaptive!=null) h+='Adaptive Cap: '+p._adaptive.toFixed(1)+'<br>';
       }
       h+='<button class="popup-compare-btn" onclick="startCompare(\\''+p.GEOID+'\\')">Compare with another tract</button>';
@@ -1759,16 +1779,16 @@ function showLegend(){
   }
   if(curLayer==="composite"){
     var cstops=pal('CR').map(function(c){return"rgb("+c.join(",")+")"}).join(",");
-    el.innerHTML='<div style="font-weight:600;margin-bottom:2px">Composite Risk'+ic('Mean of the three pillar scores: Exposure, Sensitivity, and low Adaptive Capacity. Each pillar is a PCA-weighted composite of the variables you turned on, percentile-ranked across San Diego County tracts. Higher = greater overall heat risk.')+'</div>'+
+    el.innerHTML='<div style="font-weight:600;margin-bottom:2px">Composite Risk'+ic('Mean of the three pillar scores: Heat Exposure, Population Sensitivity, and low Adaptive Capacity. Each pillar is a PCA-weighted composite of the variables you turned on, percentile-ranked across San Diego County tracts. Higher = greater overall heat risk.')+'</div>'+
       '<div class="grad" style="background:linear-gradient(to right,'+cstops+')"></div>'+
       '<div class="labels"><span>Low</span><span>High</span></div>';
     el.style.display="block";
   }else if(curLayer==="driver"){
     var dr=pal('DRGB');
     var rgb=function(arr){return"rgb("+arr.join(",")+")"};
-    el.innerHTML='<div style="font-weight:600;margin-bottom:4px">Dominant Driver'+ic('Each tract is colored by whichever pillar contributes most to its risk: Exposure, Sensitivity, or low Adaptive Capacity. This identifies the leading driver of heat risk for each tract.')+'</div>'+
-      '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.exposure)+'"></div>Exposure</div>'+
-      '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.sensitivity)+'"></div>Sensitivity</div>'+
+    el.innerHTML='<div style="font-weight:600;margin-bottom:4px">Dominant Driver'+ic('Each tract is colored by whichever pillar contributes most to its risk: Heat Exposure, Population Sensitivity, or low Adaptive Capacity. This identifies the leading driver of heat risk for each tract.')+'</div>'+
+      '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.exposure)+'"></div>Heat Exposure</div>'+
+      '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.sensitivity)+'"></div>Population Sensitivity</div>'+
       '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.adaptive)+'"></div>Adaptive Capacity</div>'+
       '<div style="font-size:10px;color:#999;margin-top:3px;font-style:italic">Lighter = lower risk</div>';
     el.style.display="block";
@@ -2105,7 +2125,7 @@ function openCompareModal(geoidA,geoidB){
   if(hasPca){
     var pcaA='<div class="cmp-pillar-hdr" style="border-color:#444;color:#444">PCA Scores</div>';
     var pcaB=pcaA;
-    [['_comp','Composite Risk'],['_exposure','Exposure'],['_sensitivity','Sensitivity'],['_adaptive','Adaptive Capacity']].forEach(function(p){
+    [['_comp','Composite Risk'],['_exposure','Heat Exposure'],['_sensitivity','Population Sensitivity'],['_adaptive','Adaptive Capacity']].forEach(function(p){
       var aV=fA.properties[p[0]],bV=fB.properties[p[0]];
       if(aV==null||bV==null)return;
       var clsA='cmp-row',clsB='cmp-row';
@@ -2371,8 +2391,8 @@ function _renderCityCompareBody(nameA,nameB){
     var pcaA='<div class="cmp-pillar-hdr" style="border-color:#444;color:#444">PCA Scores</div>';
     var pcaB=pcaA;
     var rankNote=' <span style="font-size:10px;color:#999">(mean tract rank)</span>';
-    [['_comp','Composite Risk'],['_exposure','Exposure'],
-     ['_sensitivity','Sensitivity'],['_adaptive','Adaptive Capacity']].forEach(function(p){
+    [['_comp','Composite Risk'],['_exposure','Heat Exposure'],
+     ['_sensitivity','Population Sensitivity'],['_adaptive','Adaptive Capacity']].forEach(function(p){
       var aR=_jurisPopWMean(nameA,p[0]);
       var bR=_jurisPopWMean(nameB,p[0]);
       if(aR===null||bR===null)return;
@@ -2653,7 +2673,7 @@ function openScnCompareModal(){
   }
   if(!anyExposure){
     var eb2=document.getElementById('error-bar');
-    eb2.textContent='Turn on at least one Exposure variable (e.g. a temperature metric) — that pillar is what changes between scenarios.';
+    eb2.textContent='Turn on at least one Heat Exposure variable (e.g. a temperature metric) — that pillar is what changes between scenarios.';
     eb2.style.display='block';
     setTimeout(function(){eb2.style.display='none';},5000);
     return;
@@ -3087,8 +3107,8 @@ function _captureStudyAreaMap(){
         subtitle=_scenarioLabel();
         var d=pal('DRGB');
         driverRows=[
-          {label:'Exposure',rgb:d.exposure},
-          {label:'Sensitivity',rgb:d.sensitivity},
+          {label:'Heat Exposure',rgb:d.exposure},
+          {label:'Population Sensitivity',rgb:d.sensitivity},
           {label:'Adaptive Capacity',rgb:d.adaptive}
         ];
       }else{

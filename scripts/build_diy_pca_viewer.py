@@ -2829,9 +2829,10 @@ function renderScnCompareSide(side){
     var expB=computeExposureFor(scn, period);
     if(!expB){if(metaEl)metaEl.textContent='No exposure variables selected.';return;}
     scnCmpExp.b=expB;
+    var partsA=scnCmpScn.a.split('|');
+    var scnA=partsA[0], periodA=partsA[1]||'';
     if(!scnCmpExp.a){
-      var partsA=scnCmpScn.a.split('|');
-      scnCmpExp.a=computeExposureFor(partsA[0],partsA[1]||'');
+      scnCmpExp.a=computeExposureFor(scnA, periodA);
     }
     var expA=scnCmpExp.a||[];
     var delta=new Array(expB.length);
@@ -2844,6 +2845,15 @@ function renderScnCompareSide(side){
     if(maxAbs<1)maxAbs=1; // floor so an all-zero scale doesn't render as 0/0
     window._scnDeltaMax=maxAbs;
     window._scnDeltaArr=delta;
+    // Per-tract LOCA2 Δ°C lookup (returns 0 for present day or missing data)
+    function _scnDelta(s,p,loca,i){
+      if(s==='present'||!DELTAS||!p)return 0;
+      var pp=DELTAS[p];if(!pp)return 0;
+      var ps=pp[s];if(!ps)return 0;
+      var arr=ps[loca];if(!arr)return 0;
+      return arr[i]||0;
+    }
+    var showClimateSignal=(scnA!=='present'||scn!=='present');
     styleFn=function(f){
       var idx=window._gIdx[f.properties.GEOID]||0;
       var d=delta[idx];
@@ -2855,10 +2865,22 @@ function renderScnCompareSide(side){
       var idx=window._gIdx[f.properties.GEOID]||0;
       var d=delta[idx];
       var sign=(d>0?'+':'');
+      var climateBlock='';
+      if(showClimateSignal){
+        var dTmax=_scnDelta(scn,period,'tasmax',idx)-_scnDelta(scnA,periodA,'tasmax',idx);
+        var dTmin=_scnDelta(scn,period,'tasmin',idx)-_scnDelta(scnA,periodA,'tasmin',idx);
+        var sMax=(dTmax>=0?'+':''), sMin=(dTmin>=0?'+':'');
+        climateBlock='<div style="border-top:1px solid #ddd;margin-top:4px;padding-top:4px;color:#666;font-size:11px">'+
+          'Underlying climate signal (this tract, B − A):'+
+          '<br>Δ mean Tmax: <b>'+sMax+dTmax.toFixed(2)+'\\u00b0C</b>'+
+          '<br>Δ mean Tmin: <b>'+sMin+dTmin.toFixed(2)+'\\u00b0C</b>'+
+          '</div>';
+      }
       lyr.bindTooltip('Tract '+f.properties.GEOID.slice(-6)+
         '<br>Δ Heat Exposure rank: <b>'+sign+d.toFixed(1)+'</b> percentile pts'+
         '<br><span style="color:#888">A rank: '+(expA[idx]!=null?expA[idx].toFixed(1):'—')+
-        ' → B rank: '+expB[idx].toFixed(1)+' (0–100)</span>',
+        ' → B rank: '+expB[idx].toFixed(1)+' (0–100)</span>'+
+        climateBlock,
         {sticky:true,className:'juris-tip'});
     };
   }

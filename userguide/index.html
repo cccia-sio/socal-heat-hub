@@ -183,6 +183,13 @@
       padding:32px 20px;
       background:var(--soft);
     }
+    figure.screenshot img{
+      max-width:100%;
+      height:auto;
+      border:1px solid var(--border);
+      border-radius:6px;
+      background:#fff;
+    }
     figure.screenshot figcaption{margin-top:6px}
 
     /* data sources table */
@@ -400,20 +407,19 @@
     <h3>Index interpretation</h3>
     <p>The Heat Risk Index is a <em>relative percentile</em>, not absolute risk. A Heat Risk Index of 75 means the census tract is at higher risk than 75% of San Diego County census tracts. It does not mean 75% of residents will be harmed.</p>
     <figure class="screenshot">
-      <!-- TODO: replace with screenshot of a census-tract popup showing the Heat Risk Index and dominant driver -->
-      <div class="placeholder">Screenshot placeholder: example census-tract popup showing a Heat Risk Index and dominant driver.</div>
-      <figcaption>Example: clicking a census tract opens a panel with its Heat Risk Index and dominant driver.</figcaption>
+      <img src="figure_hero_composite.png" alt="Two maps of San Diego County at the census-tract level: left, the composite Heat Risk Index colored from light yellow to dark red; right, the dominant risk driver — Heat Exposure, Population Sensitivity, or low Adaptive Capacity — with lighter shades indicating lower composite risk.">
+      <figcaption>San Diego County tracts shown two ways: the composite Heat Risk Index (left) and each tract&rsquo;s dominant risk driver (right).</figcaption>
     </figure>
 
     <h3>Map layers</h3>
     <ul>
-      <li><strong>Composite Risk:</strong> the 0&ndash;100 Heat Risk Index combining all three pillars (default view).</li>
-      <li><strong>Dominant Driver:</strong> census tracts are colored by which pillar contributes most to the Heat Risk Index. This distinguishes hotspots driven by Heat Exposure from those driven by Population Sensitivity or low Adaptive Capacity. Click on a census tract to see the scores for each of the three pillars.</li>
+      <li><strong>Composite Risk (left panel):</strong> the 0&ndash;100 Heat Risk Index combining all three pillars (default view).</li>
+      <li><strong>Dominant Driver (right panel):</strong> census tracts are colored by which pillar contributes most to the Heat Risk Index. This distinguishes hotspots driven by Heat Exposure from those driven by Population Sensitivity or low Adaptive Capacity. Click on a census tract to see the scores for each of the three pillars.</li>
       <li><strong>Primary Spatial Patterns:</strong> this drop-down menu lists the independent patterns identified by PCA across all selected variables. Each entry is labeled <strong>Pattern N (var X%)</strong>, where N is the pattern's rank by importance and X% is the share of variance in the data that this pattern explains. Hover over the blue info icons to see which variables contribute most to each pattern.</li>
     </ul>
 
     <h3>Census tract panel</h3>
-    <p>Click a census tract for its three pillar scores, its Heat Risk Index, and its dominant driver.</p>
+    <p>Click a census tract for its three pillar scores, its Heat Risk Index, its dominant driver, and to compare it directly against other census tracts.</p>
 
     <h3>Sidebar panel</h3>
     <p>The left sidebar lets you customize the map. Sections, from top to bottom:</p>
@@ -440,10 +446,10 @@
       <li><strong>High Emissions (SSP 3-7.0):</strong> emissions remain high.</li>
       <li><strong>Very High Emissions (SSP 5-8.5):</strong> unchecked fossil-fuel use.</li>
     </ul>
-    <p><strong>Compare Scenarios Side-by-Side</strong> (button below the emissions-pathway selector) opens a paired view: the Heat Risk Index map under one scenario on the left, and the change in Heat Exposure pillar rank between two chosen scenarios on the right (B minus A). The two scenarios on either side can be set independently.</p>
+    <p><strong>Compare Scenarios Side-by-Side</strong> (button below the emissions-pathway selector) opens a paired view: the Heat Risk Index map under one scenario on the left, and the change in Heat Exposure pillar rank between two chosen scenarios on the right (B minus A, in percentile points on the 0&ndash;100 pillar scale &mdash; <em>not</em> degrees of warming). The two scenarios on either side can be set independently.</p>
     <figure class="screenshot">
-      <!-- TODO: replace with screenshot of the Compare Scenarios Side-by-Side button in the sidebar -->
-      <div class="placeholder">Screenshot placeholder: Compare Scenarios Side-by-Side button.</div>
+      <img src="figure_compare_scenarios.png" alt="Compare Scenarios modal. Left panel: present-day Composite Heat Risk Index across San Diego County tracts, shaded yellow (lower) to dark red (higher). Right panel: change in Heat Exposure pillar rank for End-of-Century 2080 under SSP 2-4.5 minus Present Day, shaded blue (lower) to red (higher), values from −15.1 to +15.1 percentile points.">
+      <figcaption>Compare Scenarios view: present-day Composite Risk (left) alongside the change in Heat Exposure pillar rank for End-of-Century 2080 under SSP 2-4.5, relative to Present Day (right).</figcaption>
     </figure>
     <p>Population Sensitivity and Adaptive Capacity variables are held at present-day values. Reliable long-range projections for demographic, health, and infrastructure conditions don't yet exist at the census-tract level, so the tool does not project future changes to these variables.</p>
 

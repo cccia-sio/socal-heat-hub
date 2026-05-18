@@ -980,7 +980,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       </div>
     </div>
     <div id="scenario-info" class="scenario-info"></div>
-    <button id="scn-cmp-btn" onclick="openScnCompareModal()" title="Open a side-by-side composite-risk map (left) plus Heat Exposure change (right) under two climate scenarios">Compare Scenarios Side-by-Side</button>
+    <button id="scn-cmp-btn" onclick="openScnCompareModal()" title="Open a side-by-side composite-risk map (left) plus Heat Exposure pillar-rank change in percentile points (right) under two climate scenarios">Compare Scenarios Side-by-Side</button>
   </div>
   <div id="accessibility" style="border-top:1px solid #e0e0e0;padding-top:10px;margin-top:14px">
     <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;color:#666">Accessibility</h3>
@@ -2856,9 +2856,9 @@ function renderScnCompareSide(side){
       var d=delta[idx];
       var sign=(d>0?'+':'');
       lyr.bindTooltip('Tract '+f.properties.GEOID.slice(-6)+
-        '<br>Δ Heat Exposure: <b>'+sign+d.toFixed(1)+'</b>'+
-        '<br><span style="color:#888">A: '+(expA[idx]!=null?expA[idx].toFixed(1):'—')+
-        ' → B: '+expB[idx].toFixed(1)+'</span>',
+        '<br>Δ Heat Exposure rank: <b>'+sign+d.toFixed(1)+'</b> percentile pts'+
+        '<br><span style="color:#888">A rank: '+(expA[idx]!=null?expA[idx].toFixed(1):'—')+
+        ' → B rank: '+expB[idx].toFixed(1)+' (0–100)</span>',
         {sticky:true,className:'juris-tip'});
     };
   }
@@ -2879,7 +2879,7 @@ function renderScnCompareSide(side){
     } else {
       var aLab=null;
       for(var k2=0;k2<opts.length;k2++){if(opts[k2].val===scnCmpScn.a){aLab=opts[k2].label;break;}}
-      metaEl.innerHTML='Δ Heat Exposure vs. <b>'+(aLab||scnCmpScn.a)+'</b> &middot; '+(lab||'');
+      metaEl.innerHTML='Δ Heat Exposure pillar rank (percentile pts) vs. <b>'+(aLab||scnCmpScn.a)+'</b> &middot; '+(lab||'');
     }
   }
 }
@@ -2898,7 +2898,7 @@ function _refreshScnCompareLegend(){
       '<span class="cmp-lst-ticks"><span>Lower</span><span>Higher</span></span>'+
     '</div>'+
     '<div class="scn-leg-block">'+
-      '<span class="cmp-lst-title">Right — Δ Heat Exposure (B − A):</span>'+
+      '<span class="cmp-lst-title">Right — Δ Heat Exposure pillar rank (B − A, percentile pts):</span>'+
       '<span class="cmp-lst-bar" style="background:linear-gradient(to right,'+divStops+')"></span>'+
       '<span class="cmp-lst-ticks"><span>−'+dMax+'</span><span>0</span><span>+'+dMax+'</span></span>'+
     '</div>';

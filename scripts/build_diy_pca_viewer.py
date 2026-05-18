@@ -1165,8 +1165,8 @@ var POLARITY = __POLARITY_PLACEHOLDER__;     // {varKey: true if higher=worse(re
 
 var PMETA = {
   exposure:    {label:"Heat Exposure",     color:"#c0392b"},
-  sensitivity: {label:"Population Sensitivity", color:"#d4a017"},
-  adaptive:    {label:"Adaptive Capacity", color:"#16a085"}
+  sensitivity: {label:"Population Sensitivity", color:"#6a51a3"},
+  adaptive:    {label:"Adaptive Capacity", color:"#006d2c"}
 };
 var SREF = {exposure:"mean_tmax", sensitivity:"bphigh_prev", adaptive:"income_pctile"};
 

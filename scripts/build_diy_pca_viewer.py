@@ -53,7 +53,6 @@ INVERTED_VARS = {
     "pm25_pctile",
     "dieselpm_pctile",
     # Adaptive Capacity — these are vulnerabilities, not protections
-    "prob_NoAC",
     "pct_pre1980",
     "pct_pre1960",
     "pct_renter",
@@ -131,9 +130,8 @@ VARIABLES = [
     ("RPL_THEME4", "Housing/Transportation", "sensitivity", "Social Vulnerability Index (SVI)"),
     # ── Adaptive Capacity ────────────────────────────────────────────────
     # Air Conditioning
-    ("ac_prob", "AC Prevalence", "adaptive", "Air Conditioning"),
-    ("prob_NoAC", "Prob. No AC", "adaptive", "Air Conditioning"),
-    ("prob_Central", "Prob. Central AC", "adaptive", "Air Conditioning"),
+    ("ac_prob", "AC Prevalence (LACE)", "adaptive", "Air Conditioning"),
+    ("ac_prob_romitti", "AC Prevalence (Romitti)", "adaptive", "Air Conditioning"),
     # Built Environment
     ("treecanopy_pctile", "Tree Canopy", "adaptive", "Built Environment"),
     ("parkaccess_pctile", "Park Access", "adaptive", "Built Environment"),
@@ -170,8 +168,8 @@ _SRC_MESOWEST = "https://synopticdata.com/"
 _SRC_PLACES = "https://www.cdc.gov/places/index.html"
 _SRC_SVI = "https://www.atsdr.cdc.gov/place-health/php/svi/index.html"
 _SRC_HPI = "https://www.healthyplacesindex.org/"
+_SRC_LACE = "https://www.census.gov/newsroom/press-releases/2026/2023-lace.html"
 _SRC_ROMITTI = "https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629"
-_SRC_AHN = "https://doi.org/10.1038/s41597-025-06104-3"
 _SRC_ACS_B25034 = "https://censusreporter.org/tables/B25034/"
 _SRC_ACS_B25003 = "https://censusreporter.org/tables/B25003/"
 _SRC_SANGIS = "https://sdgis-sandag.opendata.arcgis.com/"
@@ -205,10 +203,10 @@ VAR_SOURCES = {
     "EP_GROUPQ": _SRC_SVI, "EP_NOINT": _SRC_SVI,
     "RPL_THEMES": _SRC_SVI, "RPL_THEME1": _SRC_SVI, "RPL_THEME2": _SRC_SVI,
     "RPL_THEME3": _SRC_SVI, "RPL_THEME4": _SRC_SVI,
+    # Adaptive — Census LACE 2023 (Local Air Conditioning Estimates)
+    "ac_prob": _SRC_LACE,
     # Adaptive — Romitti et al. (2022)
-    "ac_prob": _SRC_ROMITTI,
-    # Adaptive — Ahn & Uejio / COMBUST PLUS
-    "prob_NoAC": _SRC_AHN, "prob_Central": _SRC_AHN,
+    "ac_prob_romitti": _SRC_ROMITTI,
     # Adaptive — ACS
     "pct_pre1980": _SRC_ACS_B25034, "pct_pre1960": _SRC_ACS_B25034,
     "pct_renter": _SRC_ACS_B25003,
@@ -320,22 +318,30 @@ def load_data():
         svi.loc[svi["E_TOTPOP"] < 0, "E_TOTPOP"] = np.nan
     tracts = _safe_merge(tracts, svi, _SVI_COLS + ["E_TOTPOP"])
 
-    # ── Adaptive — AC prevalence ──
+    # ── Adaptive — AC prevalence (Census LACE 2023) ──
     ac = pd.read_csv(
-        ROOT / "data/adaptive_capacity/aircon/tract_ac_prevalence_sd_summary.csv"
+        ROOT / "data/adaptive_capacity/aircon/LACE_23_Tract.csv",
+        dtype={"GEO_ID": str},
     )
-    ac["GEOID"] = ac["GEOID"].astype(str).str.zfill(11)
+    # GEO_ID like '1400000US06073020811' -> 11-digit GEOID after 'US'
+    ac["GEOID"] = ac["GEO_ID"].str.split("US").str[-1].str.zfill(11)
+    # Census uses negative "jam" sentinels for suppressed/undefined estimates;
+    # valid AC_PE is a percent in [0, 100]. Convert to a 0–1 prevalence fraction
+    # to match the existing ac_prob semantics (higher = more AC = more capacity).
+    ac["AC_PE"] = pd.to_numeric(ac["AC_PE"], errors="coerce")
+    ac.loc[~ac["AC_PE"].between(0, 100), "AC_PE"] = np.nan
+    ac["ac_prob"] = ac["AC_PE"] / 100.0
     tracts = _safe_merge(tracts, ac, ["ac_prob"])
 
-    # ── Adaptive — AC type probabilities (Ahn et al.) ──
-    ac_type_path = (ROOT / "data/adaptive_capacity/aircon/ahn_etal"
-                    / "Uncertainty_tract/summary_ACprob_tract_2020.csv")
-    if ac_type_path.exists():
-        act = pd.read_csv(ac_type_path)
-        act["GEOID"] = act["GEOID"].astype(str).str.zfill(11)
-        # Rename columns with spaces
-        act = act.rename(columns={"prob_Evaporative Cooler": "prob_EvapCooler"})
-        tracts = _safe_merge(tracts, act, ["prob_NoAC", "prob_Central"])
+    # ── Adaptive — AC prevalence (Romitti et al. 2022) ──
+    # Second, independent AC-prevalence estimate kept alongside LACE.
+    rom = pd.read_csv(
+        ROOT / "data/adaptive_capacity/aircon/tract_ac_prevalence_sd_summary.csv",
+        dtype={"GEOID": str},
+    )
+    rom["GEOID"] = rom["GEOID"].str.zfill(11)
+    rom = rom.rename(columns={"ac_prob": "ac_prob_romitti"})
+    tracts = _safe_merge(tracts, rom, ["ac_prob_romitti"])
 
     # ── Adaptive — HPI domain-level (2020 tracts) ──
     hpi = pd.read_csv(ROOT / "data/sensitivity/hpi/hpi_san_diego_2020tracts.csv")
@@ -1297,8 +1303,7 @@ function getAdj(varKey,i){
 var _CMP_TEMP_KEYS={mean_tmax:1,p85_tmax:1,p99_tmax:1,max_tmax:1,
   mean_lst:1,p85_wbgt:1,p99_wbgt:1,
   mean_tmin_overnight:1,p90_tmin_overnight:1,p95_dewpoint:1};
-var _CMP_FRAC_KEYS={no_relief_fraction:1,ac_prob:1,prob_NoAC:1,
-  prob_Central:1};
+var _CMP_FRAC_KEYS={no_relief_fraction:1,ac_prob:1,ac_prob_romitti:1};
 function fmtCmpRaw(key,val){
   if(val==null||isNaN(val))return '\\u2014';
   var v=+val;
@@ -1590,7 +1595,7 @@ function pillarPCA(pid,keys){
     for(i=0;i<N;i++)X[i][j]=(X[i][j]-mu[j])/sd[j];}
   // Sign-align each column to its pillar's risk semantics so vulnerability
   // variables (INVERTED_VARS) point the same way as their peers. Without this,
-  // a P=1 selection of e.g. prob_NoAC would skip alignment and end up with the
+  // a P=1 selection of e.g. pct_renter would skip alignment and end up with the
   // 100-s adaptive inversion applied to an already-inverted score. flip[j] is
   // ±1 — used later to convert PCA loadings back to original-variable space
   // for tooltip readability.

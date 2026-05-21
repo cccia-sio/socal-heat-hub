@@ -792,6 +792,21 @@ details.pc-group[open]>summary::before{transform:rotate(90deg)}
   border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:500;
   cursor:pointer;font-family:inherit}
 .popup-compare-btn:hover{background:#1d4ed8}
+#city-focus-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  z-index:1001;background:#fff;color:#1f2937;padding:7px 8px 7px 14px;
+  border-radius:10px;font-size:13px;display:none;align-items:center;gap:10px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.14);border:1px solid #e5e7eb}
+#city-focus-bar.show{display:flex}
+#city-focus-bar .cf-name{font-weight:700;color:#111827}
+#city-focus-bar .cf-hint{color:#6b7280;font-size:11px}
+#city-focus-bar button{background:#fff;border:1px solid #d1d5db;border-radius:7px;
+  padding:5px 10px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;
+  color:#374151;transition:all 0.15s}
+#city-focus-bar button:hover{background:#f3f4f6;border-color:#9ca3af}
+#city-focus-bar button.cf-primary{background:#2563eb;border-color:#2563eb;color:#fff}
+#city-focus-bar button.cf-primary:hover{background:#1d4ed8}
+#city-focus-bar button.cf-primary:disabled{opacity:0.6;cursor:wait}
+#city-focus-bar button.cf-exit{padding:5px 9px;color:#6b7280;font-weight:700}
 
 #compare-modal{position:fixed;inset:0;z-index:2000;background:rgba(20,25,40,0.55);
   display:none;align-items:center;justify-content:center;
@@ -897,10 +912,18 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   border-top:1px solid #e5e7eb;background:#fafafa;font-size:11px;color:#555;
   flex-shrink:0;flex-wrap:wrap}
 .scn-leg-block{display:flex;align-items:center;gap:8px;flex:1;min-width:260px}
-.scn-leg-block .cmp-lst-bar{flex:1;height:10px;border-radius:2px;border:1px solid #ddd;
+.scn-leg-scale{display:flex;flex-direction:column;gap:2px;flex:1;
   min-width:120px;max-width:280px}
-.scn-leg-block .cmp-lst-ticks{display:flex;justify-content:space-between;flex:1;
-  max-width:280px;color:#888;font-variant-numeric:tabular-nums}
+.scn-leg-scale .cmp-lst-bar{width:100%;height:10px;border-radius:2px;border:1px solid #ddd}
+.scn-leg-scale .cmp-lst-ticks{display:flex;justify-content:space-between;width:100%;
+  color:#888;font-variant-numeric:tabular-nums}
+
+/* Permanent city-name labels on jurisdiction layers */
+.juris-label{background:transparent;border:none;box-shadow:none;padding:0;
+  font-size:12px;font-weight:700;color:#1a1a1a;white-space:nowrap;
+  text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;pointer-events:none}
+.juris-label::before{display:none}
+.tribal-label{color:#6b4423}
 
 /* --- welcome popup --- */
 #welcome-modal{position:fixed;inset:0;z-index:2300;background:rgba(20,25,40,0.55);
@@ -1014,6 +1037,13 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   <div id="compare-banner">
     <span><b>Compare mode:</b> click a second tract to compare with <span id="compare-first-id">—</span>.</span>
     <button onclick="cancelCompare()">Cancel (ESC)</button>
+  </div>
+  <div id="city-focus-bar">
+    <span class="cf-name" id="cf-name">—</span>
+    <span class="cf-hint">click tracts to explore</span>
+    <button class="cf-primary" id="cf-pdf-btn" onclick="downloadCityPdf()">Export risk PDF</button>
+    <button id="cf-compare-btn" onclick="openCityCompareModal(focusedCity)">Compare cities</button>
+    <button class="cf-exit" onclick="exitCityView()" title="Exit city view (ESC)">&times;</button>
   </div>
 </div>
 
@@ -1336,6 +1366,7 @@ var tLayer = null;
 
 // City jurisdiction boundary overlays — one layer per city, all rendered in black
 var jurisLayers={};
+var jurisLabels={};   // name -> permanent center label tooltip, shown with the layer
 var JURIS_COLOR="#000000";
 function jurisCheckboxId(name){return "cb-juris-"+name.replace(/\s+/g,"_");}
 if(JURIS){
@@ -1362,9 +1393,9 @@ if(JURIS){
           }
           return;
         }
-        openCityCompareModal(name);
+        focusCity(name);
       });
-      lyr.bindTooltip(f.properties.NAME+" \\u2014 click to compare",{sticky:true,className:"juris-tip"});
+      lyr.bindTooltip(f.properties.NAME+" \\u2014 click to zoom in",{sticky:true,className:"juris-tip"});
     };
   }
   // One layer per city, alphabetically sorted
@@ -1376,6 +1407,10 @@ if(JURIS){
     if(feats.length===0)return;
     var gj={type:"FeatureCollection",features:feats};
     jurisLayers[name]=L.geoJSON(gj,{style:makeJurisStyle(),onEachFeature:makeJurisHL(name)});
+    // Permanent center label so the city name is visible without hovering.
+    jurisLabels[name]=L.tooltip({permanent:true,direction:"center",className:"juris-label",interactive:false})
+      .setContent(name)
+      .setLatLng(jurisLayers[name].getBounds().getCenter());
   });
   // Build per-city checkbox list
   var itemsEl=document.getElementById("juris-items");
@@ -1396,18 +1431,19 @@ function toggleJurisLayer(name){
   var lyr=jurisLayers[name];
   if(!lyr)return;
   var cb=document.getElementById(jurisCheckboxId(name));
-  if(cb&&cb.checked){lyr.addTo(map);lyr.bringToFront();}
-  else{map.removeLayer(lyr);}
+  if(cb&&cb.checked){lyr.addTo(map);lyr.bringToFront();if(jurisLabels[name])jurisLabels[name].addTo(map);}
+  else{map.removeLayer(lyr);if(jurisLabels[name])map.removeLayer(jurisLabels[name]);if(focusedCity===name)exitCityView();}
   syncJurisAllCheckbox();
 }
 function toggleJurisAll(on){
+  if(!on&&focusedCity)exitCityView();
   Object.keys(jurisLayers).forEach(function(name){
     var cb=document.getElementById(jurisCheckboxId(name));
     if(cb)cb.checked=!!on;
     var lyr=jurisLayers[name];
     if(!lyr)return;
-    if(on){lyr.addTo(map);lyr.bringToFront();}
-    else{map.removeLayer(lyr);}
+    if(on){lyr.addTo(map);lyr.bringToFront();if(jurisLabels[name])jurisLabels[name].addTo(map);}
+    else{map.removeLayer(lyr);if(jurisLabels[name])map.removeLayer(jurisLabels[name]);}
   });
 }
 function syncJurisAllCheckbox(){
@@ -1421,10 +1457,47 @@ function syncJurisAllCheckbox(){
   all.indeterminate=(n>0&&n<names.length);
 }
 
+// ── City focus: click a city to zoom in and explore its tracts ──────────
+// While focused, the focused city's polygon fill is made non-interactive so
+// clicks/hovers fall through to the census tracts underneath; other city
+// polygons stay clickable so you can hop straight to another city.
+var focusedCity=null;
+function _setCityFillClickable(name,on){
+  var lyr=jurisLayers[name];
+  if(!lyr)return;
+  lyr.eachLayer(function(l){
+    if(l&&l._path)l._path.style.pointerEvents=on?"":"none";
+  });
+}
+function focusCity(name){
+  var lyr=jurisLayers[name];
+  if(!lyr)return;
+  // Make sure the city's boundary + label are actually on the map.
+  var cb=document.getElementById(jurisCheckboxId(name));
+  if(cb&&!cb.checked){cb.checked=true;toggleJurisLayer(name);}
+  // Restore the previously focused city's interior, mute the new one's.
+  if(focusedCity&&focusedCity!==name)_setCityFillClickable(focusedCity,true);
+  focusedCity=name;
+  _setCityFillClickable(name,false);
+  try{map.fitBounds(lyr.getBounds(),{padding:[24,24]});}catch(e){}
+  var bar=document.getElementById("city-focus-bar");
+  document.getElementById("cf-name").textContent=name;
+  if(bar)bar.classList.add("show");
+}
+function exitCityView(){
+  if(focusedCity){_setCityFillClickable(focusedCity,true);focusedCity=null;}
+  var bar=document.getElementById("city-focus-bar");
+  if(bar)bar.classList.remove("show");
+  if(tLayer&&tLayer.getBounds){
+    try{map.fitBounds(tLayer.getBounds(),{padding:[10,10]});}catch(e){}
+  }
+}
+
 // Tribal lands overlays — Census TIGER AIANNH 2024 (San Diego County)
 // Reservations and off-reservation trust lands are paired under one tribe entry;
 // the map distinguishes them with a solid (reservation) vs dashed (trust) outline.
 var tribalLayers={};      // keyed by full feature name (each polygon)
+var tribalLabels={};      // name -> permanent center label, shown with the layer
 var tribalGroups={};      // tribeKey -> [feature names]
 var TRIBAL_COLORS={reservation:"#8b5a2b",trust:"#b78050"};
 function tribalGroupKey(name){
@@ -1470,6 +1543,12 @@ if(typeof TRIBAL!=='undefined'&&TRIBAL&&TRIBAL.features&&TRIBAL.features.length)
       style:makeTribalStyle(f.properties.TYPE),
       onEachFeature:makeTribalHL(name)
     });
+    // Permanent center label so the tribe name is visible without hovering.
+    var gk0=tribalGroupKey(name);
+    var labelTxt=gk0+((f.properties.TYPE==='trust')?" (Trust Land)":"");
+    tribalLabels[name]=L.tooltip({permanent:true,direction:"center",className:"juris-label tribal-label",interactive:false})
+      .setContent(labelTxt)
+      .setLatLng(tribalLayers[name].getBounds().getCenter());
     var gk=tribalGroupKey(name);
     if(!tribalGroups[gk])tribalGroups[gk]=[];
     tribalGroups[gk].push(name);
@@ -1497,8 +1576,8 @@ function toggleTribalLayer(groupKey){
   feats.forEach(function(name){
     var lyr=tribalLayers[name];
     if(!lyr)return;
-    if(on){lyr.addTo(map);lyr.bringToFront();}
-    else{map.removeLayer(lyr);}
+    if(on){lyr.addTo(map);lyr.bringToFront();if(tribalLabels[name])tribalLabels[name].addTo(map);}
+    else{map.removeLayer(lyr);if(tribalLabels[name])map.removeLayer(tribalLabels[name]);}
   });
   syncTribalAllCheckbox();
 }
@@ -1509,8 +1588,8 @@ function toggleTribalAll(on){
     tribalGroups[gk].forEach(function(name){
       var lyr=tribalLayers[name];
       if(!lyr)return;
-      if(on){lyr.addTo(map);lyr.bringToFront();}
-      else{map.removeLayer(lyr);}
+      if(on){lyr.addTo(map);lyr.bringToFront();if(tribalLabels[name])tribalLabels[name].addTo(map);}
+      else{map.removeLayer(lyr);if(tribalLabels[name])map.removeLayer(tribalLabels[name]);}
     });
   });
 }
@@ -2110,6 +2189,7 @@ document.addEventListener('keydown',function(e){
     else if(document.getElementById('compare-modal').classList.contains('open')){closeCompareModal();}
     else if(cityModal&&cityModal.classList.contains('open')){closeCityCompareModal();}
     else if(compareMode==='awaiting'){cancelCompare();}
+    else if(focusedCity){exitCityView();}
   }
 });
 
@@ -2921,13 +3001,17 @@ function _refreshScnCompareLegend(){
   lel.innerHTML=
     '<div class="scn-leg-block">'+
       '<span class="cmp-lst-title">Left — Composite Risk:</span>'+
-      '<span class="cmp-lst-bar" style="background:linear-gradient(to right,'+crStops+')"></span>'+
-      '<span class="cmp-lst-ticks"><span>Lower</span><span>Higher</span></span>'+
+      '<span class="scn-leg-scale">'+
+        '<span class="cmp-lst-bar" style="background:linear-gradient(to right,'+crStops+')"></span>'+
+        '<span class="cmp-lst-ticks"><span>Lower</span><span>Higher</span></span>'+
+      '</span>'+
     '</div>'+
     '<div class="scn-leg-block">'+
       '<span class="cmp-lst-title">Right — Δ Heat Exposure pillar rank (B − A, percentile pts):</span>'+
-      '<span class="cmp-lst-bar" style="background:linear-gradient(to right,'+divStops+')"></span>'+
-      '<span class="cmp-lst-ticks"><span>−'+dMax+'</span><span>0</span><span>+'+dMax+'</span></span>'+
+      '<span class="scn-leg-scale">'+
+        '<span class="cmp-lst-bar" style="background:linear-gradient(to right,'+divStops+')"></span>'+
+        '<span class="cmp-lst-ticks"><span>−'+dMax+'</span><span>0</span><span>+'+dMax+'</span></span>'+
+      '</span>'+
     '</div>';
 }
 
@@ -2999,7 +3083,8 @@ function _scenarioLabel(){
 // tile pane and SVG vector pane: each pane lives under its own CSS
 // translate3d, and html2canvas captured them at different transforms,
 // producing the misaligned tracts-vs-basemap output we used to ship.
-function _captureStudyAreaMap(){
+function _captureStudyAreaMap(opts){
+  opts=opts||{};
   return new Promise(function(resolve,reject){
     // Logical figure size; canvas is rendered at 2x for retina-print output.
     var TARGET_W=1600, TARGET_H=1200;
@@ -3016,9 +3101,10 @@ function _captureStudyAreaMap(){
     var projMap=L.map(projDiv,{zoomControl:false,attributionControl:false,
       fadeAnimation:false,zoomAnimation:false});
 
-    // Frame the study area (tract bounds, fall back to county bbox)
+    // Frame the requested bounds, else the study area (tract bounds → county bbox)
     var bounds=null;
-    if(tLayer&&tLayer.getBounds){var b=tLayer.getBounds();if(b&&b.isValid())bounds=b;}
+    if(opts.bounds&&opts.bounds.isValid&&opts.bounds.isValid())bounds=opts.bounds;
+    if(!bounds&&tLayer&&tLayer.getBounds){var b=tLayer.getBounds();if(b&&b.isValid())bounds=b;}
     if(!bounds)bounds=L.latLngBounds([32.53,-117.62],[33.51,-116.08]);
     projMap.fitBounds(bounds,{padding:[20,20],animate:false});
 
@@ -3215,15 +3301,16 @@ function _captureStudyAreaMap(){
       }
       if(!title)return;
 
+      // City-scoped exports omit the jurisdiction/tribal checklist entirely.
       var cityRows=[];
-      if(typeof JURIS!=='undefined'&&JURIS&&typeof jurisLayers!=='undefined'){
+      if(!opts.jurisName&&typeof JURIS!=='undefined'&&JURIS&&typeof jurisLayers!=='undefined'){
         Object.keys(jurisLayers).sort(function(a,b){return a.localeCompare(b);}).forEach(function(k){
           if(!map.hasLayer(jurisLayers[k]))return;
           cityRows.push({label:k, color:JURIS_COLOR});
         });
       }
       var tribalRows=[];
-      if(typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalGroups!=='undefined'){
+      if(!opts.jurisName&&typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalGroups!=='undefined'){
         Object.keys(tribalGroups).sort(function(a,b){return a.localeCompare(b);}).forEach(function(gk){
           var anyOn=tribalGroups[gk].some(function(name){return map.hasLayer(tribalLayers[name]);});
           if(!anyOn)return;
@@ -3363,24 +3450,44 @@ function _captureStudyAreaMap(){
       ctx.fillText(text,bx,by);
     }
 
+    // When scoped to one city, clip tract drawing to that city's polygon so the
+    // whole municipal area is filled exactly. (Centroid-based tract assignment
+    // dropped boundary-straddling tracts, leaving gaps.) Tracts tile the county
+    // with no holes, so clipping + drawing all of them fills the city cleanly.
+    var clipFeats=null;
+    if(opts.jurisName&&typeof JURIS!=='undefined'&&JURIS){
+      clipFeats=JURIS.features.filter(function(f){return f.properties.NAME===opts.jurisName;});
+    }
+    function pathCity(){
+      ctx.beginPath();
+      clipFeats.forEach(function(f){
+        var g=f.geometry;if(!g)return;
+        if(g.type==='Polygon')addRings(g.coordinates);
+        else if(g.type==='MultiPolygon')g.coordinates.forEach(addRings);
+      });
+    }
+
     Promise.all(tileTasks).then(function(){
       // Tracts — colored using the live `fcolor()` against current pillar/var state
       if(tLayer&&typeof GJ!=='undefined'&&GJ&&GJ.features){
+        if(clipFeats&&clipFeats.length){ctx.save();pathCity();ctx.clip('evenodd');}
         GJ.features.forEach(function(f){
           var idx=window._gIdx[f.properties.GEOID]||0;
           drawFeature(f,fcolor(f.properties,idx),'#ffffff',0.5*SCALE,0.85);
         });
+        if(clipFeats&&clipFeats.length)ctx.restore();
       }
-      // Replicate visible jurisdiction outlines
+      // Jurisdiction outlines: just the focused city when scoped, else all visible
       if(typeof JURIS!=='undefined'&&JURIS){
         Object.keys(jurisLayers).forEach(function(k){
-          if(!map.hasLayer(jurisLayers[k]))return;
+          if(opts.jurisName){if(k!==opts.jurisName)return;}
+          else if(!map.hasLayer(jurisLayers[k]))return;
           var feats=JURIS.features.filter(function(f){return f.properties.NAME===k;});
           feats.forEach(function(f){drawFeature(f,null,JURIS_COLOR,1.8*SCALE,0);});
         });
       }
-      // Replicate visible tribal land outlines
-      if(typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalLayers!=='undefined'){
+      // Replicate visible tribal land outlines (skipped on city-scoped exports)
+      if(!opts.jurisName&&typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalLayers!=='undefined'){
         Object.keys(tribalLayers).forEach(function(k){
           if(!map.hasLayer(tribalLayers[k]))return;
           var f=TRIBAL.features.filter(function(x){return x.properties.NAME===k;})[0];
@@ -3393,8 +3500,7 @@ function _captureStudyAreaMap(){
           if(dashed)ctx.restore();
         });
       }
-      drawLegend();
-      drawScaleBar();
+      if(!opts.minimal){drawLegend();drawScaleBar();}
       drawAttribution();
       cleanup();
       resolve(canvas);
@@ -3405,7 +3511,8 @@ function _captureStudyAreaMap(){
   });
 }
 
-function _heroPdf(canvas){
+function _heroPdf(canvas,opts){
+  opts=opts||{};
   var jsPDF=window.jspdf.jsPDF;
   var pdf=new jsPDF({orientation:'landscape',unit:'pt',format:'letter',compress:true});
   var pw=pdf.internal.pageSize.getWidth();   // 792
@@ -3424,9 +3531,10 @@ function _heroPdf(canvas){
 
   pdf.setFont('helvetica','normal');
   pdf.setFontSize(11);pdf.setTextColor(71,85,105);
-  pdf.text(_layerLabel(),M,55);
+  var lead=opts.jurisName?(opts.jurisName+'  \\u2014  '+_layerLabel()):_layerLabel();
+  pdf.text(lead,M,55);
   pdf.setTextColor(120,130,148);
-  pdf.text('  \\u2022  '+_scenarioLabel(),M+pdf.getTextWidth(_layerLabel()),55);
+  pdf.text('  \\u2022  '+_scenarioLabel(),M+pdf.getTextWidth(lead),55);
 
   // ── Map figure ─────────────────────────────────────────────
   var top=92;
@@ -3476,7 +3584,8 @@ function _heroPdf(canvas){
   pdf.text(url,pw-M-urlW,ph-18);
 
   var ts=dt.toISOString().replace(/[:.]/g,'-').slice(0,19);
-  pdf.save('san_diego_heat_risk_'+ts+'.pdf');
+  var slug=opts.jurisName?('_'+opts.jurisName.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')):'';
+  pdf.save('san_diego_heat_risk'+slug+'_'+ts+'.pdf');
 }
 
 function downloadMapPdf(){
@@ -3501,6 +3610,153 @@ function downloadMapPdf(){
     bar.style.display='block';
     setTimeout(function(){bar.style.display='none';},9000);
   });
+}
+
+// Crisp gradient bar drawn as vector segments (jsPDF has no native gradients).
+function _pdfGradientBar(pdf,x,y,w,h,stops){
+  var n=64;
+  for(var i=0;i<n;i++){
+    var c=interpC(stops,i/(n-1));
+    pdf.setFillColor(c[0],c[1],c[2]);
+    pdf.rect(x+(i/n)*w,y,w/n+0.6,h,'F');
+  }
+  pdf.setDrawColor(180,188,200);pdf.setLineWidth(0.4);pdf.rect(x,y,w,h);
+}
+
+// City-scoped two-panel figure: composite risk (left) + dominant driver (right),
+// mirroring the user-guide hero figure but framed and clipped to one city. Builds
+// the composite first if it hasn't been computed yet.
+function downloadCityPdf(){
+  var name=focusedCity;
+  if(!name||!jurisLayers[name]){return;}
+  var btn=document.getElementById('cf-pdf-btn');
+  if(btn)btn.disabled=true;
+  function bail(msg){
+    if(btn)btn.disabled=false;
+    var b=document.getElementById('error-bar');
+    b.textContent=msg;b.style.display='block';
+    setTimeout(function(){b.style.display='none';},7000);
+  }
+  // Build the composite first if it hasn't been computed yet.
+  if(!results){
+    compute();
+    if(!results){bail('Turn on at least one variable, then export.');return;}
+  }
+  var bounds=jurisLayers[name].getBounds();
+  var prevLayer=curLayer, prevRaw=rawVar;
+  function restore(){curLayer=prevLayer;rawVar=prevRaw;}
+  _pdfShow('Loading PDF library\\u2026');
+  _ensurePdfLibs().then(function(){
+    _pdfShow('Rendering '+name+' \\u2014 composite\\u2026');
+    rawVar=null;curLayer='composite';
+    return _captureStudyAreaMap({bounds:bounds,jurisName:name,minimal:true});
+  }).then(function(canvasL){
+    _pdfShow('Rendering '+name+' \\u2014 dominant driver\\u2026');
+    rawVar=null;curLayer='driver';
+    return _captureStudyAreaMap({bounds:bounds,jurisName:name,minimal:true})
+      .then(function(canvasR){return [canvasL,canvasR];});
+  }).then(function(pair){
+    _pdfShow('Building PDF\\u2026');
+    restore();
+    _heroPdfTwoPanel(pair[0],pair[1],{jurisName:name});
+    _pdfHide();
+    if(btn)btn.disabled=false;
+  }).catch(function(err){
+    restore();
+    console.error('City PDF export failed:',err);
+    _pdfHide();
+    if(btn)btn.disabled=false;
+    var bar=document.getElementById('error-bar');
+    bar.textContent='PDF export failed: '+err.message+
+      '. If basemap tiles were blocked, allow basemaps.cartocdn.com, or use the browser\\u2019s Print \\u2192 Save as PDF.';
+    bar.style.display='block';
+    setTimeout(function(){bar.style.display='none';},9000);
+  });
+}
+
+function _heroPdfTwoPanel(cL,cR,opts){
+  opts=opts||{};
+  var jsPDF=window.jspdf.jsPDF;
+  var pdf=new jsPDF({orientation:'landscape',unit:'pt',format:'letter',compress:true});
+  var pw=pdf.internal.pageSize.getWidth();   // 792
+  var ph=pdf.internal.pageSize.getHeight();  // 612
+  var M=36;
+
+  // ── Title band ─────────────────────────────────────────────
+  pdf.setFillColor(247,249,252);pdf.rect(0,0,pw,72,'F');
+  pdf.setFillColor(37,99,235);pdf.rect(0,72,pw,2.4,'F');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(20);pdf.setTextColor(15,23,42);
+  pdf.text('San Diego Heat Risk Explorer',M,36);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(11);pdf.setTextColor(71,85,105);
+  var lead=(opts.jurisName?opts.jurisName+'  \\u2014  ':'')+'Composite Risk & Dominant Driver';
+  pdf.text(lead,M,55);
+  pdf.setTextColor(120,130,148);
+  pdf.text('  \\u2022  '+_scenarioLabel(),M+pdf.getTextWidth(lead),55);
+
+  // ── Two panels side by side ────────────────────────────────
+  var gap=22, capH=15, legH=40;
+  var top=90, bottom=ph-58;
+  var colW=(pw-2*M-gap)/2;
+  var imgAreaH=(bottom-top)-capH-legH;
+  var ratio=cL.width/cL.height;
+
+  function placePanel(canvas,x0,caption,kind){
+    // caption
+    pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.setTextColor(30,41,59);
+    pdf.text(caption,x0+colW/2,top+11,{align:'center'});
+    // image, centered in its area
+    var imgW=colW, imgH=imgW/ratio;
+    if(imgH>imgAreaH){imgH=imgAreaH;imgW=imgH*ratio;}
+    var imgX=x0+(colW-imgW)/2;
+    var imgY=top+capH+(imgAreaH-imgH)/2;
+    pdf.setFillColor(225,228,235);pdf.rect(imgX+2,imgY+2,imgW,imgH,'F');
+    pdf.addImage(canvas.toDataURL('image/png'),'PNG',imgX,imgY,imgW,imgH,undefined,'FAST');
+    pdf.setDrawColor(203,213,225);pdf.setLineWidth(0.6);pdf.rect(imgX,imgY,imgW,imgH);
+    // legend below image
+    var ly=top+capH+imgAreaH+12;
+    if(kind==='composite'){
+      var barW=Math.min(colW*0.7,190), barX=x0+(colW-barW)/2;
+      _pdfGradientBar(pdf,barX,ly,barW,8,pal('CR'));
+      pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(100,116,139);
+      pdf.text('Lower',barX,ly+18);
+      pdf.text('Higher',barX+barW,ly+18,{align:'right'});
+    }else{
+      var d=pal('DRGB');
+      var items=[['Heat Exposure',d.exposure],['Pop. Sensitivity',d.sensitivity],['Adaptive Capacity',d.adaptive]];
+      var sw=9, txtGap=4, itemGap=12;
+      pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);
+      var total=0;
+      items.forEach(function(it){total+=sw+txtGap+pdf.getTextWidth(it[0]);});
+      total+=itemGap*(items.length-1);
+      var ix=x0+(colW-total)/2, iy=ly;
+      items.forEach(function(it){
+        var c=it[1];
+        pdf.setFillColor(c[0],c[1],c[2]);pdf.rect(ix,iy,sw,sw,'F');
+        pdf.setTextColor(71,85,105);
+        pdf.text(it[0],ix+sw+txtGap,iy+sw-1.5);
+        ix+=sw+txtGap+pdf.getTextWidth(it[0])+itemGap;
+      });
+      pdf.setFontSize(6.5);pdf.setTextColor(140,150,165);
+      pdf.text('Lighter shade = lower composite risk',x0+colW/2,ly+18,{align:'center'});
+    }
+  }
+  placePanel(cL,M,'Composite Risk','composite');
+  placePanel(cR,M+colW+gap,'Dominant Driver','driver');
+
+  // ── Footer ─────────────────────────────────────────────────
+  pdf.setDrawColor(226,232,240);pdf.setLineWidth(0.5);pdf.line(M,ph-46,pw-M,ph-46);
+  pdf.setFontSize(8);pdf.setTextColor(100,116,139);
+  var dt=new Date();
+  var dStr=dt.toLocaleString(undefined,{year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+  pdf.text('Generated '+dStr,M,ph-30);
+  pdf.text('Sources: LOCA2-Hybrid CMIP6 \\u00b7 USGS Landsat \\u00b7 NOAA HRRR \\u00b7 CDC PLACES & SVI \\u00b7 HealthyPlacesIndex',M,ph-18);
+  var url='connorjmack.github.io/heat-risk-viewer';
+  pdf.setFont('helvetica','bold');pdf.setTextColor(37,99,235);
+  var urlW=pdf.getTextWidth(url);pdf.text(url,pw-M-urlW,ph-18);
+
+  var ts=dt.toISOString().replace(/[:.]/g,'-').slice(0,19);
+  var slug=opts.jurisName?('_'+opts.jurisName.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')):'';
+  pdf.save('san_diego_heat_risk'+slug+'_'+ts+'.pdf');
 }
 
 /* ================================================================

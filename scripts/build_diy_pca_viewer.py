@@ -89,10 +89,10 @@ VARIABLES = [
     ("mean_tmin_overnight", "Mean Overnight Minimum Temperature", "exposure", "Nighttime Heat"),
     ("p90_tmin_overnight", "90th Percentile Overnight Minimum Temperature", "exposure", "Nighttime Heat"),
     ("no_relief_fraction", "No-Relief Night Fraction", "exposure", "Nighttime Heat"),
-    # Humidity
-    ("mean_rh_hrrr", "Mean Relative Humidity", "exposure", "Humidity"),
-    ("mean_rh_hot_hours", "Mean Humidity During Hot Hours", "exposure", "Humidity"),
-    ("p95_dewpoint", "95th Percentile Dewpoint Temperature", "exposure", "Humidity"),
+    # NOTE: Raw humidity (mean_rh_hrrr, mean_rh_hot_hours, p95_dewpoint) is
+    # intentionally NOT exposed as exposure variables. Humidity is a hazard
+    # *modifier*, already integrated into WBGT (which is the "Humid heat" mode);
+    # as a standalone variable it loaded backwards. See the HEAT_MODES design.
     # ── Sensitivity ──────────────────────────────────────────────────────
     # Health — CDC PLACES
     ("bphigh_prev", "High Blood Pressure", "sensitivity", "Health"),
@@ -162,6 +162,30 @@ VARIABLES = [
     ("pm25_pctile", "PM 2.5", "sensitivity", "Environment"),
     ("dieselpm_pctile", "Diesel PM", "sensitivity", "Environment"),
 ]
+
+# ── Exposure heat modes ──────────────────────────────────────────────────
+# The exposure pillar is NOT a PCA blend — it's a single-select "heat mode."
+# Each mode is a distinct physical hazard; its score is the mean of its
+# z-scored member layers, percentile-ranked (no PCA). Daytime is the default.
+# Rationale: heat hazards are physically distinct (daytime vs. nighttime heat
+# are spatially anti-correlated, r=-0.18), so collapsing them via PCA produced
+# an inland/coastal geography axis and a backwards humidity loading.
+# (key, label, [member layer keys], one-line description)
+HEAT_MODES = [
+    ("daytime", "Daytime heat",
+     ["mean_tmax", "p85_tmax", "p99_tmax", "max_tmax"],
+     "Daytime air temperature — typical and extreme highs. Peaks inland."),
+    ("nighttime", "Nighttime heat",
+     ["mean_tmin_overnight", "p90_tmin_overnight", "no_relief_fraction"],
+     "Overnight heat and lack of relief. Peaks in dense urban/coastal tracts."),
+    ("wbgt", "Humid heat (WBGT)",
+     ["p85_wbgt", "p99_wbgt"],
+     "Wet-Bulb Globe Temperature — integrates heat, humidity, sun, and wind."),
+    ("surface", "Surface temperature",
+     ["mean_lst"],
+     "Satellite land-surface temperature — radiant/urban-heat-island signal."),
+]
+DEFAULT_HEAT_MODE = "daytime"
 
 # ── Source URLs per variable ─────────────────────────────────────────────
 _SRC_MESOWEST = "https://synopticdata.com/"
@@ -487,6 +511,14 @@ def main():
         {k: v for k, v in VAR_SOURCES.items() if k in tracts.columns},
         ensure_ascii=True,
     )
+    # Heat modes: drop any layer missing from the data, then any empty mode.
+    heat_modes_str = json.dumps(
+        [{"key": k, "label": lbl, "layers": [c for c in cols if c in tracts.columns],
+          "desc": desc}
+         for k, lbl, cols, desc in HEAT_MODES
+         if any(c in tracts.columns for c in cols)],
+        ensure_ascii=True,
+    )
     deltas_str = json.dumps(deltas, ensure_ascii=True) if deltas else "null"
     delta_map_str = json.dumps(
         {k: v for k, v in DELTA_VAR_MAP.items() if k in tracts.columns},
@@ -537,6 +569,7 @@ def main():
     html = html.replace("__GEOJSON_PLACEHOLDER__", geojson_str)
     html = html.replace("__VARMETA_PLACEHOLDER__", var_meta_str)
     html = html.replace("__VARSOURCES_PLACEHOLDER__", var_sources_str)
+    html = html.replace("__HEATMODES_PLACEHOLDER__", heat_modes_str)
     html = html.replace("__DELTAS_PLACEHOLDER__", deltas_str)
     html = html.replace("__DELTAMAP_PLACEHOLDER__", delta_map_str)
     html = html.replace("__JURIS_PLACEHOLDER__", juris_str)
@@ -623,6 +656,18 @@ details.subsec[open] summary::before{transform:rotate(90deg)}
   margin-left:auto;white-space:nowrap;flex-shrink:0}
 .src-link:hover{text-decoration:underline}
 .var-row.on .src-link{display:inline}
+
+/* Heat-exposure single-select mode rows (compact radio list) */
+.mode-help{font-size:11px;color:#777;line-height:1.4;margin:1px 0 4px;padding-left:2px}
+.mode-row{display:flex;align-items:baseline;gap:7px;padding:2px 0 2px 12px;
+  cursor:pointer;user-select:none}
+.mode-row input[type=radio]{width:13px;height:13px;accent-color:currentColor;
+  cursor:pointer;flex-shrink:0;margin:0;align-self:center}
+.mode-txt{display:flex;align-items:baseline;gap:6px;font-size:12px}
+.mode-name{color:#444}
+.mode-row.on .mode-name{font-weight:600}
+.mode-meta{font-size:10px;color:#aaa;cursor:help;
+  text-decoration:underline dotted #ccc;text-underline-offset:2px}
 
 #compute-btn{width:100%;padding:11px;margin:16px 0 12px;
   background:#2563eb;color:#fff;border:none;border-radius:10px;
@@ -1169,7 +1214,8 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       </div>
       <p>Or use the left panel to customize your map. Here&rsquo;s what each section does:</p>
       <ul>
-        <li><b>Heat Exposure / Population Sensitivity / Adaptive Capacity</b> &mdash; three groups of factors that shape heat risk. Turn any on or off to include them in your map.</li>
+        <li><b>Heat Exposure</b> &mdash; pick one heat hazard to map (daytime, nighttime, humid heat, or surface temperature). They affect different places, so you compare them one at a time.</li>
+        <li><b>Population Sensitivity / Adaptive Capacity</b> &mdash; two groups of factors that shape heat risk. Turn any on or off to include them in your map.</li>
         <li><b>Build Composite Risk Map</b> &mdash; combines the factors you picked into a single risk score for every census tract.</li>
         <li><b>Map Layer</b> &mdash; switch between the combined risk score, each group on its own, or any single factor.</li>
         <li><b>Jurisdictions</b> &mdash; show city or tribal-land boundaries on the map.</li>
@@ -1198,6 +1244,7 @@ var JURIS = __JURIS_PLACEHOLDER__;           // city jurisdiction GeoJSON or nul
 var TRIBAL = __TRIBAL_PLACEHOLDER__;         // tribal lands GeoJSON or null
 var LST   = __LST_PLACEHOLDER__;             // Landsat LST overlay meta or null
 var POLARITY = __POLARITY_PLACEHOLDER__;     // {varKey: true if higher=worse(red)}
+var HEAT_MODES = __HEATMODES_PLACEHOLDER__;  // [{key,label,layers:[...],desc}] — exposure is single-select, not PCA
 
 var PMETA = {
   exposure:    {label:"Heat Exposure",     color:"#c0392b"},
@@ -1209,14 +1256,23 @@ var SREF = {exposure:"mean_tmax", sensitivity:"bphigh_prev", adaptive:"income_pc
 /* ================================================================
    STATE
    ================================================================ */
-var enabled = {};   // varKey -> bool
+var enabled = {};   // varKey -> bool (sensitivity/adaptive only; exposure uses heatMode)
+var heatMode = (HEAT_MODES[0]?HEAT_MODES[0].key:"daytime"); // selected exposure hazard
 var curLayer = "composite";
 var rawVar   = null; // key of raw variable being previewed (before PCA)
 var results  = null;
 var curScenario = "present"; // "present" | "ssp245" | "ssp370" | "ssp585"
 var curPeriod   = "";        // "" (present) | "2050" | "2080"
 var cbMode = (function(){try{return localStorage.getItem('hrv-cb-mode')==='1';}catch(e){return false;}})();
-VM.forEach(function(v){ enabled[v.key] = true; });
+// Exposure is a single-select heat mode, so its raw variables are excluded from
+// the `enabled` toggle set — only Sensitivity and Adaptive Capacity use toggles.
+VM.forEach(function(v){ enabled[v.key] = (v.pillar!=="exposure"); });
+
+// Resolve a heat-mode key to its definition object.
+function heatModeDef(key){
+  for(var i=0;i<HEAT_MODES.length;i++)if(HEAT_MODES[i].key===key)return HEAT_MODES[i];
+  return HEAT_MODES[0]||null;
+}
 
 // Pre-compute percentile ranks for every raw variable (for preview rendering)
 var rawPct = {}; // varKey -> array of percentile values (0-100), indexed by feature
@@ -1730,6 +1786,29 @@ function pillarPCA(pid,keys){
   return{scores:pctRank(w),pcs:pcs,nret:nret,totvar:Math.round(tv*1000)/10,keys:keys};
 }
 
+// Exposure pillar score for the currently-selected heat mode. NOT PCA:
+// the mean of the mode's z-scored member layers (climate deltas applied),
+// percentile-ranked. Returns a result shaped like pillarPCA's (scores + empty
+// pcs) so the rest of the pipeline is unchanged. Returns null if no data.
+function exposureScore(){
+  var mode=heatModeDef(heatMode);if(!mode)return null;
+  var feats=GJ.features,N=feats.length,i,j;
+  var keys=mode.layers.filter(function(k){
+    for(var t=0;t<N;t++){if(feats[t].properties[k]!=null)return true;}return false;});
+  if(!keys.length)return null;
+  var acc=new Array(N);for(i=0;i<N;i++)acc[i]=0;
+  for(j=0;j<keys.length;j++){
+    var d=getDeltaArr(keys[j]),x=new Array(N),mu=0;
+    for(i=0;i<N;i++){var v=feats[i].properties[keys[j]];if(v==null)v=0;if(d)v+=d[i];x[i]=v;mu+=v;}
+    mu/=N;var sd=0;for(i=0;i<N;i++)sd+=(x[i]-mu)*(x[i]-mu);
+    sd=Math.sqrt(sd/(N-1));if(sd<1e-10)sd=1;
+    for(i=0;i<N;i++)acc[i]+=(x[i]-mu)/sd;
+  }
+  for(i=0;i<N;i++)acc[i]/=keys.length;
+  return{scores:pctRank(acc),pcs:[],nret:0,totvar:null,keys:keys,
+         mode:mode.key,label:mode.label};
+}
+
 /* ================================================================
    COMPUTE
    ================================================================ */
@@ -1737,17 +1816,13 @@ function compute(){
   try{
     document.getElementById("prompt").style.display="none";
     document.getElementById("error-bar").style.display="none";
-    // collect enabled vars per pillar
-    var pv={exposure:[],sensitivity:[],adaptive:[]};
-    VM.forEach(function(v){if(enabled[v.key])pv[v.pillar].push(v.key);});
-    var total=pv.exposure.length+pv.sensitivity.length+pv.adaptive.length;
-    console.log("Pillar vars:",JSON.stringify({e:pv.exposure.length,s:pv.sensitivity.length,a:pv.adaptive.length}));
-    if(total===0){document.getElementById("prompt").style.display="flex";
-      document.getElementById("prompt").textContent="Turn on at least one variable, then click Build Composite Risk Map";return;}
-    rawVar=null; // switch from raw preview to PCA results mode
-    // PCA
-    var res={};
-    ["exposure","sensitivity","adaptive"].forEach(function(pid){res[pid]=pillarPCA(pid,pv[pid]);});
+    // collect enabled vars per pillar (exposure uses the selected heat mode, not toggles)
+    var pv={sensitivity:[],adaptive:[]};
+    VM.forEach(function(v){if(v.pillar!=="exposure"&&enabled[v.key])pv[v.pillar].push(v.key);});
+    rawVar=null; // switch from raw preview to results mode
+    // Exposure = selected heat mode (no PCA); Sensitivity/Adaptive = PCA.
+    var res={exposure:exposureScore()};
+    ["sensitivity","adaptive"].forEach(function(pid){res[pid]=pillarPCA(pid,pv[pid]);});
     // write to features
     var N=GJ.features.length;
     for(var i=0;i<N;i++){
@@ -1837,6 +1912,8 @@ function fcolor(pr,fi){
     return toHex(interpC(cs,(pct-2)/96));
   }
   if(curLayer==="composite")return toHex(interpC(cr,(pr._comp-2)/96));
+  if(curLayer==="exposure"){var ev=pr._exposure;if(ev==null)return"#ccc";
+    return toHex(interpC(pcc.exposure||cr,(ev-2)/96));}
   if(curLayer==="driver"){var b=drgb[pr._drv]||[128,128,128];
     var intn=0.15+0.85*(pr._drvI||0.5);
     return toHex(b.map(function(c){return Math.round(255-intn*(255-c))}));}
@@ -1930,8 +2007,15 @@ function showLegend(){
   }
   if(curLayer==="composite"){
     var cstops=pal('CR').map(function(c){return"rgb("+c.join(",")+")"}).join(",");
-    el.innerHTML='<div style="font-weight:600;margin-bottom:2px">Composite Risk'+ic('Mean of the three pillar scores: Heat Exposure, Population Sensitivity, and low Adaptive Capacity. Each pillar is a PCA-weighted composite of the variables you turned on, percentile-ranked across San Diego County tracts. Higher = greater overall heat risk.')+'</div>'+
+    el.innerHTML='<div style="font-weight:600;margin-bottom:2px">Composite Risk'+ic('Mean of the three pillar scores: Heat Exposure, Population Sensitivity, and low Adaptive Capacity. Heat Exposure is the heat mode you selected; Sensitivity and Adaptive Capacity are PCA-weighted composites of the variables you turned on. Each is percentile-ranked across San Diego County tracts. Higher = greater overall heat risk.')+'</div>'+
       '<div class="grad" style="background:linear-gradient(to right,'+cstops+')"></div>'+
+      '<div class="labels"><span>Low</span><span>High</span></div>';
+    el.style.display="block";
+  }else if(curLayer==="exposure"){
+    var estops=(pal('PCC').exposure||pal('CR')).map(function(c){return"rgb("+c.join(",")+")"}).join(",");
+    var emL=(results&&results.exposure&&results.exposure.label)||"Heat Exposure";
+    el.innerHTML='<div style="font-weight:600;margin-bottom:2px">Heat Exposure &mdash; '+emL+ic('The selected heat mode, scored as the mean of its z-scored layers and percentile-ranked across San Diego County tracts. Higher = hotter relative to other tracts. This is not a PCA blend.')+'</div>'+
+      '<div class="grad" style="background:linear-gradient(to right,'+estops+')"></div>'+
       '<div class="labels"><span>Low</span><span>High</span></div>';
     el.style.display="block";
   }else if(curLayer==="driver"){
@@ -1965,7 +2049,28 @@ function showLegend(){
    ================================================================ */
 function buildUI(){
   var el=document.getElementById("controls"),html="";
-  ["exposure","sensitivity","adaptive"].forEach(function(pid){
+  // ── Heat Exposure: single-select heat mode (radio), not a PCA blend ──
+  (function(){
+    var pm=PMETA.exposure;
+    html+='<div class="pillar-section">';
+    html+='<div class="pillar-hdr" style="border-color:'+pm.color+';color:'+pm.color+'">'+pm.label+'</div>';
+    html+='<div class="mode-help">Pick one heat hazard to map. Each is scored on its own &mdash; daytime and nighttime heat affect different places.</div>';
+    HEAT_MODES.forEach(function(m){
+      var on=(heatMode===m.key);
+      var n=m.layers.length;
+      var meta=n>1?('('+n+' layers)'):'(1 layer)';
+      // Hover the layer-count to see which layers are averaged into the mode.
+      var layerTip=(n>1?'Averaged layers:\\n':'Layer:\\n')+
+        m.layers.map(function(k){return '\\u2022 '+(varLabel[k]||k);}).join('\\n');
+      html+='<label class="mode-row'+(on?' on':'')+'" id="mr_'+m.key+'" style="color:'+pm.color+'" title="'+m.desc.replace(/"/g,'&quot;')+'">'+
+        '<input type="radio" name="heatmode"'+(on?' checked':'')+' onchange="selectHeatMode(\\''+m.key+'\\')">'+
+        '<span class="mode-txt"><span class="mode-name">'+m.label+'</span>'+
+        '<span class="mode-meta" title="'+layerTip.replace(/"/g,'&quot;')+'">'+meta+'</span></span></label>';
+    });
+    html+='</div>';
+  })();
+  // ── Sensitivity & Adaptive Capacity: multi-toggle variables (PCA) ──
+  ["sensitivity","adaptive"].forEach(function(pid){
     var pm=PMETA[pid];
     html+='<div class="pillar-section">';
     html+='<label class="pillar-hdr" style="border-color:'+pm.color+';color:'+pm.color+'" title="Toggle all variables in this pillar">'+
@@ -1984,18 +2089,41 @@ function buildUI(){
         var chk=enabled[v.key]?" checked":"";
         var cls=enabled[v.key]?"var-row on":"var-row";
         var src=VSRC[v.key]?'<a class="src-link" href="'+VSRC[v.key]+'" target="_blank">(Source)</a>':"";
-        var fix=(DELTAS&&v.pillar==='exposure'&&!DELTA_MAP[v.key])?
-          '<span class="fixed-tag" id="fix_'+v.key+'" style="display:none">held fixed</span>':"";
         html+='<div class="'+cls+'" id="vr_'+v.key+'"><label style="color:'+pm.color+'">'+
           '<input type="checkbox" onchange="tog(\\''+v.key+'\\')" '+chk+'>'+
-          '<span style="color:#444">'+v.label+'</span></label>'+fix+src+'</div>';
+          '<span style="color:#444">'+v.label+'</span></label>'+src+'</div>';
       });
       html+='</details>';
     });
     html+='</div>';
   });
   el.innerHTML=html;
-  ["exposure","sensitivity","adaptive"].forEach(syncPillarCb);
+  ["sensitivity","adaptive"].forEach(syncPillarCb);
+}
+
+// Select a heat mode (exposure is single-select). Recompute if a composite is
+// already built; otherwise live-preview the mode's lead layer on the map.
+function selectHeatMode(key){
+  if(!heatModeDef(key))return;
+  heatMode=key;
+  var rows=document.querySelectorAll('.mode-row');
+  for(var i=0;i<rows.length;i++)rows[i].classList.remove('on');
+  var row=document.getElementById('mr_'+key);if(row)row.classList.add('on');
+  if(results)compute();
+  else previewHeatMode();
+}
+
+// Pre-build preview: show the selected mode's lead layer using the existing
+// raw-variable percentile machinery (a quick look at the heat geography).
+function previewHeatMode(){
+  var mode=heatModeDef(heatMode);if(!mode)return;
+  var lead=null;
+  for(var i=0;i<mode.layers.length;i++){if(rawPct[mode.layers[i]]){lead=mode.layers[i];break;}}
+  if(!lead)return;
+  rawVar=lead;curLayer="composite";
+  updateDeltaRange();
+  document.getElementById("prompt").style.display="none";
+  drawTracts();
 }
 
 function tog(key){
@@ -2076,8 +2204,12 @@ function showResults(){
   var html="";
   ["exposure","sensitivity","adaptive"].forEach(function(pid){
     var r=results[pid],pm=PMETA[pid];
-    if(r)html+='<div class="res-row"><b style="color:'+pm.color+'">'+pm.label+'</b>: '+
-      r.totvar+'% var ('+r.nret+' PC'+(r.nret>1?'s':'')+')</div>';
+    if(r&&pid==="exposure")
+      html+='<div class="res-row"><b style="color:'+pm.color+'">'+pm.label+'</b>: '+
+        (r.label||"heat mode")+'</div>';
+    else if(r)
+      html+='<div class="res-row"><b style="color:'+pm.color+'">'+pm.label+'</b>: '+
+        r.totvar+'% var ('+r.nret+' PC'+(r.nret>1?'s':'')+')</div>';
     else html+='<div class="res-row res-empty">'+pm.label+': no variables</div>';
   });
   el.innerHTML=html;
@@ -2111,6 +2243,13 @@ function showLayerBtns(){
    {id:"driver",label:"Dominant Driver",dot:"#2c3e50"}].forEach(function(b){
     html+='<button class="lbtn'+(curLayer===b.id?" active":"")+'" onclick="setLyr(\\''+b.id+'\\')">'+
       '<span class="ldot" style="background:'+b.dot+'"></span>'+b.label+'</button>';});
+  // Exposure mode score (its own map — exposure is a heat mode, not PCA patterns)
+  if(results&&results.exposure){
+    var emLab=results.exposure.label||"Heat Exposure";
+    html+='<button class="lbtn'+(curLayer==="exposure"?" active":"")+'" onclick="setLyr(\\'exposure\\')">'+
+      '<span class="ldot" style="background:'+PMETA.exposure.color+'"></span>'+
+      '<span class="lbtn-txt">Heat Exposure &mdash; '+emLab+'</span></button>';
+  }
   if(results){
     var anyPC=false;
     ["exposure","sensitivity","adaptive"].forEach(function(pid){
@@ -2275,7 +2414,7 @@ function openCompareModal(geoidA,geoidB){
   // Add PCA pillar / composite scores at top if available
   var hasPca=(fA.properties._comp!=null);
   if(hasPca){
-    var pcaA='<div class="cmp-pillar-hdr" style="border-color:#444;color:#444">PCA Scores</div>';
+    var pcaA='<div class="cmp-pillar-hdr" style="border-color:#444;color:#444">Pillar Scores</div>';
     var pcaB=pcaA;
     [['_comp','Composite Risk'],['_exposure','Heat Exposure'],['_sensitivity','Population Sensitivity'],['_adaptive','Adaptive Capacity']].forEach(function(p){
       var aV=fA.properties[p[0]],bV=fB.properties[p[0]];
@@ -2540,7 +2679,7 @@ function _renderCityCompareBody(nameA,nameB){
     }
   });
   if(results){
-    var pcaA='<div class="cmp-pillar-hdr" style="border-color:#444;color:#444">PCA Scores</div>';
+    var pcaA='<div class="cmp-pillar-hdr" style="border-color:#444;color:#444">Pillar Scores</div>';
     var pcaB=pcaA;
     var rankNote=' <span style="font-size:10px;color:#999">(mean tract rank)</span>';
     [['_comp','Composite Risk'],['_exposure','Heat Exposure'],
@@ -2762,12 +2901,10 @@ function computeCompositeFor(scenario, period){
   curScenario=scenario;
   curPeriod=(scenario==='present')?'':(period||'');
   try{
-    var pv={exposure:[],sensitivity:[],adaptive:[]};
-    VM.forEach(function(v){if(enabled[v.key])pv[v.pillar].push(v.key);});
-    var total=pv.exposure.length+pv.sensitivity.length+pv.adaptive.length;
-    if(total===0)return null;
-    var res={};
-    ['exposure','sensitivity','adaptive'].forEach(function(pid){
+    var pv={sensitivity:[],adaptive:[]};
+    VM.forEach(function(v){if(v.pillar!=="exposure"&&enabled[v.key])pv[v.pillar].push(v.key);});
+    var res={exposure:exposureScore()};
+    ['sensitivity','adaptive'].forEach(function(pid){
       res[pid]=pillarPCA(pid,pv[pid]);
     });
     var N=GJ.features.length, comp=new Array(N);
@@ -2789,17 +2926,13 @@ function computeCompositeFor(scenario, period){
 }
 
 // Compute the exposure-pillar percentile per feature for an arbitrary
-// (scenario, period), using only the exposure variables the user has
-// turned on. Returns null if no exposure variables are enabled.
+// (scenario, period), using the currently-selected heat mode.
 function computeExposureFor(scenario, period){
   var savedScn=curScenario, savedPer=curPeriod;
   curScenario=scenario;
   curPeriod=(scenario==='present')?'':(period||'');
   try{
-    var keys=[];
-    VM.forEach(function(v){if(enabled[v.key]&&v.pillar==='exposure')keys.push(v.key);});
-    if(keys.length===0)return null;
-    var res=pillarPCA('exposure',keys);
+    var res=exposureScore();
     return res?res.scores:null;
   } finally {
     curScenario=savedScn;
@@ -2808,28 +2941,8 @@ function computeExposureFor(scenario, period){
 }
 
 function openScnCompareModal(){
-  // Need at least one variable enabled overall, and at least one EXPOSURE
-  // variable for the right delta map to mean anything.
-  var anyOn=false, anyExposure=false;
-  for(var k in enabled){
-    if(!enabled[k])continue;
-    anyOn=true;
-    if(varPillar[k]==='exposure')anyExposure=true;
-  }
-  if(!anyOn){
-    var eb=document.getElementById('error-bar');
-    eb.textContent='Turn on at least one variable before comparing scenarios.';
-    eb.style.display='block';
-    setTimeout(function(){eb.style.display='none';},3500);
-    return;
-  }
-  if(!anyExposure){
-    var eb2=document.getElementById('error-bar');
-    eb2.textContent='Turn on at least one Heat Exposure variable (e.g. a temperature metric) — that pillar is what changes between scenarios.';
-    eb2.style.display='block';
-    setTimeout(function(){eb2.style.display='none';},5000);
-    return;
-  }
+  // Exposure always has a selected heat mode, and the temperature layers carry
+  // the climate deltas — so scenario comparison is always meaningful.
   // Defaults: left = Present Day, right = currently selected (or first non-present option)
   var opts=_scnCompareOptions();
   var defaultRight=null;
@@ -3062,6 +3175,7 @@ function _ensurePdfLibs(){
 function _layerLabel(){
   if(rawVar)return varLabel[rawVar]||rawVar;
   if(curLayer==='composite')return'Composite Risk';
+  if(curLayer==='exposure')return'Heat Exposure — '+((results&&results.exposure&&results.exposure.label)||'heat mode');
   if(curLayer==='driver')return'Dominant Driver';
   var m=curLayer.match(/^(exposure|sensitivity|adaptive)_pc(\\d+)$/);
   if(m)return PMETA[m[1]].label+' — Pattern '+m[2];
@@ -3282,6 +3396,10 @@ function _captureStudyAreaMap(opts){
         title='Composite Risk';
         subtitle=_scenarioLabel();
         stops=pal('CR');
+      }else if(curLayer==='exposure'){
+        title='Heat Exposure — '+((results&&results.exposure&&results.exposure.label)||'heat mode');
+        subtitle=_scenarioLabel();
+        stops=pal('PCC').exposure||pal('CR');
       }else if(curLayer==='driver'){
         title='Dominant Driver';
         subtitle=_scenarioLabel();

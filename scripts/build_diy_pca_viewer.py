@@ -1004,6 +1004,49 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 .wlc-btn:hover{background:#1d4ed8;border-color:#1d4ed8}
 .wlc-btn.secondary{background:#fff;color:#2563eb}
 .wlc-btn.secondary:hover{background:#eff6ff;color:#1d4ed8}
+
+/* --- address search (bottom of sidebar) --- */
+#addr-search{border-top:1px solid #e0e0e0;padding-top:10px;margin-top:14px}
+#addr-search h3{font-size:12px;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.5px;margin-bottom:6px;color:#666}
+.addr-help{font-size:11px;color:#777;line-height:1.4;margin-bottom:6px}
+.addr-row{display:flex;gap:6px;position:relative}
+.addr-input-wrap{position:relative;flex:1;min-width:0}
+#addr-input{width:100%;padding:8px 10px;border:1px solid #d1d5db;
+  border-radius:8px;font-size:12px;font-family:inherit;color:#374151;
+  background:#fff;outline:none;transition:border-color 0.15s}
+#addr-input:focus{border-color:#2563eb}
+.addr-suggest{position:absolute;top:calc(100% + 4px);left:0;right:0;
+  background:#fff;border:1px solid #d1d5db;border-radius:8px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.08);max-height:220px;overflow-y:auto;
+  z-index:1000;list-style:none;margin:0;padding:4px 0;display:none}
+.addr-suggest.open{display:block}
+.addr-suggest li{padding:6px 10px;font-size:11.5px;color:#374151;
+  cursor:pointer;line-height:1.35;border-bottom:1px solid #f1f5f9}
+.addr-suggest li:last-child{border-bottom:none}
+.addr-suggest li:hover,.addr-suggest li.active{background:#eff6ff;color:#1d4ed8}
+.addr-suggest li.empty{color:#999;font-style:italic;cursor:default;background:#fff}
+.addr-suggest li.empty:hover{background:#fff;color:#999}
+.addr-suggest .addr-sg-main{font-weight:500;color:#111;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.addr-suggest li.active .addr-sg-main,
+.addr-suggest li:hover .addr-sg-main{color:#1d4ed8}
+.addr-suggest .addr-sg-sub{font-size:10.5px;color:#888;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+#addr-go{padding:8px 12px;border:1px solid #2563eb;border-radius:8px;
+  background:#2563eb;color:#fff;font-size:12px;font-weight:600;
+  cursor:pointer;font-family:inherit;flex-shrink:0}
+#addr-go:hover{background:#1d4ed8;border-color:#1d4ed8}
+#addr-go:disabled{background:#9ca3af;border-color:#9ca3af;cursor:wait}
+#addr-status{font-size:11px;color:#555;margin-top:6px;line-height:1.4;min-height:1em}
+#addr-status.err{color:#b91c1c}
+#addr-status .addr-found{color:#111;font-weight:500;display:block}
+#addr-status .addr-tract{color:#666;display:block;margin-top:2px}
+#addr-clear{display:none;margin-top:6px;width:100%;padding:6px;
+  border:1px solid #d1d5db;border-radius:6px;background:#fff;
+  font-size:11px;color:#6b7280;cursor:pointer;font-family:inherit}
+#addr-clear:hover{background:#f3f4f6;color:#374151}
+.addr-marker-icon{background:transparent;border:none}
 </style>
 </head>
 <body>
@@ -1064,6 +1107,19 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;color:#666">Export</h3>
     <button id="dl-pdf-btn" onclick="downloadMapPdf()" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s">Download Map as PDF</button>
     <button id="dl-data-btn" onclick="openExportModal()" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s">Download Data</button>
+  </div>
+  <div id="addr-search">
+    <h3>Find Address</h3>
+    <div class="addr-help">Zoom to a San Diego County address and open its census tract.</div>
+    <div class="addr-row">
+      <div class="addr-input-wrap">
+        <input id="addr-input" type="text" placeholder="e.g. 5998 Alcala Park, San Diego" autocomplete="off" spellcheck="false" />
+        <ul id="addr-suggest" class="addr-suggest" role="listbox"></ul>
+      </div>
+      <button id="addr-go" onclick="searchAddress()">Go</button>
+    </div>
+    <div id="addr-status"></div>
+    <button id="addr-clear" onclick="clearAddressMarker()">Clear marker</button>
   </div>
 </div>
 
@@ -1419,6 +1475,317 @@ var basemapLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/
   attribution:"CARTO", maxZoom:18}).addTo(map);
 L.control.scale().addTo(map);
 var tLayer = null;
+
+/* ================================================================
+   ADDRESS SEARCH (sidebar bottom)
+   Geocodes via OpenStreetMap Nominatim (no API key, biased to SD County),
+   drops a marker, finds the containing census tract via point-in-polygon,
+   and opens the tract's existing popup so variable info appears.
+   ================================================================ */
+var addrMarker = null;
+var ADDR_BBOX = {minLat:32.45, maxLat:33.55, minLon:-117.65, maxLon:-115.95};
+
+function _addrSetStatus(msg, isErr){
+  var el = document.getElementById('addr-status'); if(!el) return;
+  el.className = isErr ? 'err' : '';
+  el.innerHTML = msg || '';
+}
+
+function clearAddressMarker(){
+  if(addrMarker){map.removeLayer(addrMarker); addrMarker = null;}
+  _addrSetStatus('');
+  var cb = document.getElementById('addr-clear'); if(cb) cb.style.display = 'none';
+  var inp = document.getElementById('addr-input'); if(inp) inp.value = '';
+  if(typeof _addrHideSuggest === 'function') _addrHideSuggest();
+  _addrLastQuery = '';
+}
+
+// Ray-cast point-in-polygon (single ring; ring is [[lon,lat],...]).
+function _addrPointInRing(lon, lat, ring){
+  var inside = false;
+  for(var i=0, j=ring.length-1; i<ring.length; j=i++){
+    var xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+    if(((yi>lat)!==(yj>lat)) && (lon < (xj-xi)*(lat-yi)/((yj-yi)||1e-12) + xi))
+      inside = !inside;
+  }
+  return inside;
+}
+function _addrPointInPoly(lon, lat, rings){
+  if(!rings || !rings.length) return false;
+  if(!_addrPointInRing(lon, lat, rings[0])) return false;
+  for(var k=1;k<rings.length;k++)
+    if(_addrPointInRing(lon, lat, rings[k])) return false; // in a hole
+  return true;
+}
+function _addrFindTract(lon, lat){
+  if(!GJ || !GJ.features) return null;
+  for(var i=0;i<GJ.features.length;i++){
+    var f = GJ.features[i], g = f.geometry; if(!g) continue;
+    if(g.type === 'Polygon'){
+      if(_addrPointInPoly(lon, lat, g.coordinates)) return f;
+    }else if(g.type === 'MultiPolygon'){
+      for(var p=0;p<g.coordinates.length;p++)
+        if(_addrPointInPoly(lon, lat, g.coordinates[p])) return f;
+    }
+  }
+  return null;
+}
+
+// Given a Nominatim row, drop the marker, fly the map, find the containing
+// tract, and open the tract popup. Used by both the Go button and the
+// autocomplete dropdown so we don't double-geocode.
+function _addrApplyHit(hit, fallbackLabel){
+  var lat = parseFloat(hit.lat), lon = parseFloat(hit.lon);
+  if(!isFinite(lat) || !isFinite(lon)){_addrSetStatus('Could not parse location.', true); return;}
+  var inBbox = (lat>=ADDR_BBOX.minLat && lat<=ADDR_BBOX.maxLat &&
+                lon>=ADDR_BBOX.minLon && lon<=ADDR_BBOX.maxLon);
+  if(addrMarker) map.removeLayer(addrMarker);
+  addrMarker = L.marker([lat, lon], {title: hit.display_name || fallbackLabel || ''}).addTo(map);
+  map.flyTo([lat, lon], inBbox ? 14 : 11, {duration:0.6});
+  var feat = _addrFindTract(lon, lat);
+  var dn = hit.display_name || fallbackLabel || '';
+  var dnShort = dn.length>80 ? dn.slice(0,77)+'\\u2026' : dn;
+  var html = '<span class="addr-found">'+dnShort+'</span>';
+  if(feat){
+    var gid = feat.properties.GEOID;
+    html += '<span class="addr-tract">Census tract '+gid.slice(-6)+'</span>';
+    if(tLayer){
+      _addrSetStatus(html, false);
+      tLayer.eachLayer(function(lyr){
+        if(lyr.feature && lyr.feature.properties.GEOID === gid){
+          var content = lyr.getPopup() ? lyr.getPopup().getContent() : null;
+          if(content) addrMarker.bindPopup(content).openPopup();
+          try{
+            lyr.setStyle({weight:2.5, color:'#1d4ed8'});
+            setTimeout(function(){if(tLayer) tLayer.resetStyle(lyr);}, 2500);
+          }catch(_){}
+        }
+      });
+    }else{
+      html += '<span class="addr-tract" style="color:#b45309">Click <b>Build Composite Risk Map</b> to see this tract\\'s risk info.</span>';
+      _addrSetStatus(html, false);
+    }
+  }else{
+    html += '<span class="addr-tract">No San Diego County census tract at this location.</span>';
+    _addrSetStatus(html, !inBbox);
+  }
+  var cb = document.getElementById('addr-clear'); if(cb) cb.style.display = 'block';
+}
+
+function searchAddress(){
+  var input = document.getElementById('addr-input');
+  var btn = document.getElementById('addr-go');
+  if(!input || !btn) return;
+  // If a suggestion is highlighted, prefer that.
+  if(_addrSuggestActive >= 0 && _addrSuggestRows[_addrSuggestActive]){
+    _addrHideSuggest();
+    _addrApplyHit(_addrSuggestRows[_addrSuggestActive], input.value);
+    return;
+  }
+  var q = (input.value||'').trim();
+  if(!q){_addrSetStatus('Enter an address.', true); return;}
+  _addrHideSuggest();
+  btn.disabled = true; var prev = btn.textContent; btn.textContent = '...';
+  _addrSetStatus('Searching\\u2026');
+  var vb = [ADDR_BBOX.minLon, ADDR_BBOX.maxLat, ADDR_BBOX.maxLon, ADDR_BBOX.minLat].join(',');
+  var url1 = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&viewbox='+vb+'&bounded=1&q='+encodeURIComponent(q);
+  fetch(url1, {headers:{'Accept':'application/json'}})
+    .then(function(r){if(!r.ok) throw new Error('HTTP '+r.status); return r.json();})
+    .then(function(rows){
+      if(rows && rows.length) return rows;
+      return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q='+encodeURIComponent(q),
+        {headers:{'Accept':'application/json'}}).then(function(r){return r.json();});
+    })
+    .then(function(rows){
+      btn.disabled = false; btn.textContent = prev;
+      if(!rows || !rows.length){
+        _addrSetStatus('No match found. Try adding a city, e.g. "San Diego".', true); return;
+      }
+      _addrApplyHit(rows[0], q);
+    })
+    .catch(function(err){
+      btn.disabled = false; btn.textContent = prev;
+      _addrSetStatus('Search failed: '+(err && err.message ? err.message : 'network error'), true);
+    });
+}
+
+/* ---- Autocomplete dropdown (debounced live suggestions) ---- */
+var _addrDebounceTimer = null;
+var _addrAbort = null;
+var _addrSuggestRows = [];
+var _addrSuggestActive = -1;
+var _addrLastQuery = '';
+
+function _addrEsc(s){
+  return String(s||'').replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+// Split Nominatim's "display_name" into a primary line (street/place) and
+// secondary line (city, county, state) for a cleaner two-line suggestion.
+function _addrFormatRow(row){
+  var dn = String(row.display_name||'');
+  var parts = dn.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var primary = parts[0] || dn;
+  var secondary = parts.slice(1, 4).join(', ');
+  return {primary: primary, secondary: secondary};
+}
+
+function _addrHideSuggest(){
+  var ul = document.getElementById('addr-suggest'); if(!ul) return;
+  ul.classList.remove('open');
+  ul.innerHTML = '';
+  _addrSuggestRows = [];
+  _addrSuggestActive = -1;
+}
+
+function _addrRenderSuggest(rows, msg){
+  var ul = document.getElementById('addr-suggest'); if(!ul) return;
+  ul.innerHTML = '';
+  _addrSuggestRows = rows || [];
+  _addrSuggestActive = -1;
+  if(msg){
+    var li = document.createElement('li');
+    li.className = 'empty'; li.textContent = msg;
+    ul.appendChild(li);
+    ul.classList.add('open');
+    return;
+  }
+  if(!rows || !rows.length){_addrHideSuggest(); return;}
+  rows.forEach(function(row, i){
+    var fmt = _addrFormatRow(row);
+    var li = document.createElement('li');
+    li.setAttribute('role', 'option');
+    li.dataset.idx = String(i);
+    var badge = (row._inSD === false) ? ' <span style="font-size:9.5px;color:#b45309;font-weight:600">outside SD County</span>' : '';
+    li.innerHTML = '<div class="addr-sg-main">'+_addrEsc(fmt.primary)+badge+'</div>'+
+                   (fmt.secondary ? '<div class="addr-sg-sub">'+_addrEsc(fmt.secondary)+'</div>' : '');
+    li.addEventListener('mousedown', function(e){
+      // mousedown (not click) so we fire before the input's blur hides the list
+      e.preventDefault();
+      var idx = parseInt(li.dataset.idx, 10);
+      var hit = _addrSuggestRows[idx];
+      if(!hit) return;
+      var inp = document.getElementById('addr-input');
+      if(inp) inp.value = fmt.primary + (fmt.secondary ? ', ' + fmt.secondary : '');
+      _addrHideSuggest();
+      _addrApplyHit(hit, inp ? inp.value : '');
+    });
+    li.addEventListener('mouseenter', function(){
+      _addrSuggestActive = parseInt(li.dataset.idx, 10);
+      _addrUpdateActiveStyle();
+    });
+    ul.appendChild(li);
+  });
+  ul.classList.add('open');
+}
+
+function _addrUpdateActiveStyle(){
+  var ul = document.getElementById('addr-suggest'); if(!ul) return;
+  var items = ul.querySelectorAll('li');
+  for(var i=0;i<items.length;i++){
+    if(i === _addrSuggestActive) items[i].classList.add('active');
+    else items[i].classList.remove('active');
+  }
+  if(_addrSuggestActive >= 0 && items[_addrSuggestActive]){
+    var el = items[_addrSuggestActive];
+    if(el.scrollIntoView) el.scrollIntoView({block:'nearest'});
+  }
+}
+
+function _addrInBbox(lat, lon){
+  return (lat>=ADDR_BBOX.minLat && lat<=ADDR_BBOX.maxLat &&
+          lon>=ADDR_BBOX.minLon && lon<=ADDR_BBOX.maxLon);
+}
+
+function _addrFetchSuggest(q){
+  if(_addrAbort){try{_addrAbort.abort();}catch(_){}}
+  var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  _addrAbort = ctl;
+  // viewbox biases ranking toward SD County but does NOT filter (no bounded=1),
+  // so partial prefixes like "5998 Alc" still return matches. We then filter
+  // client-side to addresses inside the county and fall back to nearby out-of-
+  // county hits if none are local.
+  var vb = [ADDR_BBOX.minLon, ADDR_BBOX.maxLat, ADDR_BBOX.maxLon, ADDR_BBOX.minLat].join(',');
+  var url = 'https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=12&countrycodes=us&viewbox='+vb+'&q='+encodeURIComponent(q);
+  var opts = {headers:{'Accept':'application/json'}};
+  if(ctl) opts.signal = ctl.signal;
+  fetch(url, opts)
+    .then(function(r){if(!r.ok) throw new Error('HTTP '+r.status); return r.json();})
+    .then(function(rows){
+      if(q !== _addrLastQuery) return; // a newer query has fired
+      if(!rows || !rows.length){
+        _addrRenderSuggest([], 'No matches \\u2014 try a more specific address.');
+        return;
+      }
+      // Partition by SD County bbox.
+      var inSD = [], outSD = [];
+      for(var i=0;i<rows.length;i++){
+        var lat=parseFloat(rows[i].lat), lon=parseFloat(rows[i].lon);
+        if(!isFinite(lat)||!isFinite(lon)) continue;
+        rows[i]._inSD = _addrInBbox(lat, lon);
+        if(rows[i]._inSD) inSD.push(rows[i]); else outSD.push(rows[i]);
+      }
+      var combined = inSD.concat(outSD).slice(0, 6);
+      if(!combined.length){
+        _addrRenderSuggest([], 'No matches \\u2014 try a more specific address.');
+        return;
+      }
+      _addrRenderSuggest(combined, null);
+    })
+    .catch(function(err){
+      if(err && err.name === 'AbortError') return;
+    });
+}
+
+function _addrOnInput(){
+  var inp = document.getElementById('addr-input'); if(!inp) return;
+  var q = (inp.value||'').trim();
+  _addrLastQuery = q;
+  if(_addrDebounceTimer){clearTimeout(_addrDebounceTimer); _addrDebounceTimer = null;}
+  if(q.length < 4){_addrHideSuggest(); return;}
+  _addrDebounceTimer = setTimeout(function(){_addrFetchSuggest(q);}, 350);
+}
+
+function _addrOnKey(e){
+  var ul = document.getElementById('addr-suggest');
+  var open = ul && ul.classList.contains('open') && _addrSuggestRows.length > 0;
+  if(e.key === 'ArrowDown'){
+    if(!open) return;
+    e.preventDefault();
+    _addrSuggestActive = (_addrSuggestActive + 1) % _addrSuggestRows.length;
+    _addrUpdateActiveStyle();
+  }else if(e.key === 'ArrowUp'){
+    if(!open) return;
+    e.preventDefault();
+    _addrSuggestActive = (_addrSuggestActive - 1 + _addrSuggestRows.length) % _addrSuggestRows.length;
+    _addrUpdateActiveStyle();
+  }else if(e.key === 'Escape'){
+    if(open){e.preventDefault(); _addrHideSuggest();}
+  }else if(e.key === 'Enter'){
+    e.preventDefault();
+    searchAddress();
+  }
+}
+
+(function(){
+  var inp = document.getElementById('addr-input');
+  if(!inp) return;
+  inp.addEventListener('input', _addrOnInput);
+  inp.addEventListener('keydown', _addrOnKey);
+  inp.addEventListener('focus', function(){
+    if(_addrSuggestRows.length > 0){
+      var ul = document.getElementById('addr-suggest');
+      if(ul) ul.classList.add('open');
+    }
+  });
+  // Hide on outside click
+  document.addEventListener('mousedown', function(e){
+    var wrap = document.querySelector('#addr-search .addr-input-wrap');
+    if(wrap && !wrap.contains(e.target)) _addrHideSuggest();
+  });
+})();
 
 // City jurisdiction boundary overlays — one layer per city, all rendered in black
 var jurisLayers={};

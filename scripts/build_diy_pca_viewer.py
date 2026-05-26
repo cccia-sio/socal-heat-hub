@@ -376,7 +376,8 @@ def load_data():
     hpi_full_path = ROOT / "data/sensitivity/hpi/hpi_san_diego.csv"
     if hpi_full_path.exists():
         hpi_full = pd.read_csv(hpi_full_path, dtype={"geoid": str})
-        hpi_full["GEOID"] = hpi_full["geoid"].astype(str).str.zfill(11)
+        # geoid is formatted '14000US06073000100' — strip the 14000US prefix
+        hpi_full["GEOID"] = hpi_full["geoid"].str.split("US").str[-1].str.zfill(11)
         tracts = _safe_merge(tracts, hpi_full, _HPI_INDICATOR_COLS)
 
     # ── Adaptive — Building age (ACS B25034) ──
@@ -1005,6 +1006,100 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 .wlc-btn.secondary{background:#fff;color:#2563eb}
 .wlc-btn.secondary:hover{background:#eff6ff;color:#1d4ed8}
 
+/* --- Tract detail modal (opened from address-search popup) --- */
+#detail-modal{display:none;position:fixed;inset:0;z-index:2000;
+  background:rgba(15,23,42,0.55);justify-content:center;align-items:center;
+  font-family:inherit;padding:20px}
+#detail-modal.open{display:flex}
+.dt-panel{background:#fff;border-radius:12px;width:640px;max-width:96vw;
+  max-height:92vh;display:flex;flex-direction:column;
+  box-shadow:0 20px 50px rgba(0,0,0,0.35);overflow:hidden}
+.dt-hdr{display:flex;align-items:center;gap:10px;padding:14px 18px 12px;
+  border-bottom:1px solid #e5e7eb;flex-shrink:0;background:#f9fafb}
+.dt-hdr h2{font-size:16px;font-weight:700;margin:0;color:#111;line-height:1.2}
+.dt-hdr .dt-sub{font-size:11px;color:#6b7280;margin-top:2px}
+.dt-hdr-text{flex:1;min-width:0}
+.dt-close{width:30px;height:30px;border:none;border-radius:6px;
+  background:transparent;font-size:22px;color:#6b7280;cursor:pointer;
+  font-family:inherit;line-height:1;padding:0;flex-shrink:0}
+.dt-close:hover{background:#e5e7eb;color:#111}
+.dt-ctx{font-size:10.5px;color:#6b7280;font-style:italic;
+  padding:6px 18px;background:#fafafa;border-bottom:1px solid #f1f5f9;flex-shrink:0}
+.dt-body{flex:1;overflow-y:auto;padding:0;scrollbar-width:thin}
+.dt-body::-webkit-scrollbar{width:6px}
+.dt-body::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
+.dt-section{padding:14px 18px;border-bottom:1px solid #f1f5f9}
+.dt-section:last-child{border-bottom:none}
+.dt-section-hdr{font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.5px;color:#666;margin-bottom:10px}
+/* Summary cards (composite + pillar scores) */
+.dt-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.dt-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;
+  padding:9px 10px;display:flex;flex-direction:column;gap:2px}
+.dt-card-lbl{font-size:9.5px;font-weight:600;color:#6b7280;text-transform:uppercase;
+  letter-spacing:0.4px;line-height:1.1}
+.dt-card-val{font-size:18px;font-weight:700;color:#111;
+  font-variant-numeric:tabular-nums;line-height:1.1}
+.dt-card-pct{font-size:9.5px;color:#9ca3af;line-height:1.1}
+.dt-driver{margin-top:10px;font-size:11.5px;color:#374151;line-height:1.45}
+.dt-driver b{color:#111}
+.dt-maps-stack{display:flex;flex-direction:column;gap:14px}
+.dt-map-block{display:flex;flex-direction:column}
+.dt-map-cap{font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;
+  letter-spacing:0.4px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.dt-map-cap .dt-map-sub{font-weight:400;text-transform:none;letter-spacing:0;
+  color:#6b7280;font-size:10.5px}
+.dt-map{height:220px;border-radius:8px;overflow:hidden;background:#eef;
+  border:1px solid #e5e7eb}
+.dt-lst-legend{display:flex;flex-direction:column;gap:2px;font-size:10px;
+  color:#666;margin-top:6px}
+.dt-lst-bar{height:8px;border-radius:2px}
+.dt-lst-ticks{display:flex;justify-content:space-between;font-size:9px;color:#888;margin-top:1px}
+.dt-lu-legend{display:flex;margin-top:6px;flex-wrap:wrap;gap:6px;font-size:10px}
+.dt-lu-item{display:flex;align-items:center;gap:4px;color:#555}
+.dt-lu-sw{width:11px;height:11px;border-radius:2px;border:1px solid rgba(0,0,0,0.18)}
+.dt-pillar-hdr{font-size:11.5px;font-weight:700;margin-bottom:8px;
+  padding-bottom:5px;border-bottom:2px solid currentColor;
+  text-transform:uppercase;letter-spacing:0.3px}
+.dt-var-row{padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:11.5px}
+.dt-var-row:last-child{border-bottom:none}
+.dt-var-top{display:flex;justify-content:space-between;align-items:baseline;
+  gap:8px;margin-bottom:4px}
+.dt-var-label{color:#374151;flex:1;min-width:0}
+.dt-var-val{font-weight:600;color:#111;font-variant-numeric:tabular-nums;
+  white-space:nowrap}
+.dt-var-bar-wrap{position:relative;height:6px;background:#e5e7eb;
+  border-radius:3px;overflow:hidden}
+.dt-var-bar{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.dt-var-pct{font-size:9.5px;color:#9ca3af;margin-top:2px;text-align:right;
+  font-variant-numeric:tabular-nums}
+.dt-na{color:#bbb;font-style:italic;font-weight:400}
+.dt-hint{background:#fffbeb;color:#92400e;padding:10px 12px;border-radius:6px;
+  font-size:11.5px;line-height:1.45}
+.popup-more-btn{display:inline-block;margin-top:6px;margin-left:6px;
+  background:#1d4ed8;color:#fff;font-size:11px;font-weight:600;
+  padding:5px 10px;border:none;border-radius:4px;cursor:pointer;
+  font-family:inherit}
+.popup-more-btn:hover{background:#1e40af}
+
+/* --- on-map basemap picker (bottom-left) --- */
+#basemap-picker{position:absolute;bottom:38px;left:10px;z-index:500;
+  display:flex;gap:8px;background:rgba(255,255,255,0.92);
+  padding:6px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);
+  border:1px solid rgba(0,0,0,0.12)}
+.bm-thumb{position:relative;width:54px;height:54px;border-radius:6px;
+  overflow:hidden;cursor:pointer;border:2px solid #fff;outline:none;
+  padding:0;background-color:#e5e7eb;background-size:cover;
+  background-position:center;transition:transform 0.15s,box-shadow 0.15s;
+  box-shadow:0 1px 3px rgba(0,0,0,0.15)}
+.bm-thumb:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,0.25)}
+.bm-thumb.active{border-color:#2563eb;box-shadow:0 0 0 2px #2563eb,0 2px 6px rgba(0,0,0,0.25)}
+.bm-thumb-lbl{position:absolute;bottom:0;left:0;right:0;
+  font-size:10px;font-weight:600;color:#fff;text-align:center;
+  padding:2px 0;background:linear-gradient(transparent,rgba(0,0,0,0.65));
+  text-shadow:0 1px 2px rgba(0,0,0,0.5);font-family:inherit;
+  letter-spacing:0.2px}
+
 /* --- address search (bottom of sidebar) --- */
 #addr-search{border-top:1px solid #e0e0e0;padding-top:10px;margin-top:14px}
 #addr-search h3{font-size:12px;font-weight:700;text-transform:uppercase;
@@ -1125,6 +1220,16 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 
 <div id="map-wrap">
   <div id="map"></div>
+  <div id="basemap-picker">
+    <button class="bm-thumb active" data-bm="light" onclick="setBasemap('light')" title="Light basemap"
+            style="background-image:url('https://a.basemaps.cartocdn.com/light_all/11/358/825.png')">
+      <span class="bm-thumb-lbl">Light</span>
+    </button>
+    <button class="bm-thumb" data-bm="satellite" onclick="setBasemap('satellite')" title="Satellite basemap"
+            style="background-image:url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/11/825/358')">
+      <span class="bm-thumb-lbl">Satellite</span>
+    </button>
+  </div>
   <div id="logos">
     <img src="../assets/usd-logo-horizontal.png" alt="University of San Diego">
     <img src="../assets/ccsd_logo.png" alt="Climate Collaborative — San Diego Region">
@@ -1284,6 +1389,20 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <a class="wlc-btn secondary" href="../userguide/index.html" target="_blank" rel="noopener noreferrer">User Guide</a>
       <button class="wlc-btn" id="wlc-got-it">Got it</button>
     </div>
+  </div>
+</div>
+
+<div id="detail-modal" role="dialog" aria-label="Tract Detail" onclick="if(event.target===this)closeDetailDrawer()">
+  <div class="dt-panel">
+    <div class="dt-hdr">
+      <div class="dt-hdr-text">
+        <h2 id="dt-title">Tract</h2>
+        <div class="dt-sub" id="dt-sub"></div>
+      </div>
+      <button class="dt-close" onclick="closeDetailDrawer()" title="Close (ESC)">&times;</button>
+    </div>
+    <div class="dt-ctx" id="dt-ctx"></div>
+    <div class="dt-body" id="dt-body"></div>
   </div>
 </div>
 
@@ -1471,10 +1590,34 @@ function updateDeltaRange(){
    MAP
    ================================================================ */
 var map = L.map("map").setView([32.85,-117.05],10);
-var basemapLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{
-  attribution:"CARTO", maxZoom:18}).addTo(map);
+var BASEMAPS = {
+  light: {
+    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    opts: {attribution:"\\u00a9 CARTO \\u00a9 OpenStreetMap contributors", maxZoom:18}
+  },
+  satellite: {
+    // Esri World Imagery — free, no API key, attribution required.
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    opts: {attribution:"Imagery \\u00a9 Esri, Maxar, Earthstar Geographics, and the GIS User Community", maxZoom:19}
+  }
+};
+var currentBasemap = 'light';
+var basemapLayer = L.tileLayer(BASEMAPS.light.url, BASEMAPS.light.opts).addTo(map);
 L.control.scale().addTo(map);
 var tLayer = null;
+
+function setBasemap(name){
+  if(!BASEMAPS[name] || name===currentBasemap) return;
+  if(basemapLayer){map.removeLayer(basemapLayer);}
+  basemapLayer = L.tileLayer(BASEMAPS[name].url, BASEMAPS[name].opts).addTo(map);
+  basemapLayer.bringToBack();
+  currentBasemap = name;
+  var btns = document.querySelectorAll('#basemap-picker .bm-thumb');
+  for(var i=0;i<btns.length;i++){
+    if(btns[i].getAttribute('data-bm')===name) btns[i].classList.add('active');
+    else btns[i].classList.remove('active');
+  }
+}
 
 /* ================================================================
    ADDRESS SEARCH (sidebar bottom)
@@ -1549,12 +1692,17 @@ function _addrApplyHit(hit, fallbackLabel){
   if(feat){
     var gid = feat.properties.GEOID;
     html += '<span class="addr-tract">Census tract '+gid.slice(-6)+'</span>';
+    var moreBtn = '<button class="popup-more-btn" onclick="map.closePopup();openDetailDrawer(\\''+gid+'\\')">Show more info \\u25b8</button>';
     if(tLayer){
       _addrSetStatus(html, false);
       tLayer.eachLayer(function(lyr){
         if(lyr.feature && lyr.feature.properties.GEOID === gid){
           var content = lyr.getPopup() ? lyr.getPopup().getContent() : null;
-          if(content) addrMarker.bindPopup(content).openPopup();
+          if(content){
+            // Insert the more-info button just before the popup's closing </div>
+            var enhanced = content.replace(/<\\/div>\\s*$/, '') + moreBtn + '</div>';
+            addrMarker.bindPopup(enhanced).openPopup();
+          }
           try{
             lyr.setStyle({weight:2.5, color:'#1d4ed8'});
             setTimeout(function(){if(tLayer) tLayer.resetStyle(lyr);}, 2500);
@@ -1564,6 +1712,12 @@ function _addrApplyHit(hit, fallbackLabel){
     }else{
       html += '<span class="addr-tract" style="color:#b45309">Click <b>Build Composite Risk Map</b> to see this tract\\'s risk info.</span>';
       _addrSetStatus(html, false);
+      // Even without the composite map, let the user open the detail drawer
+      // (it will show "build the composite map" hint at the top, plus the
+      // mini-map and per-variable percentiles which are computed at load).
+      var basic = '<div style="font-family:sans-serif;font-size:13px;line-height:1.6">'+
+        '<b>Tract '+gid.slice(-6)+'</b><br>'+moreBtn+'</div>';
+      addrMarker.bindPopup(basic).openPopup();
     }
   }else{
     html += '<span class="addr-tract">No San Diego County census tract at this location.</span>';
@@ -1786,6 +1940,319 @@ function _addrOnKey(e){
     if(wrap && !wrap.contains(e.target)) _addrHideSuggest();
   });
 })();
+
+/* ================================================================
+   TRACT DETAIL MODAL
+   Single-tract centered modal opened from the address-search popup.
+   Shows: popup-style summary cards (composite + pillar scores +
+   dominant driver), LST + land-use mini-map, and a curated set of
+   key variables per pillar with polarity-aware percentile bars.
+   ================================================================ */
+// Three stacked maps in the detail modal: satellite, land use, LST.
+// _dtMaps[k] is the Leaflet map for slot k ('sat'|'lu'|'lst'); pan/zoom are
+// kept in sync across all three.
+var _dtMaps={}, _dtLanduseLayer=null, _dtSyncGuard=false, _dtGeoid=null;
+
+// Curated variables to show in the modal — three per pillar, picked to
+// cover the headline aspects of each.
+var _DT_CURATED = {
+  exposure: ['mean_tmax', 'mean_tmin_overnight', 'p99_wbgt'],
+  sensitivity: ['RPL_THEMES', 'EP_AGE65', 'diabetes_prev'],
+  adaptive: ['ac_prob', 'pct_green', 'pct_pre1980']
+};
+
+function openDetailDrawer(geoid){
+  if(!geoid) return;
+  var idx=null;
+  if(window._gIdx && window._gIdx[geoid]!=null) idx=window._gIdx[geoid];
+  else{
+    for(var i=0;i<GJ.features.length;i++){
+      if(GJ.features[i].properties.GEOID===geoid){idx=i;break;}
+    }
+  }
+  if(idx==null||!GJ.features[idx]) return;
+  var feat=GJ.features[idx], pr=feat.properties;
+  _dtGeoid=geoid;
+
+  document.getElementById('dt-title').textContent='Tract '+geoid.slice(-6);
+  document.getElementById('dt-sub').textContent='GEOID '+geoid;
+  var ctx='Present Day';
+  if(curScenario!=='present'){
+    var sl={'ssp245':'SSP2-4.5','ssp370':'SSP3-7.0','ssp585':'SSP5-8.5'};
+    ctx=(sl[curScenario]||curScenario)+' \\u2022 '+(curPeriod==='2050'?'Mid-Century 2050':'End-of-Century 2080');
+  }
+  document.getElementById('dt-ctx').textContent=ctx;
+
+  var html='';
+  // ---- Summary section (popup-style: composite + pillar score cards + driver)
+  html+='<div class="dt-section">';
+  if(pr._comp!=null){
+    var cards=[
+      {lbl:'Composite', val:pr._comp},
+      {lbl:'Heat Exp.', val:pr._exposure},
+      {lbl:'Sensitivity', val:pr._sensitivity},
+      {lbl:'Adaptive Cap.', val:pr._adaptive}
+    ];
+    html+='<div class="dt-section-hdr">Risk Summary</div>';
+    html+='<div class="dt-summary">';
+    cards.forEach(function(c){
+      if(c.val==null){
+        html+='<div class="dt-card"><div class="dt-card-lbl">'+c.lbl+'</div><div class="dt-card-val dt-na">\\u2014</div></div>';
+      }else{
+        var col=_dtRiskColor(c.val);
+        html+='<div class="dt-card" style="border-left:3px solid '+col+'">'+
+          '<div class="dt-card-lbl">'+c.lbl+'</div>'+
+          '<div class="dt-card-val">'+c.val.toFixed(0)+'</div>'+
+          '<div class="dt-card-pct">/ 100</div></div>';
+      }
+    });
+    html+='</div>';
+    if(pr._drv){
+      html+='<div class="dt-driver">Dominant driver: <b>'+_addrEsc(pr._drv)+'</b></div>';
+    }
+  }else{
+    html+='<div class="dt-hint">Click <b>Build Composite Risk Map</b> in the left panel to populate composite and pillar scores. The map and variable rows below work without it.</div>';
+  }
+  html+='</div>';
+
+  // ---- Three stacked maps: satellite, land use, LST
+  html+='<div class="dt-section">'+
+    '<div class="dt-section-hdr">Imagery, Land Use &amp; Heat</div>'+
+    '<div class="dt-maps-stack">'+
+      '<div class="dt-map-block">'+
+        '<div class="dt-map-cap">Satellite <span class="dt-map-sub">Esri World Imagery</span></div>'+
+        '<div class="dt-map" id="dt-map-sat"></div>'+
+      '</div>'+
+      '<div class="dt-map-block">'+
+        '<div class="dt-map-cap">Land Use <span class="dt-map-sub">SANDAG parcels</span></div>'+
+        '<div class="dt-map" id="dt-map-lu"></div>'+
+        '<div id="dt-lu-legend" class="dt-lu-legend"></div>'+
+      '</div>'+
+      '<div class="dt-map-block">'+
+        '<div class="dt-map-cap">Landsat LST <span class="dt-map-sub">annual mean surface temp</span></div>'+
+        '<div class="dt-map" id="dt-map-lst"></div>'+
+        '<div id="dt-lst-legend" class="dt-lst-legend"></div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+
+  // ---- Curated variable rows per pillar
+  ['exposure','sensitivity','adaptive'].forEach(function(pid){
+    var pm=PMETA[pid];
+    var keys=_DT_CURATED[pid]||[];
+    var rows='';
+    keys.forEach(function(key){
+      var meta=null;
+      for(var i=0;i<VM.length;i++){if(VM[i].key===key){meta=VM[i];break;}}
+      if(!meta) return;
+      var rawV=pr[key];
+      if(rawV==null||(typeof rawV==='number'&&isNaN(rawV))){
+        rows+=_dtRowNA(meta.label);return;
+      }
+      var dArr=getDeltaArr(key);
+      var disp=dArr?getAdj(key,idx):+rawV;
+      var dispStr=fmtCmpRaw(key,disp);
+      var p=(rawPct[key]&&rawPct[key][idx]!=null)?rawPct[key][idx]:null;
+      var higherIsWorse=(POLARITY&&POLARITY[key]!==false);
+      rows+=_dtRow(meta.label, dispStr, p, higherIsWorse);
+    });
+    if(rows){
+      html+='<div class="dt-section">'+
+        '<div class="dt-pillar-hdr" style="color:'+pm.color+'">'+pm.label+'</div>'+
+        rows+'</div>';
+    }
+  });
+
+  document.getElementById('dt-body').innerHTML=html;
+  document.getElementById('detail-modal').classList.add('open');
+  // Two-stage init so each map container has its final size before Leaflet
+  // measures it, and so the protomaps tile layer attaches after the size
+  // stabilizes (otherwise parcels can silently fail to render).
+  setTimeout(function(){
+    _dtBuildMaps(feat);
+    _dtRenderLstLegend();
+    _dtRenderLuLegend();
+  }, 60);
+}
+
+function closeDetailDrawer(){
+  var dr=document.getElementById('detail-modal');
+  if(!dr) return;
+  dr.classList.remove('open');
+  Object.keys(_dtMaps).forEach(function(k){
+    try{_dtMaps[k].remove();}catch(_){}
+  });
+  _dtMaps={};
+  _dtLanduseLayer=null;_dtGeoid=null;_dtSyncGuard=false;
+}
+
+function _dtRow(label, dispVal, pct, higherIsWorse){
+  if(pct==null){
+    return '<div class="dt-var-row">'+
+      '<div class="dt-var-top"><span class="dt-var-label">'+_addrEsc(label)+'</span>'+
+      '<span class="dt-var-val">'+_addrEsc(dispVal)+'</span></div></div>';
+  }
+  var p=Math.max(0,Math.min(100,pct));
+  var riskPct = higherIsWorse ? p : (100 - p);
+  var color = _dtRiskColor(riskPct);
+  var width = Math.max(2, p);
+  var dirNote = higherIsWorse ? 'higher = more risk' : 'higher = more protection';
+  return '<div class="dt-var-row">'+
+    '<div class="dt-var-top"><span class="dt-var-label">'+_addrEsc(label)+'</span>'+
+    '<span class="dt-var-val">'+_addrEsc(dispVal)+'</span></div>'+
+    '<div class="dt-var-bar-wrap"><div class="dt-var-bar" style="width:'+width+'%;background:'+color+'"></div></div>'+
+    '<div class="dt-var-pct">'+Math.round(p)+'th pct \\u00b7 '+dirNote+'</div>'+
+  '</div>';
+}
+function _dtRowNA(label){
+  return '<div class="dt-var-row">'+
+    '<div class="dt-var-top"><span class="dt-var-label">'+_addrEsc(label)+'</span>'+
+    '<span class="dt-var-val dt-na">no data</span></div></div>';
+}
+// Risk-aligned percentile (0=safe, 100=high risk) -> color via green->yellow->red.
+function _dtRiskColor(rp){
+  rp = Math.max(0, Math.min(100, rp));
+  var stops=[[0,[34,160,80]],[50,[240,180,20]],[100,[220,60,40]]];
+  function lerp(a,b,t){return a+(b-a)*t;}
+  for(var i=1;i<stops.length;i++){
+    if(rp<=stops[i][0]){
+      var t=(rp-stops[i-1][0])/(stops[i][0]-stops[i-1][0]);
+      var c0=stops[i-1][1], c1=stops[i][1];
+      return 'rgb('+Math.round(lerp(c0[0],c1[0],t))+','+Math.round(lerp(c0[1],c1[1],t))+','+Math.round(lerp(c0[2],c1[2],t))+')';
+    }
+  }
+  return 'rgb(220,60,40)';
+}
+
+// Build all three stacked maps for the detail modal. Each gets the tract
+// outline, plus its own primary layer: satellite imagery, SANDAG land-use
+// parcels (protomaps-leaflet), or the Landsat LST overlay. Pan/zoom is
+// synced across all three so they always show the same view.
+function _dtBuildMaps(feat){
+  // Tear down any previous instances first.
+  Object.keys(_dtMaps).forEach(function(k){try{_dtMaps[k].remove();}catch(_){}});
+  _dtMaps={};_dtLanduseLayer=null;
+  var common={zoomControl:true,attributionControl:false,
+    scrollWheelZoom:true,dragging:true};
+
+  // 1) Satellite
+  var mSat=L.map('dt-map-sat',common);
+  L.tileLayer(BASEMAPS.satellite.url,BASEMAPS.satellite.opts).addTo(mSat);
+  L.geoJSON(feat,{style:{color:'#fff',weight:2.5,fill:false,opacity:0.95}}).addTo(mSat);
+
+  // 2) Land use (CARTO light base + protomaps parcels in landusePane)
+  var mLu=L.map('dt-map-lu',common);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(mLu);
+  if(!mLu.getPane('landusePane')){
+    mLu.createPane('landusePane');
+    mLu.getPane('landusePane').style.zIndex=450;
+  }
+  L.geoJSON(feat,{style:{color:'#111',weight:2,fill:false}}).addTo(mLu);
+
+  // 3) LST (CARTO light base + LST image overlay)
+  var mLst=L.map('dt-map-lst',common);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(mLst);
+  var lv=lstVariant();
+  if(lv){
+    var b=LST.bounds;
+    L.imageOverlay(lv.url,[[b.south,b.west],[b.north,b.east]],{opacity:0.85}).addTo(mLst);
+  }
+  L.geoJSON(feat,{style:{color:'#111',weight:2,fill:false}}).addTo(mLst);
+
+  _dtMaps={sat:mSat, lu:mLu, lst:mLst};
+
+  // Fit all three to the tract before wiring sync, so the initial fitBounds
+  // calls don't fight each other through the sync handlers.
+  var bounds=L.geoJSON(feat).getBounds();
+  Object.keys(_dtMaps).forEach(function(k){
+    _dtMaps[k].fitBounds(bounds,{padding:[18,18]});
+  });
+  _dtWireSync();
+
+  // Defer protomaps + size-invalidation until the modal layout settles —
+  // protomaps-leaflet's first render needs valid container dimensions.
+  setTimeout(function(){
+    Object.keys(_dtMaps).forEach(function(k){
+      try{_dtMaps[k].invalidateSize();}catch(_){}
+    });
+    _dtAddLanduse();
+  }, 60);
+}
+
+// Keep pan/zoom in sync across all three stacked maps. The guard prevents
+// the cascade of moveend events from looping back through each map.
+function _dtWireSync(){
+  var keys=Object.keys(_dtMaps);
+  keys.forEach(function(src){
+    _dtMaps[src].on('move zoom', function(){
+      if(_dtSyncGuard) return;
+      _dtSyncGuard=true;
+      var c=_dtMaps[src].getCenter();
+      var z=_dtMaps[src].getZoom();
+      keys.forEach(function(dst){
+        if(dst===src) return;
+        try{_dtMaps[dst].setView(c, z, {animate:false});}catch(_){}
+      });
+      _dtSyncGuard=false;
+    });
+  });
+}
+
+function _dtAddLanduse(){
+  var m=_dtMaps.lu;
+  if(!m||_dtLanduseLayer) return;
+  if(!window.protomapsL){console.warn('protomaps-leaflet not loaded');return;}
+  var layer=_buildLanduseLayer();
+  if(!layer){console.warn('land-use layer construction failed');return;}
+  try{m.invalidateSize();}catch(_){}
+  layer.addTo(m);
+  _dtLanduseLayer=layer;
+  m.on('click', _dtLanduseClickHandler);
+}
+function _dtLanduseClickHandler(e){
+  if(!_dtLanduseLayer) return;
+  if(typeof _dtLanduseLayer.queryTileFeaturesDebug!=='function') return;
+  var hits=null;
+  try{hits=_dtLanduseLayer.queryTileFeaturesDebug(e.latlng.lng,e.latlng.lat,16);}catch(err){return;}
+  if(!hits||!hits.size) return;
+  var feats=null;
+  hits.forEach(function(arr){if(!feats&&arr&&arr.length)feats=arr;});
+  if(!feats||!feats.length) return;
+  var p=(feats[0].feature&&feats[0].feature.props)||{};
+  var cat=_luCategoryName(p);
+  var label=p.Landuse||cat;
+  var lu=p.lu||'';
+  L.popup({offset:[0,-4]}).setLatLng(e.latlng)
+    .setContent('<div style="font-size:11px;line-height:1.35"><b>'+label+'</b><br><span style="color:#888">'+cat+(lu?' &middot; LU '+lu:'')+'</span></div>')
+    .openOn(_dtMaps.lu);
+}
+function _dtRenderLstLegend(){
+  var el=document.getElementById('dt-lst-legend');
+  var lv=lstVariant();
+  if(!el||!lv){if(el)el.innerHTML='';return;}
+  var stops=lv.legend.map(function(s){return"rgb("+s.rgb.join(",")+")"}).join(",");
+  var ticks='';
+  lv.legend.forEach(function(s){ticks+='<span>'+s.value+'&deg;</span>';});
+  el.innerHTML='<div style="font-weight:600;color:#444;margin-bottom:2px">Landsat LST 100m (annual mean &deg;C)</div>'+
+    '<div class="dt-lst-bar" style="background:linear-gradient(to right,'+stops+')"></div>'+
+    '<div class="dt-lst-ticks">'+ticks+'</div>';
+}
+function _dtRenderLuLegend(){
+  var el=document.getElementById('dt-lu-legend');
+  if(!el) return;
+  var cats=LU_CATS.concat([LU_WATER_CAT]);
+  el.innerHTML=cats.map(function(c){
+    return '<div class="dt-lu-item"><div class="dt-lu-sw" style="background:'+c.color+'"></div>'+_addrEsc(c.name)+'</div>';
+  }).join('');
+}
+
+// Close drawer on Esc
+document.addEventListener('keydown', function(e){
+  if(e.key==='Escape'){
+    var dr=document.getElementById('detail-drawer');
+    if(dr&&dr.classList.contains('open')) closeDetailDrawer();
+  }
+});
 
 // City jurisdiction boundary overlays — one layer per city, all rendered in black
 var jurisLayers={};
@@ -2233,13 +2700,14 @@ function interpC(cs,t){t=Math.max(0,Math.min(1,t));
 function toHex(rgb){return"#"+rgb.map(function(c){return Math.max(0,Math.min(255,c)).toString(16).padStart(2,"0")}).join("")}
 
 // ── Default palettes (ColorBrewer sequential — individually CB-safe; the
-//    pillar set still uses red/orange/green together which can be confusing)
+//    pillar set uses red/purple/green together for the dominant-driver layer,
+//    matching each pillar's choropleth so the swatch reads as the same hue.)
 var CR=[[255,255,178],[254,204,92],[253,141,60],[240,59,32],[189,0,38]];
 var CE=[[254,229,217],[252,174,145],[251,106,74],[203,24,29]];
 var CS=[[242,240,247],[203,201,226],[158,154,200],[106,81,163]];
 var CA=[[229,245,224],[161,217,155],[65,171,93],[0,109,44]];
 var CD=[[255,255,204],[255,237,160],[254,178,76],[253,141,60],[252,78,42],[227,26,28],[177,0,38]];
-var DRGB={exposure:[192,57,43],sensitivity:[212,160,23],adaptive:[22,160,82]};
+var DRGB={exposure:[192,57,43],sensitivity:[106,81,163],adaptive:[22,160,82]};
 
 // ── Colorblind-friendly palettes ─────────────────────────────────────────
 // Composite + delta: viridis (perceptually uniform, CB-safe across all forms)

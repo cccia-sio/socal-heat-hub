@@ -375,13 +375,15 @@
 
       <h4>Environment</h4>
       <p>Pollution (Inverse), Ozone, PM 2.5, and Diesel PM exposure. Source: <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy Places Index</a>.</p>
+
+      <p>Higher population sensitivity raises the Heat Risk Index.</p>
     </div>
 
     <div class="pillar-section ada">
       <h3>Adaptive Capacity</h3>
 
       <h4>Air Conditioning</h4>
-      <p>AC Prevalence (percent of homes with any AC), Probability of No AC, and Probability of Central AC. Sources: <a href="https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629" target="_blank" rel="noopener">Romitti et&nbsp;al.</a> and <a href="https://doi.org/10.1038/s41597-025-06104-3" target="_blank" rel="noopener">Ahn et&nbsp;al.</a> (modeled).</p>
+      <p>AC Prevalence (the percent of homes with any AC) from two independent sources: the U.S. Census Bureau's <a href="https://www.census.gov/newsroom/press-releases/2026/2023-lace.html" target="_blank" rel="noopener">Local Air Conditioning Estimates (LACE) 2023</a>, the first official tract-level AC estimates from the Census Bureau, and <a href="https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629" target="_blank" rel="noopener">Romitti et&nbsp;al. (2022)</a>, a published modeled estimate retained for comparison.</p>
 
       <h4>Built Environment</h4>
       <p>Tree Canopy, Park Access, Green Space (%), Renter-Occupied (%), and housing age (Pre-1980 and Pre-1960 Housing share). Sources: <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy Places Index</a>, <a href="https://censusreporter.org/tables/B25034/" target="_blank" rel="noopener">ACS B25034</a>, and <a href="https://sdgis-sandag.opendata.arcgis.com/" target="_blank" rel="noopener">SanGIS</a>.</p>
@@ -415,7 +417,7 @@
     <ul>
       <li><strong>Composite Risk (left panel):</strong> the 0&ndash;100 Heat Risk Index combining all three pillars (default view).</li>
       <li><strong>Dominant Driver (right panel):</strong> census tracts are colored by which pillar contributes most to the Heat Risk Index. This distinguishes hotspots driven by Heat Exposure from those driven by Population Sensitivity or low Adaptive Capacity. Click on a census tract to see the scores for each of the three pillars.</li>
-      <li><strong>Primary Spatial Patterns:</strong> this drop-down menu lists the independent patterns identified by PCA across all selected variables. Each entry is labeled <strong>Pattern N (var X%)</strong>, where N is the pattern's rank by importance and X% is the share of variance in the data that this pattern explains. Hover over the blue info icons to see which variables contribute most to each pattern.</li>
+      <li><strong>Primary Spatial Patterns:</strong> this drop-down menu lists the independent patterns identified by Principal Component Analysis across all selected variables. Each entry is labeled <strong>Pattern N (var X%)</strong>, where N is the pattern's rank by importance and X% is the share of variance in the data that this pattern explains. Hover over the blue information icons to see which variables contribute most to each pattern.</li>
     </ul>
 
     <h3>Census tract panel</h3>
@@ -511,7 +513,7 @@
         <tr><td>Social vulnerability</td><td><a href="https://www.atsdr.cdc.gov/place-health/php/svi/index.html" target="_blank" rel="noopener">CDC SVI 2022</a></td></tr>
         <tr><td>Income, education, healthcare, housing</td><td><a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy Places Index (HPI)</a></td></tr>
         <tr><td>Demographics and housing</td><td><a href="https://www.census.gov/programs-surveys/acs" target="_blank" rel="noopener">ACS 5-year estimates</a></td></tr>
-        <tr><td>Air conditioning prevalence</td><td><a href="https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629" target="_blank" rel="noopener">Romitti et&nbsp;al.</a>; <a href="https://doi.org/10.1038/s41597-025-06104-3" target="_blank" rel="noopener">Ahn et&nbsp;al.</a> (modeled)</td></tr>
+        <tr><td>Air conditioning prevalence</td><td><a href="https://www.census.gov/newsroom/press-releases/2026/2023-lace.html" target="_blank" rel="noopener">U.S. Census LACE 2023</a>; <a href="https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629" target="_blank" rel="noopener">Romitti et&nbsp;al.</a> (modeled)</td></tr>
       </tbody>
     </table>
     <p>Each variable name in the tool has a small <code>(Source)</code> link that opens the original source.</p>

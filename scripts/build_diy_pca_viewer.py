@@ -30,6 +30,7 @@ OUTPUT_PATH = ROOT / "main" / "diy_pca.html"
 TRACTS_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "tracts_sd.geojson"
 JURIS_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "jurisdictions_sd.geojson"
 TRIBAL_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "tribal_lands_sd.geojson"
+COOLZONES_PATH = ROOT / "data" / "cool_zones" / "coolzone_sites.csv"
 
 # ── CMIP6 / LOCA2 projection settings ──────────────────────────────────────
 LOCA2_DIR = ROOT / "data" / "exposure" / "raw" / "loca2"
@@ -582,6 +583,34 @@ def main():
     else:
         logger.warning("No tribal lands file — tribal overlay will not be shown")
 
+    # Load cool zone sites (optional) — county-published list of cooling sites
+    # for hot-weather refuge. Extracted from CoolZoneSiteList.pdf and geocoded
+    # via US Census + Nominatim. Inlined into the HTML so the static page is
+    # self-contained.
+    coolzones_str = "null"
+    if COOLZONES_PATH.exists():
+        import csv as _csv
+        import json as _json
+        feats = []
+        with COOLZONES_PATH.open() as f:
+            for row in _csv.DictReader(f):
+                try:
+                    lat = float(row["lat"]); lon = float(row["lon"])
+                except (ValueError, KeyError, TypeError):
+                    continue
+                feats.append({
+                    "name": row.get("organization", "").strip(),
+                    "address": row.get("address", "").strip(),
+                    "city": row.get("city", "").strip(),
+                    "zip": row.get("zip", "").strip(),
+                    "phone": row.get("phone", "").strip(),
+                    "lat": lat, "lon": lon,
+                })
+        coolzones_str = _json.dumps(feats, separators=(",", ":"))
+        logger.info(f"Loaded {len(feats)} cool-zone sites")
+    else:
+        logger.warning("No cool-zone file — cool-zone overlay will not be shown")
+
     html = HTML_TEMPLATE
     html = html.replace("__GEOJSON_PLACEHOLDER__", geojson_str)
     html = html.replace("__VARMETA_PLACEHOLDER__", var_meta_str)
@@ -591,6 +620,7 @@ def main():
     html = html.replace("__DELTAMAP_PLACEHOLDER__", delta_map_str)
     html = html.replace("__JURIS_PLACEHOLDER__", juris_str)
     html = html.replace("__TRIBAL_PLACEHOLDER__", tribal_str)
+    html = html.replace("__COOLZONES_PLACEHOLDER__", coolzones_str)
     html = html.replace("__LST_PLACEHOLDER__", lst_str)
     html = html.replace("__POLARITY_PLACEHOLDER__", polarity_str)
 
@@ -1248,6 +1278,10 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-tribal-all" onchange="toggleTribalAll(this.checked)"><span style="color:#8b5a2b;font-weight:600">Show all tribal lands</span></label></div>
       <div id="tribal-items" style="margin-top:2px"></div>
     </details>
+    <details class="subsec" id="coolzones-subsec" style="margin-top:6px"><summary>Cool Zones</summary>
+      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-coolzones" onchange="toggleCoolZones(this.checked)">Show county cool-zone sites</label></div>
+      <div style="font-size:10px;color:#666;margin:2px 0 0 6px">County-listed cooling sites (libraries, civic centers, malls). Click a marker for address &amp; phone.</div>
+    </details>
   </div>
   <div id="scenario-bar">
     <div class="scenario-label">Climate Scenario</div>
@@ -1302,11 +1336,11 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 <div id="map-wrap">
   <div id="map"></div>
   <div id="basemap-picker">
-    <button class="bm-thumb active" data-bm="light" onclick="setBasemap('light')" title="Light basemap"
+    <button class="bm-thumb" data-bm="light" onclick="setBasemap('light')" title="Light basemap"
             style="background-image:url('https://a.basemaps.cartocdn.com/light_all/11/358/825.png')">
       <span class="bm-thumb-lbl">Light</span>
     </button>
-    <button class="bm-thumb" data-bm="satellite" onclick="setBasemap('satellite')" title="Satellite basemap"
+    <button class="bm-thumb active" data-bm="satellite" onclick="setBasemap('satellite')" title="Satellite basemap"
             style="background-image:url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/11/825/358')">
       <span class="bm-thumb-lbl">Satellite</span>
     </button>
@@ -1495,6 +1529,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     <div class="tc-footer">
       <button class="tc-skip" id="tc-skip">Skip tour</button>
       <span class="spacer"></span>
+      <button class="tc-btn" id="tc-example" style="display:none">See worked example</button>
       <button class="tc-btn" id="tc-back">Back</button>
       <button class="tc-btn primary" id="tc-next">Next</button>
     </div>
@@ -1526,6 +1561,7 @@ var DELTAS = __DELTAS_PLACEHOLDER__;         // {period:{ssp:{tasmax:[...],tasmi
 var DELTA_MAP = __DELTAMAP_PLACEHOLDER__;    // {varKey:"tasmax"|"tasmin"}
 var JURIS = __JURIS_PLACEHOLDER__;           // city jurisdiction GeoJSON or null
 var TRIBAL = __TRIBAL_PLACEHOLDER__;         // tribal lands GeoJSON or null
+var COOLZONES = __COOLZONES_PLACEHOLDER__;   // [{name,address,city,zip,phone,lat,lon}, ...] or null
 var LST   = __LST_PLACEHOLDER__;             // Landsat LST overlay meta or null
 var POLARITY = __POLARITY_PLACEHOLDER__;     // {varKey: true if higher=worse(red)}
 var HEAT_MODES = __HEATMODES_PLACEHOLDER__;  // [{key,label,layers:[...],desc}] — exposure is single-select, not PCA
@@ -1710,8 +1746,8 @@ var BASEMAPS = {
     opts: {attribution:"Imagery \\u00a9 Esri, Maxar, Earthstar Geographics, and the GIS User Community", maxZoom:19}
   }
 };
-var currentBasemap = 'light';
-var basemapLayer = L.tileLayer(BASEMAPS.light.url, BASEMAPS.light.opts).addTo(map);
+var currentBasemap = 'satellite';
+var basemapLayer = L.tileLayer(BASEMAPS.satellite.url, BASEMAPS.satellite.opts).addTo(map);
 L.control.scale().addTo(map);
 var tLayer = null;
 // User-adjustable opacity for the composite-risk choropleth (see #map-opacity-slider).
@@ -2627,6 +2663,42 @@ function syncTribalAllCheckbox(){
   });
   all.checked=(n===keys.length);
   all.indeterminate=(n>0&&n<keys.length);
+}
+
+/* ================================================================
+   Cool Zones — point overlay of county-published cooling sites
+   ================================================================ */
+var coolZonesLayer=null;
+if(COOLZONES&&COOLZONES.length){
+  coolZonesLayer=L.layerGroup();
+  COOLZONES.forEach(function(s){
+    var m=L.circleMarker([s.lat,s.lon],{
+      radius:5, color:"#ffffff", weight:1.5,
+      fillColor:"#111111", fillOpacity:0.95
+    });
+    var addr=s.address+(s.city?", "+s.city:"")+(s.zip?" "+s.zip:"");
+    var phone=s.phone?'<div style="color:#444;margin-top:2px">'+s.phone+'</div>':'';
+    m.bindPopup(
+      '<div style="font-size:12px;line-height:1.35;max-width:240px">'+
+      '<div style="font-weight:600;margin-bottom:3px">'+s.name+'</div>'+
+      '<div>'+addr+'</div>'+phone+
+      '<div style="margin-top:4px;font-size:10px;color:#888">Source: SD County Cool Zones</div>'+
+      '</div>',
+      {closeButton:true, autoPan:true, maxWidth:260}
+    );
+    m.on("click",function(e){if(L.DomEvent)L.DomEvent.stopPropagation(e);});
+    coolZonesLayer.addLayer(m);
+  });
+  document.getElementById("overlay-toggles").style.display="block";
+}
+function toggleCoolZones(on){
+  if(!coolZonesLayer)return;
+  if(on){
+    coolZonesLayer.addTo(map);
+    coolZonesLayer.eachLayer(function(l){if(l.bringToFront)l.bringToFront();});
+  } else {
+    map.removeLayer(coolZonesLayer);
+  }
 }
 
 /* ================================================================
@@ -5203,100 +5275,128 @@ function closeWelcome(){
 
 /* ================================================================
    GUIDED TOUR — opt-in walkthrough of the sidebar pillars.
-   Steps prompt the user to actually click the highlighted control;
-   the tour advances on that action (auto-advance) or on Next.
+   Each step describes a section, optionally prompts the user to try
+   the highlighted control, and advances on Next.
    ================================================================ */
 var TOUR_STEPS=[
   {key:"exposure",target:'[data-tour="pillar-exposure"]',side:"right",
    title:"1. Heat Exposure",
-   body:"Heat Exposure is the hazard itself \\u2014 how hot the air or ground gets. Pick one of four modes: <b>Daytime</b>, <b>Nighttime</b>, <b>Humid Heat (WBGT)</b>, or <b>Surface Temperature</b>. Each affects different places, so you map them one at a time.",
-   prompt:"Click any heat mode to continue",
-   waitOn:function(){
-     return _tourWaitForChange('[data-tour="pillar-exposure"] input[type=radio]');
-   }},
+   body:"How hot the air or ground gets. Pick one of four modes \\u2014 <b>Daytime</b>, <b>Nighttime</b>, <b>Humid Heat (WBGT)</b>, or <b>Surface Temperature</b>. Each affects different places, so they're mapped one at a time.",
+   prompt:"Pick a heat mode, then click Next."},
   {key:"sensitivity",target:'[data-tour="pillar-sensitivity"]',side:"right",
    title:"2. Population Sensitivity",
-   body:"These are factors that make people more vulnerable to heat \\u2014 like age, income, language, or pre-existing health conditions. Click the <b>Population Sensitivity</b> header to turn on every variable, or expand a subsection to pick specific ones.",
-   prompt:"Toggle the pillar or a variable to continue",
-   waitOn:function(){
-     return _tourWaitForChange('[data-tour="pillar-sensitivity"] input[type=checkbox]');
-   }},
+   body:"Factors that make people more vulnerable to heat \\u2014 age, income, language, pre-existing health conditions. Toggle the pillar header to enable everything, or expand a subsection to pick specific variables.",
+   prompt:"Toggle a variable or the pillar header, then click Next."},
   {key:"adaptive",target:'[data-tour="pillar-adaptive"]',side:"right",
    title:"3. Adaptive Capacity",
-   body:"Adaptive Capacity is what helps people cope \\u2014 air conditioning, tree canopy, walkable access to cool spaces. <i>Low</i> adaptive capacity increases risk, so the tool inverts these when blending. Toggle on what you'd like included.",
-   prompt:"Toggle the pillar or a variable to continue",
-   waitOn:function(){
-     return _tourWaitForChange('[data-tour="pillar-adaptive"] input[type=checkbox]');
-   }},
+   body:"What helps people cope \\u2014 air conditioning, tree canopy, walkable access to cool spaces. <i>Low</i> adaptive capacity raises risk, so these variables are inverted when blending.",
+   prompt:"Toggle a variable or the pillar header, then click Next."},
   {key:"build",target:'#compute-btn',side:"right",
    title:"4. Build the map",
-   body:"Now blend everything you picked into one composite risk score for every census tract. The tool z-scores each layer, runs PCA on the Sensitivity and Adaptive pillars, and percentile-ranks the result countywide.",
-   prompt:"Click \\u201CBuild Composite Risk Map\\u201D",
-   waitOn:function(){
-     return _tourWaitForClick('#compute-btn');
-   }},
+   body:"Blends your selections into one composite risk score per census tract. Each variable is z-scored, Sensitivity and Adaptive Capacity run through PCA, and the result is percentile-ranked countywide.",
+   prompt:"Click \\u201CBuild Composite Risk Map\\u201D, then click Next."},
   {key:"layer",target:'#layer-select',side:"right",
    title:"5. Switch the map layer",
-   body:"Once built, you can switch views without rebuilding. <b>Composite Risk</b> is the overall blend. <b>Dominant Driver</b> colors each tract by whichever pillar contributes most. Each pillar score and individual variable is also available.",
-   prompt:"Click any layer button to continue",
-   waitOn:function(){
-     return _tourWaitForClick('#layer-buttons .lbtn');
-   }},
+   body:"Switch views without rebuilding. <b>Composite Risk</b> is the overall blend; <b>Dominant Driver</b> colors each tract by the pillar contributing most. Individual pillar scores and variables are also available.",
+   prompt:"Click a layer button, then click Next."},
   {key:"scenario",target:'#scenario-bar',side:"right",
    title:"6. Climate scenarios",
-   body:"See how risk shifts under future warming. Pick <b>2050</b> or <b>2080</b> and a scenario (moderate, high, or very high emissions). The Heat Exposure pillar gets re-projected; sensitivity and adaptive capacity hold at present-day baselines.",
+   body:"See how risk shifts under future warming. Pick <b>2050</b> or <b>2080</b> and an emissions pathway (moderate, high, or very high). Only Heat Exposure is re-projected \\u2014 Sensitivity and Adaptive Capacity hold at present-day baselines.",
    prompt:null},
   {key:"done",target:null,side:"center",
    title:"You're set",
-   body:"Click any tract on the map to see its composite score, pillar scores, and dominant driver. Use the <b>Find Address</b> box at the bottom of the sidebar to jump to a specific location. Refresh the page anytime to take the tour again.",
+   body:"Click any tract for its composite score, pillar scores, and dominant driver. Use <b>Find Address</b> (bottom of sidebar) to jump to a location. Refresh the page anytime to retake the tour.",
    prompt:null}
 ];
-var _tourIdx=0,_tourCleanup=null;
+/* ----------------------------------------------------------------
+   WORKED EXAMPLE — Example 1 from the user guide
+   ("Where are children most at risk?"). Mirrors the regular tour
+   state machine but each step's `action` auto-fires on Next so the
+   user watches the tool perform the example.
+   ---------------------------------------------------------------- */
+var WE_STEPS=[
+  {key:"we-intro",target:null,side:"center",
+   title:"Worked example: where are children most at risk?",
+   body:"From the user guide. We'll narrow Population Sensitivity to one variable \\u2014 children under 18 \\u2014 to find tracts where kids face the most heat stress. Click <b>Next</b> at each step and the tool performs the action.",
+   prompt:null},
+  {key:"we-clear",target:'[data-tour="pillar-sensitivity"]',side:"right",
+   title:"1. Clear Population Sensitivity",
+   body:"Uncheck every variable in this pillar so we can isolate one factor.",
+   prompt:"Next will clear the pillar.",
+   action:function(){togPillar('sensitivity',false);}},
+  {key:"we-age",target:'#vr_EP_AGE17',side:"right",
+   title:"2. Enable only Age 17 & Under",
+   body:"Re-enable just the under-18 variable. Population Sensitivity is now driven entirely by where children live.",
+   prompt:"Next will enable this variable.",
+   // `prepare` runs before the spotlight positions, so the Demographics
+   // subsection is open and the target row is laid out (non-zero height)
+   // by the time getBoundingClientRect reads it.
+   prepare:function(){
+     var sec=document.querySelector('[data-tour="pillar-sensitivity"]');
+     if(!sec)return;
+     var ds=sec.querySelectorAll('details.subsec');
+     for(var i=0;i<ds.length;i++){
+       if(ds[i].querySelector('#vr_EP_AGE17')){ds[i].open=true;break;}
+     }
+   },
+   action:function(){if(!enabled['EP_AGE17'])tog('EP_AGE17');}},
+  {key:"we-build",target:'#compute-btn',side:"right",
+   title:"3. Build the map",
+   body:"Blend Heat Exposure, Population Sensitivity (children-only), and Adaptive Capacity into the composite Heat Risk Index.",
+   prompt:"Next will build the map.",
+   action:function(){
+     // Safety net: ensure Adaptive Capacity has variables on so the
+     // composite is meaningful (matches the user-guide instruction
+     // "select all variables for Heat Exposure and Adaptive Capacity").
+     // Heat Exposure is a single-select radio, so a mode is already chosen.
+     var anyAdaptive=false;
+     VM.forEach(function(v){if(v.pillar==='adaptive'&&enabled[v.key])anyAdaptive=true;});
+     if(!anyAdaptive)togPillar('adaptive',true);
+     compute();
+   }},
+  {key:"we-done",target:null,side:"center",
+   title:"Done \\u2014 children at risk",
+   body:"Dark-red tracts are where children face the most heat stress: hot, lots of kids under 18, and limited capacity to cope. Click any tract for its driver breakdown.",
+   prompt:null}
+];
 
-function startTour(){_tourIdx=0;_showTourStep(0);}
+var _tourIdx=0;
+var _inWorkedExample=false;
+var _tourResizeObs=null;
+function _currentSteps(){return _inWorkedExample?WE_STEPS:TOUR_STEPS;}
+
+function startTour(){_inWorkedExample=false;_tourIdx=0;_showTourStep(0);}
+function startWorkedExample(){_inWorkedExample=true;_tourIdx=0;_showTourStep(0);}
+
+// Re-position the spotlight whenever the highlighted element changes size
+// (e.g. user expands a <details> subsection, revealing more variables).
+function _attachTourResizeObs(el,side){
+  _detachTourResizeObs();
+  if(typeof ResizeObserver==='undefined')return;
+  _tourResizeObs=new ResizeObserver(function(){_positionAtTarget(el,side);});
+  _tourResizeObs.observe(el);
+}
+function _detachTourResizeObs(){
+  if(_tourResizeObs){try{_tourResizeObs.disconnect();}catch(e){}_tourResizeObs=null;}
+}
 
 function endTour(){
-  _clearTourListener();
+  _detachTourResizeObs();
+  _inWorkedExample=false;
   var ov=document.getElementById('tour-overlay');
   if(ov)ov.classList.remove('open');
 }
 
-function _clearTourListener(){
-  if(typeof _tourCleanup==='function'){try{_tourCleanup();}catch(e){}}
-  _tourCleanup=null;
-}
-
-function _tourWaitForChange(selector){
-  var fired=false;
-  function handler(){if(fired)return;fired=true;_advanceTour();}
-  var nodes=document.querySelectorAll(selector);
-  for(var i=0;i<nodes.length;i++)nodes[i].addEventListener('change',handler);
-  return function(){
-    for(var i=0;i<nodes.length;i++)nodes[i].removeEventListener('change',handler);
-  };
-}
-
-function _tourWaitForClick(selector){
-  var fired=false;
-  function handler(){if(fired)return;fired=true;
-    // Defer so the click handler the user triggered runs first and the
-    // UI updates before we move to the next step.
-    setTimeout(_advanceTour,80);
-  }
-  // Delegate so newly-rendered buttons (e.g. after compute) are caught too.
-  function delegate(e){
-    var t=e.target;
-    while(t&&t!==document){
-      if(t.matches&&t.matches(selector)){handler();return;}
-      t=t.parentNode;
-    }
-  }
-  document.addEventListener('click',delegate,true);
-  return function(){document.removeEventListener('click',delegate,true);};
-}
-
 function _advanceTour(){
-  if(_tourIdx>=TOUR_STEPS.length-1){endTour();return;}
+  var steps=_currentSteps();
+  if(_tourIdx>=steps.length-1){endTour();return;}
+  var step=steps[_tourIdx];
+  if(step&&typeof step.action==='function'){
+    try{step.action();}catch(e){console.warn('Tour step action failed:',e);}
+    // Brief pause so the user sees the action take effect before the card moves on.
+    setTimeout(function(){_tourIdx++;_showTourStep(_tourIdx);},420);
+    return;
+  }
   _tourIdx++;_showTourStep(_tourIdx);
 }
 
@@ -5306,11 +5406,12 @@ function _tourBack(){
 }
 
 function _showTourStep(i){
-  _clearTourListener();
-  var step=TOUR_STEPS[i];if(!step)return endTour();
+  var steps=_currentSteps();
+  var step=steps[i];if(!step)return endTour();
   var ov=document.getElementById('tour-overlay');
   ov.classList.add('open');
-  document.getElementById('tc-progress').textContent='Step '+(i+1)+' of '+TOUR_STEPS.length;
+  var progLabel=_inWorkedExample?'Example':'Step';
+  document.getElementById('tc-progress').textContent=progLabel+' '+(i+1)+' of '+steps.length;
   document.getElementById('tc-title').textContent=step.title;
   document.getElementById('tc-body').innerHTML=step.body;
   var pr=document.getElementById('tc-prompt');
@@ -5321,25 +5422,37 @@ function _showTourStep(i){
   back.disabled=(i===0);
   back.style.visibility=(i===0?'hidden':'visible');
   var next=document.getElementById('tc-next');
-  next.textContent=(i===TOUR_STEPS.length-1?'Finish':'Next');
+  next.textContent=(i===steps.length-1?'Finish':'Next');
+  // "See worked example" button: only visible on the last step of the main tour.
+  var ex=document.getElementById('tc-example');
+  if(ex)ex.style.display=(!_inWorkedExample&&i===TOUR_STEPS.length-1)?'inline-block':'none';
+  // Detach the previous step's ResizeObserver before any DOM mutations in
+  // `prepare` so we don't briefly reposition the old spotlight on stale targets.
+  _detachTourResizeObs();
+  if(typeof step.prepare==='function'){try{step.prepare();}catch(e){console.warn('Tour prepare failed:',e);}}
   // Position card + spotlight
   if(step.target){
     var el=document.querySelector(step.target);
     if(!el){_positionCenter();}
     else{
-      // Scroll into view inside sidebar if needed
       try{el.scrollIntoView({behavior:'instant',block:'nearest'});}catch(e){el.scrollIntoView();}
-      // Defer a tick so layout settles after the scroll
-      setTimeout(function(){_positionAtTarget(el,step.side);},20);
+      // Double-rAF so the sidebar scroll + layout fully settle before
+      // we read getBoundingClientRect — a single setTimeout occasionally
+      // measured stale coords and left the spotlight a few px off.
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          _positionAtTarget(el,step.side);
+          _attachTourResizeObs(el,step.side);
+        });
+      });
     }
   }else{
     _positionCenter();
   }
-  // Hook up advance listener for this step
-  if(typeof step.waitOn==='function'){_tourCleanup=step.waitOn();}
 }
 
 function _positionCenter(){
+  _detachTourResizeObs();
   // Hide dim rects and spotlight; center the card.
   ['tour-dim-top','tour-dim-right','tour-dim-bottom','tour-dim-left'].forEach(function(id){
     var d=document.getElementById(id);d.style.cssText='position:fixed;background:rgba(15,23,42,0.55);z-index:2400;left:0;top:0;width:0;height:0';
@@ -5356,7 +5469,7 @@ function _positionCenter(){
 function _positionAtTarget(el,side){
   var r=el.getBoundingClientRect();
   // Pad the spotlight slightly so the ring sits proud of the element.
-  var pad=4;
+  var pad=6;
   var x=r.left-pad,y=r.top-pad,w=r.width+pad*2,h=r.height+pad*2;
   var vw=window.innerWidth,vh=window.innerHeight;
   // Four-rectangle dim
@@ -5405,6 +5518,8 @@ function _positionAtTarget(el,side){
   if(bb)bb.addEventListener('click',_tourBack);
   var sb=document.getElementById('tc-skip');
   if(sb)sb.addEventListener('click',endTour);
+  var ex=document.getElementById('tc-example');
+  if(ex)ex.addEventListener('click',startWorkedExample);
   document.addEventListener('keydown',function(e){
     var ov=document.getElementById('tour-overlay');
     if(!ov||!ov.classList.contains('open'))return;
@@ -5415,7 +5530,7 @@ function _positionAtTarget(el,side){
   window.addEventListener('resize',function(){
     var ov=document.getElementById('tour-overlay');
     if(!ov||!ov.classList.contains('open'))return;
-    var step=TOUR_STEPS[_tourIdx];if(!step||!step.target){_positionCenter();return;}
+    var step=_currentSteps()[_tourIdx];if(!step||!step.target){_positionCenter();return;}
     var el=document.querySelector(step.target);
     if(el)_positionAtTarget(el,step.side);
   });
@@ -5424,7 +5539,7 @@ function _positionAtTarget(el,side){
   if(sb2)sb2.addEventListener('scroll',function(){
     var ov=document.getElementById('tour-overlay');
     if(!ov||!ov.classList.contains('open'))return;
-    var step=TOUR_STEPS[_tourIdx];if(!step||!step.target)return;
+    var step=_currentSteps()[_tourIdx];if(!step||!step.target)return;
     var el=document.querySelector(step.target);
     if(el)_positionAtTarget(el,step.side);
   });

@@ -8,7 +8,7 @@ Usage:
     python scripts/build_diy_pca_viewer.py
 
 Output:
-    figures/heat_risk/main/diy_pca.html
+    main/heat_risk_map.html
 """
 
 import json
@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
-OUTPUT_PATH = ROOT / "main" / "diy_pca.html"
+OUTPUT_PATH = ROOT / "main" / "heat_risk_map.html"
 TRACTS_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "tracts_sd.geojson"
 JURIS_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "jurisdictions_sd.geojson"
 TRIBAL_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "tribal_lands_sd.geojson"

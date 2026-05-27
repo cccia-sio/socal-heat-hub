@@ -10,7 +10,7 @@ def project_root() -> Path:
 
 @pytest.fixture(scope="session")
 def viewer_html_path(project_root: Path) -> Path:
-    return project_root / "main" / "diy_pca.html"
+    return project_root / "main" / "heat_risk_map.html"
 
 
 @pytest.fixture(scope="session")

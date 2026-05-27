@@ -1,6 +1,6 @@
 """Structural checks on the generated viewer HTML.
 
-The viewer at main/diy_pca.html is built by scripts/build_diy_pca_viewer.py.
+The viewer at main/heat_risk_map.html is built by scripts/build_diy_pca_viewer.py.
 These tests guard against the most common ways a build can silently regress:
 unreplaced placeholder tokens, missing DOM hooks, or malformed inlined JSON.
 """
@@ -48,7 +48,7 @@ def test_no_unreplaced_placeholders(viewer_html_text):
     """Every `__FOO_PLACEHOLDER__` token must be substituted at build time."""
     leftovers = re.findall(r"__[A-Z0-9_]+_PLACEHOLDER__", viewer_html_text)
     assert not leftovers, (
-        f"Unreplaced placeholders in main/diy_pca.html: {sorted(set(leftovers))}. "
+        f"Unreplaced placeholders in main/heat_risk_map.html: {sorted(set(leftovers))}. "
         "Rebuild with: python3 scripts/build_diy_pca_viewer.py"
     )
 
@@ -87,7 +87,7 @@ def test_viewer_html_is_nontrivial(viewer_html_path):
     """A viewer that's <100 KB almost certainly means the data splice failed."""
     size_kb = viewer_html_path.stat().st_size / 1024
     assert size_kb > 100, (
-        f"main/diy_pca.html is only {size_kb:.0f} KB — expected >100 KB once "
+        f"main/heat_risk_map.html is only {size_kb:.0f} KB — expected >100 KB once "
         "tract data is spliced in. Did the build run with empty inputs?"
     )
 

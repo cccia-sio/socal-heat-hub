@@ -6,7 +6,7 @@ is built and deployed.
 ## What the repo ships
 
 The public artifact is a static GitHub Pages site at
-`https://connorjmack.github.io/heat-risk-viewer/`. Three pages:
+`https://cccia-sio.github.io/socal-heat-hub/`. Three pages:
 
 - `/` — landing page (`index.html`).
 - `/main/diy_pca.html` — the interactive heat-risk viewer (single self-contained HTML).
@@ -44,7 +44,7 @@ time (belt-and-suspenders — see `.github/workflows/pages.yml`).
 ## Top-level layout
 
 ```
-heat-risk-viewer/
+socal-heat-hub/
 ├── index.html                ← landing page
 ├── README.md                 ← short project blurb + launch link
 ├── ARCHITECTURE.md           ← this file

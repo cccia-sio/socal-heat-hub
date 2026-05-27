@@ -630,7 +630,7 @@ def main():
 
     rel = OUTPUT_PATH.relative_to(ROOT)
     print(f"\nGitHub Pages URL (after push):")
-    print(f"  https://connorjmack.github.io/heat-risk-viewer/{rel}")
+    print(f"  https://cccia-sio.github.io/socal-heat-hub/{rel}")
 
 
 # ---------------------------------------------------------------------------
@@ -4735,7 +4735,7 @@ function _heroPdf(canvas,opts){
   pdf.text('Sources: LOCA2-Hybrid CMIP6 \\u00b7 USGS Landsat \\u00b7 NOAA HRRR \\u00b7 CDC PLACES & SVI \\u00b7 HealthyPlacesIndex',
     M,ph-18);
 
-  var url='connorjmack.github.io/heat-risk-viewer';
+  var url='cccia-sio.github.io/socal-heat-hub';
   pdf.setFont('helvetica','bold');pdf.setTextColor(37,99,235);
   var urlW=pdf.getTextWidth(url);
   pdf.text(url,pw-M-urlW,ph-18);
@@ -4907,7 +4907,7 @@ function _heroPdfTwoPanel(cL,cR,opts){
   var dStr=dt.toLocaleString(undefined,{year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'});
   pdf.text('Generated '+dStr,M,ph-30);
   pdf.text('Sources: LOCA2-Hybrid CMIP6 \\u00b7 USGS Landsat \\u00b7 NOAA HRRR \\u00b7 CDC PLACES & SVI \\u00b7 HealthyPlacesIndex',M,ph-18);
-  var url='connorjmack.github.io/heat-risk-viewer';
+  var url='cccia-sio.github.io/socal-heat-hub';
   pdf.setFont('helvetica','bold');pdf.setTextColor(37,99,235);
   var urlW=pdf.getTextWidth(url);pdf.text(url,pw-M-urlW,ph-18);
 

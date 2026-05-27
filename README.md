@@ -1,6 +1,6 @@
 # San Diego Heat Risk Explorer
 
-### [**Landing Page &rarr;**](https://connorjmack.github.io/heat-risk-viewer/)
+### [**Landing Page &rarr;**](https://cccia-sio.github.io/socal-heat-hub/)
 
 Custom composite heat-risk map for every census tract in San Diego County.
 
@@ -10,7 +10,7 @@ neighborhood-level risk map. Toggle climate scenarios to see how risk shifts
 under mid-century and end-of-century warming. The tool runs entirely in the
 browser — no server, no tracking, no account needed.
 
-See the [User Guide](https://connorjmack.github.io/heat-risk-viewer/userguide/)
+See the [User Guide](https://cccia-sio.github.io/socal-heat-hub/userguide/)
 for variables, methodology, and map interpretation.
 
 ## Three pillars of heat risk

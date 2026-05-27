@@ -145,7 +145,6 @@ VARIABLES = [
     ("economic_pctile", "Economic", "adaptive", "Socioeconomic"),
     ("education_pctile", "Education", "adaptive", "Socioeconomic"),
     ("houseing_pctile", "Housing Quality", "adaptive", "Socioeconomic"),
-    ("healthcareaccess_pctile", "Healthcare Access", "adaptive", "Socioeconomic"),
     ("transportation_pctile", "Transportation", "adaptive", "Socioeconomic"),
     ("social_pctile", "Social Cohesion", "adaptive", "Socioeconomic"),
     ("neighborhood_pctile", "Neighborhood Quality", "adaptive", "Socioeconomic"),
@@ -153,7 +152,6 @@ VARIABLES = [
     ("automobile_pctile", "Automobile Access", "adaptive", "Socioeconomic"),
     ("homeownership_pctile", "Homeownership", "adaptive", "Socioeconomic"),
     ("commute_pctile", "Commute Time", "adaptive", "Socioeconomic"),
-    ("supermkts_pctile", "Supermarket Access", "adaptive", "Socioeconomic"),
     ("voting_pctile", "Voter Participation", "adaptive", "Socioeconomic"),
     ("retail_pctile", "Retail Food Access", "adaptive", "Socioeconomic"),
     # Environment
@@ -240,11 +238,11 @@ VAR_SOURCES = {
     "treecanopy_pctile": _SRC_HPI, "parkaccess_pctile": _SRC_HPI,
     "income_pctile": _SRC_HPI, "abovepoverty_pctile": _SRC_HPI,
     "economic_pctile": _SRC_HPI, "education_pctile": _SRC_HPI,
-    "houseing_pctile": _SRC_HPI, "healthcareaccess_pctile": _SRC_HPI,
+    "houseing_pctile": _SRC_HPI,
     "transportation_pctile": _SRC_HPI, "social_pctile": _SRC_HPI,
     "neighborhood_pctile": _SRC_HPI, "insured_pctile": _SRC_HPI,
     "automobile_pctile": _SRC_HPI, "homeownership_pctile": _SRC_HPI,
-    "commute_pctile": _SRC_HPI, "supermkts_pctile": _SRC_HPI,
+    "commute_pctile": _SRC_HPI,
     "voting_pctile": _SRC_HPI, "retail_pctile": _SRC_HPI,
     "leb_pctile": _SRC_HPI, "pollution_pctile": _SRC_HPI,
     "ozone_pctile": _SRC_HPI, "pm25_pctile": _SRC_HPI,
@@ -260,17 +258,23 @@ _EXP_CSV_COLS = [
 _PLACES_COLS = [v[0] for v in VARIABLES if v[0].endswith("_prev")]
 # Columns from SVI
 _SVI_COLS = [v[0] for v in VARIABLES if v[0].startswith(("EP_", "RPL_"))]
-# Columns from HPI (2020 tracts file — domain-level)
-_HPI_DOMAIN_COLS = [
+# Columns sourced from the HPI 3.0 complete data file (xlsx, 2020-tract xwalk).
+# Single file replaces the previous HPI 2.x domain CSV + indicator CSV pair.
+# Three columns are renamed on load to preserve our existing keys:
+#   percapitaincome_pctile → income_pctile
+#   housing_pctile         → houseing_pctile  (keeps our typo'd key)
+#   clean_enviro_pctile    → pollution_pctile (HPI 3.0 env composite)
+# Two HPI 2.x columns were discontinued in HPI 3.0 and removed from VARIABLES:
+#   supermkts_pctile, healthcareaccess_pctile
+_HPI_COLS = [
+    # Domain-level rollups
     "treecanopy_pctile", "parkaccess_pctile", "income_pctile",
     "abovepoverty_pctile", "economic_pctile", "education_pctile",
-    "healthcareaccess_pctile", "transportation_pctile", "social_pctile",
+    "transportation_pctile", "social_pctile",
     "houseing_pctile", "neighborhood_pctile", "pollution_pctile", "leb_pctile",
-]
-# Columns from HPI (full file — indicator-level)
-_HPI_INDICATOR_COLS = [
+    # Indicator-level
     "insured_pctile", "automobile_pctile", "homeownership_pctile",
-    "commute_pctile", "supermkts_pctile", "voting_pctile", "retail_pctile",
+    "commute_pctile", "voting_pctile", "retail_pctile",
     "ozone_pctile", "pm25_pctile", "dieselpm_pctile",
 ]
 
@@ -367,18 +371,25 @@ def load_data():
     rom = rom.rename(columns={"ac_prob": "ac_prob_romitti"})
     tracts = _safe_merge(tracts, rom, ["ac_prob_romitti"])
 
-    # ── Adaptive — HPI domain-level (2020 tracts) ──
-    hpi = pd.read_csv(ROOT / "data/sensitivity/hpi/hpi_san_diego_2020tracts.csv")
-    hpi["GEOID"] = hpi["GEOID_TRACT_20"].astype(str).str.zfill(11)
-    tracts = _safe_merge(tracts, hpi, _HPI_DOMAIN_COLS)
-
-    # ── Adaptive — HPI indicator-level (full file) ──
-    hpi_full_path = ROOT / "data/sensitivity/hpi/hpi_san_diego.csv"
-    if hpi_full_path.exists():
-        hpi_full = pd.read_csv(hpi_full_path, dtype={"geoid": str})
-        # geoid is formatted '14000US06073000100' — strip the 14000US prefix
-        hpi_full["GEOID"] = hpi_full["geoid"].str.split("US").str[-1].str.zfill(11)
-        tracts = _safe_merge(tracts, hpi_full, _HPI_INDICATOR_COLS)
+    # ── Adaptive + Sensitivity — HPI 3.0 (complete file, 2020-tract xwalk) ──
+    # Single statewide xlsx with all indicator + domain pctile columns.
+    # Three columns are renamed to preserve our existing keys so downstream
+    # code (VARIABLES, INVERTED_VARS, VAR_SOURCES) doesn't have to change.
+    # HPI 3.0 publishes pctiles on a 0–1 scale; HPI 2.x and the rest of the
+    # viewer's variables use 0–100, so we rescale on load.
+    hpi_path = ROOT / "data/hpi/hpi3_xwalked_complete_file_2020tracts.xlsx"
+    if hpi_path.exists():
+        hpi = pd.read_excel(hpi_path, sheet_name="HPI 3.0 Data")
+        hpi["GEOID"] = hpi["GEO_ID"].astype(str).str.zfill(11)
+        hpi = hpi.rename(columns={
+            "percapitaincome_pctile": "income_pctile",
+            "housing_pctile":         "houseing_pctile",
+            "clean_enviro_pctile":    "pollution_pctile",
+        })
+        for col in _HPI_COLS:
+            if col in hpi.columns:
+                hpi[col] = pd.to_numeric(hpi[col], errors="coerce") * 100.0
+        tracts = _safe_merge(tracts, hpi, _HPI_COLS)
 
     # ── Adaptive — Building age (ACS B25034) ──
     bldg_path = ROOT / "data/adaptive_capacity/building_age/acs_b25034_year_built_sd_tracts.csv"
@@ -1043,14 +1054,17 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 .dt-card-pct{font-size:9.5px;color:#9ca3af;line-height:1.1}
 .dt-driver{margin-top:10px;font-size:11.5px;color:#374151;line-height:1.45}
 .dt-driver b{color:#111}
-.dt-maps-stack{display:flex;flex-direction:column;gap:14px}
-.dt-map-block{display:flex;flex-direction:column}
-.dt-map-cap{font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;
-  letter-spacing:0.4px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
-.dt-map-cap .dt-map-sub{font-weight:400;text-transform:none;letter-spacing:0;
-  color:#6b7280;font-size:10.5px}
-.dt-map{height:220px;border-radius:8px;overflow:hidden;background:#eef;
-  border:1px solid #e5e7eb}
+/* Layer toggle buttons above the single tract map */
+.dt-view-switch{display:inline-flex;background:#f3f4f6;border:1px solid #e5e7eb;
+  border-radius:8px;padding:3px;gap:2px;margin-bottom:6px}
+.dt-view-btn{background:transparent;border:none;font-family:inherit;font-size:11.5px;
+  font-weight:600;padding:5px 11px;border-radius:6px;cursor:pointer;color:#4b5563;
+  letter-spacing:0.2px}
+.dt-view-btn:hover{background:#fff;color:#111}
+.dt-view-btn.active{background:#fff;color:#111;box-shadow:0 1px 2px rgba(0,0,0,0.08)}
+.dt-view-sub{font-size:10.5px;color:#6b7280;margin-bottom:6px}
+.dt-map-frame{border-radius:8px;overflow:hidden;border:1px solid #e5e7eb}
+.dt-map{height:280px;background:#eef}
 .dt-lst-legend{display:flex;flex-direction:column;gap:2px;font-size:10px;
   color:#666;margin-top:6px}
 .dt-lst-bar{height:8px;border-radius:2px}
@@ -1099,6 +1113,17 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   padding:2px 0;background:linear-gradient(transparent,rgba(0,0,0,0.65));
   text-shadow:0 1px 2px rgba(0,0,0,0.5);font-family:inherit;
   letter-spacing:0.2px}
+
+/* --- composite-risk opacity slider (sits above the basemap picker) --- */
+#map-opacity-control{position:absolute;bottom:112px;left:10px;z-index:500;
+  display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.92);
+  padding:6px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);
+  border:1px solid rgba(0,0,0,0.12);font-family:inherit;font-size:11px;
+  color:#374151}
+#map-opacity-control .opacity-lbl{font-weight:600;white-space:nowrap}
+#map-opacity-slider{width:110px;cursor:pointer;accent-color:#2563eb}
+#map-opacity-val{font-variant-numeric:tabular-nums;color:#6b7280;
+  min-width:34px;text-align:right}
 
 /* --- address search (bottom of sidebar) --- */
 #addr-search{border-top:1px solid #e0e0e0;padding-top:10px;margin-top:14px}
@@ -1229,6 +1254,12 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
             style="background-image:url('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/11/825/358')">
       <span class="bm-thumb-lbl">Satellite</span>
     </button>
+  </div>
+  <div id="map-opacity-control" title="Fade the composite-risk choropleth to see the basemap underneath">
+    <span class="opacity-lbl">Map opacity</span>
+    <input type="range" id="map-opacity-slider" min="0" max="100" value="80"
+           oninput="setTractOpacity(this.value)">
+    <span id="map-opacity-val">80%</span>
   </div>
   <div id="logos">
     <img src="../assets/usd-logo-horizontal.png" alt="University of San Diego">
@@ -1605,6 +1636,9 @@ var currentBasemap = 'light';
 var basemapLayer = L.tileLayer(BASEMAPS.light.url, BASEMAPS.light.opts).addTo(map);
 L.control.scale().addTo(map);
 var tLayer = null;
+// User-adjustable opacity for the composite-risk choropleth (see #map-opacity-slider).
+// Read by the tract style function in drawTracts() so changes survive resetStyle().
+var tractOpacity = 0.8;
 
 function setBasemap(name){
   if(!BASEMAPS[name] || name===currentBasemap) return;
@@ -1617,6 +1651,13 @@ function setBasemap(name){
     if(btns[i].getAttribute('data-bm')===name) btns[i].classList.add('active');
     else btns[i].classList.remove('active');
   }
+}
+
+function setTractOpacity(pct){
+  tractOpacity = (+pct)/100;
+  var lbl = document.getElementById('map-opacity-val');
+  if(lbl) lbl.textContent = pct+'%';
+  if(tLayer) tLayer.setStyle({fillOpacity: tractOpacity});
 }
 
 /* ================================================================
@@ -1948,10 +1989,11 @@ function _addrOnKey(e){
    dominant driver), LST + land-use mini-map, and a curated set of
    key variables per pillar with polarity-aware percentile bars.
    ================================================================ */
-// Three stacked maps in the detail modal: satellite, land use, LST.
-// _dtMaps[k] is the Leaflet map for slot k ('sat'|'lu'|'lst'); pan/zoom are
-// kept in sync across all three.
-var _dtMaps={}, _dtLanduseLayer=null, _dtSyncGuard=false, _dtGeoid=null;
+// One map in the detail modal with three switchable primary layers:
+// satellite / SANDAG land-use / Landsat LST. _dtLayers holds the pre-built
+// layer for each view; _dtView is the currently active key.
+var _dtMap=null, _dtLayers={sat:null,lu:null,lst:null};
+var _dtView='sat', _dtGeoid=null;
 
 // Curated variables to show in the modal — three per pillar, picked to
 // cover the headline aspects of each.
@@ -2015,25 +2057,18 @@ function openDetailDrawer(geoid){
   }
   html+='</div>';
 
-  // ---- Three stacked maps: satellite, land use, LST
+  // ---- Single map with switchable layer (satellite / land use / LST)
   html+='<div class="dt-section">'+
     '<div class="dt-section-hdr">Imagery, Land Use &amp; Heat</div>'+
-    '<div class="dt-maps-stack">'+
-      '<div class="dt-map-block">'+
-        '<div class="dt-map-cap">Satellite <span class="dt-map-sub">Esri World Imagery</span></div>'+
-        '<div class="dt-map" id="dt-map-sat"></div>'+
-      '</div>'+
-      '<div class="dt-map-block">'+
-        '<div class="dt-map-cap">Land Use <span class="dt-map-sub">SANDAG parcels</span></div>'+
-        '<div class="dt-map" id="dt-map-lu"></div>'+
-        '<div id="dt-lu-legend" class="dt-lu-legend"></div>'+
-      '</div>'+
-      '<div class="dt-map-block">'+
-        '<div class="dt-map-cap">Landsat LST <span class="dt-map-sub">annual mean surface temp</span></div>'+
-        '<div class="dt-map" id="dt-map-lst"></div>'+
-        '<div id="dt-lst-legend" class="dt-lst-legend"></div>'+
-      '</div>'+
+    '<div class="dt-view-switch" role="tablist">'+
+      '<button class="dt-view-btn active" data-view="sat" onclick="_dtSetView(\\'sat\\')">Satellite</button>'+
+      '<button class="dt-view-btn" data-view="lu" onclick="_dtSetView(\\'lu\\')">Land Use</button>'+
+      '<button class="dt-view-btn" data-view="lst" onclick="_dtSetView(\\'lst\\')">Landsat LST</button>'+
     '</div>'+
+    '<div class="dt-view-sub" id="dt-view-sub">Esri World Imagery</div>'+
+    '<div class="dt-map-frame"><div class="dt-map" id="dt-map"></div></div>'+
+    '<div id="dt-lu-legend" class="dt-lu-legend" style="display:none"></div>'+
+    '<div id="dt-lst-legend" class="dt-lst-legend" style="display:none"></div>'+
   '</div>';
 
   // ---- Curated variable rows per pillar
@@ -2079,11 +2114,9 @@ function closeDetailDrawer(){
   var dr=document.getElementById('detail-modal');
   if(!dr) return;
   dr.classList.remove('open');
-  Object.keys(_dtMaps).forEach(function(k){
-    try{_dtMaps[k].remove();}catch(_){}
-  });
-  _dtMaps={};
-  _dtLanduseLayer=null;_dtGeoid=null;_dtSyncGuard=false;
+  if(_dtMap){try{_dtMap.remove();}catch(_){}_dtMap=null;}
+  _dtLayers={sat:null,lu:null,lst:null};
+  _dtView='sat';_dtGeoid=null;
 }
 
 function _dtRow(label, dispVal, pct, higherIsWorse){
@@ -2124,96 +2157,117 @@ function _dtRiskColor(rp){
   return 'rgb(220,60,40)';
 }
 
-// Build all three stacked maps for the detail modal. Each gets the tract
-// outline, plus its own primary layer: satellite imagery, SANDAG land-use
-// parcels (protomaps-leaflet), or the Landsat LST overlay. Pan/zoom is
-// synced across all three so they always show the same view.
+// Build the single detail-modal map. We always start in 'sat' view; the
+// other view layers (land-use protomaps, LST imageOverlay) are created lazily
+// when the user clicks their toggle button. The tract outline and the
+// 'landusePane' are set up up-front so they're ready for any view.
 function _dtBuildMaps(feat){
-  // Tear down any previous instances first.
-  Object.keys(_dtMaps).forEach(function(k){try{_dtMaps[k].remove();}catch(_){}});
-  _dtMaps={};_dtLanduseLayer=null;
-  var common={zoomControl:true,attributionControl:false,
-    scrollWheelZoom:true,dragging:true};
-
-  // 1) Satellite
-  var mSat=L.map('dt-map-sat',common);
-  L.tileLayer(BASEMAPS.satellite.url,BASEMAPS.satellite.opts).addTo(mSat);
-  L.geoJSON(feat,{style:{color:'#fff',weight:2.5,fill:false,opacity:0.95}}).addTo(mSat);
-
-  // 2) Land use (CARTO light base + protomaps parcels in landusePane)
-  var mLu=L.map('dt-map-lu',common);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(mLu);
-  if(!mLu.getPane('landusePane')){
-    mLu.createPane('landusePane');
-    mLu.getPane('landusePane').style.zIndex=450;
+  if(_dtMap){try{_dtMap.remove();}catch(_){}}
+  _dtMap=null;_dtLayers={sat:null,lu:null,lst:null};_dtView='sat';
+  var m=L.map('dt-map',{zoomControl:true,attributionControl:false,
+    scrollWheelZoom:true,dragging:true});
+  // Pre-create landusePane so the protomaps layer can attach cleanly later.
+  if(!m.getPane('landusePane')){
+    m.createPane('landusePane');
+    m.getPane('landusePane').style.zIndex=450;
   }
-  L.geoJSON(feat,{style:{color:'#111',weight:2,fill:false}}).addTo(mLu);
-
-  // 3) LST (CARTO light base + LST image overlay)
-  var mLst=L.map('dt-map-lst',common);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(mLst);
-  var lv=lstVariant();
-  if(lv){
-    var b=LST.bounds;
-    L.imageOverlay(lv.url,[[b.south,b.west],[b.north,b.east]],{opacity:0.85}).addTo(mLst);
-  }
-  L.geoJSON(feat,{style:{color:'#111',weight:2,fill:false}}).addTo(mLst);
-
-  _dtMaps={sat:mSat, lu:mLu, lst:mLst};
-
-  // Fit all three to the tract before wiring sync, so the initial fitBounds
-  // calls don't fight each other through the sync handlers.
-  var bounds=L.geoJSON(feat).getBounds();
-  Object.keys(_dtMaps).forEach(function(k){
-    _dtMaps[k].fitBounds(bounds,{padding:[18,18]});
-  });
-  _dtWireSync();
-
-  // Defer protomaps + size-invalidation until the modal layout settles —
-  // protomaps-leaflet's first render needs valid container dimensions.
-  setTimeout(function(){
-    Object.keys(_dtMaps).forEach(function(k){
-      try{_dtMaps[k].invalidateSize();}catch(_){}
-    });
-    _dtAddLanduse();
-  }, 60);
-}
-
-// Keep pan/zoom in sync across all three stacked maps. The guard prevents
-// the cascade of moveend events from looping back through each map.
-function _dtWireSync(){
-  var keys=Object.keys(_dtMaps);
-  keys.forEach(function(src){
-    _dtMaps[src].on('move zoom', function(){
-      if(_dtSyncGuard) return;
-      _dtSyncGuard=true;
-      var c=_dtMaps[src].getCenter();
-      var z=_dtMaps[src].getZoom();
-      keys.forEach(function(dst){
-        if(dst===src) return;
-        try{_dtMaps[dst].setView(c, z, {animate:false});}catch(_){}
-      });
-      _dtSyncGuard=false;
-    });
-  });
-}
-
-function _dtAddLanduse(){
-  var m=_dtMaps.lu;
-  if(!m||_dtLanduseLayer) return;
-  if(!window.protomapsL){console.warn('protomaps-leaflet not loaded');return;}
-  var layer=_buildLanduseLayer();
-  if(!layer){console.warn('land-use layer construction failed');return;}
-  try{m.invalidateSize();}catch(_){}
-  layer.addTo(m);
-  _dtLanduseLayer=layer;
+  // Initial view is satellite — add the satellite tile layer now.
+  _dtLayers.sat=L.tileLayer(BASEMAPS.satellite.url,BASEMAPS.satellite.opts).addTo(m);
+  // Tract outline sits on top of every view.
+  var poly=L.geoJSON(feat,{style:{color:'#fff',weight:2.5,fill:false,opacity:0.95}}).addTo(m);
+  m.fitBounds(poly.getBounds(),{padding:[18,18]});
   m.on('click', _dtLanduseClickHandler);
+  _dtMap=m;
+  _dtUpdateViewUi();
 }
+
+// Switch the visible primary layer. Each layer is built on first use and
+// cached on _dtLayers; the previous layer is removed (not destroyed) so
+// switching back is instant.
+function _dtSetView(view){
+  if(!_dtMap||view===_dtView) return;
+  var m=_dtMap;
+  // Remove the current primary layer.
+  var cur=_dtLayers[_dtView];
+  if(cur){try{m.removeLayer(cur);}catch(_){}}
+  // Build the target layer if it doesn't exist yet.
+  if(!_dtLayers[view]){
+    if(view==='sat'){
+      _dtLayers.sat=L.tileLayer(BASEMAPS.satellite.url,BASEMAPS.satellite.opts);
+    }else if(view==='lu'){
+      // CARTO base + SANDAG parcels via protomaps-leaflet. We bundle them
+      // into a LayerGroup so we can add/remove with a single handle.
+      var carto=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19});
+      var group=L.layerGroup([carto]);
+      if(window.protomapsL){
+        var luLayer=_buildLanduseLayer();
+        if(luLayer){group.addLayer(luLayer); group._luLayer=luLayer;}
+        else{console.warn('detail-modal: land-use layer construction failed');}
+      }else{
+        console.warn('detail-modal: protomaps-leaflet not loaded');
+      }
+      // Switch tract-outline color to dark for visibility over CARTO.
+      group._outlineColor='#111';
+      _dtLayers.lu=group;
+    }else if(view==='lst'){
+      var carto2=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19});
+      var grp=L.layerGroup([carto2]);
+      var lv=lstVariant();
+      if(lv){
+        var b=LST.bounds;
+        grp.addLayer(L.imageOverlay(lv.url,[[b.south,b.west],[b.north,b.east]],{opacity:0.85}));
+      }
+      grp._outlineColor='#111';
+      _dtLayers.lst=grp;
+    }
+  }
+  var next=_dtLayers[view];
+  if(next){
+    next.addTo(m);
+    // bringToBack so the tract outline stays visible above tiles/parcels.
+    if(next.eachLayer){
+      next.eachLayer(function(l){if(l.bringToBack)l.bringToBack();});
+    }else if(next.bringToBack){
+      next.bringToBack();
+    }
+    // Adjust tract-outline color for legibility against the new base.
+    var outlineColor=(view==='sat')?'#fff':'#111';
+    m.eachLayer(function(l){
+      if(l instanceof L.GeoJSON){
+        try{l.setStyle({color:outlineColor});}catch(_){}
+      }
+    });
+  }
+  _dtView=view;
+  _dtUpdateViewUi();
+}
+
+// Update the active toggle button, subtitle, and per-view legend visibility.
+function _dtUpdateViewUi(){
+  var subText={sat:'Esri World Imagery',
+               lu:'SANDAG parcels — click a parcel for its land-use category',
+               lst:'Landsat 100 m annual mean surface temperature'};
+  var sub=document.getElementById('dt-view-sub');
+  if(sub) sub.textContent=subText[_dtView]||'';
+  var btns=document.querySelectorAll('.dt-view-btn');
+  for(var i=0;i<btns.length;i++){
+    if(btns[i].getAttribute('data-view')===_dtView) btns[i].classList.add('active');
+    else btns[i].classList.remove('active');
+  }
+  var lu=document.getElementById('dt-lu-legend');
+  if(lu) lu.style.display=(_dtView==='lu')?'flex':'none';
+  var lst=document.getElementById('dt-lst-legend');
+  if(lst) lst.style.display=(_dtView==='lst')?'flex':'none';
+}
+
 function _dtLanduseClickHandler(e){
-  if(!_dtLanduseLayer) return;
-  if(typeof _dtLanduseLayer.queryTileFeaturesDebug!=='function') return;
+  // Only fire when the land-use view is active.
+  if(_dtView!=='lu') return;
+  var grp=_dtLayers.lu;
+  var luLayer=grp&&grp._luLayer;
+  if(!luLayer||typeof luLayer.queryTileFeaturesDebug!=='function') return;
   var hits=null;
-  try{hits=_dtLanduseLayer.queryTileFeaturesDebug(e.latlng.lng,e.latlng.lat,16);}catch(err){return;}
+  try{hits=luLayer.queryTileFeaturesDebug(e.latlng.lng,e.latlng.lat,16);}catch(err){return;}
   if(!hits||!hits.size) return;
   var feats=null;
   hits.forEach(function(arr){if(!feats&&arr&&arr.length)feats=arr;});
@@ -2224,7 +2278,7 @@ function _dtLanduseClickHandler(e){
   var lu=p.lu||'';
   L.popup({offset:[0,-4]}).setLatLng(e.latlng)
     .setContent('<div style="font-size:11px;line-height:1.35"><b>'+label+'</b><br><span style="color:#888">'+cat+(lu?' &middot; LU '+lu:'')+'</span></div>')
-    .openOn(_dtMaps.lu);
+    .openOn(_dtMap);
 }
 function _dtRenderLstLegend(){
   var el=document.getElementById('dt-lst-legend');
@@ -2766,7 +2820,7 @@ function drawTracts(){
   // Build GEOID->index lookup for raw percentile access
   if(!window._gIdx){window._gIdx={};GJ.features.forEach(function(f,i){window._gIdx[f.properties.GEOID]=i;});}
   tLayer=L.geoJSON(GJ,{
-    style:function(f){var idx=window._gIdx[f.properties.GEOID]||0;return{fillColor:fcolor(f.properties,idx),color:"#fff",weight:0.5,fillOpacity:0.8}},
+    style:function(f){var idx=window._gIdx[f.properties.GEOID]||0;return{fillColor:fcolor(f.properties,idx),color:"#fff",weight:0.5,fillOpacity:tractOpacity}},
     onEachFeature:function(f,lyr){
       lyr.on("mouseover",function(e){e.target.setStyle({weight:2,color:"#333"})});
       lyr.on("mouseout",function(e){if(tLayer)tLayer.resetStyle(e.target)});

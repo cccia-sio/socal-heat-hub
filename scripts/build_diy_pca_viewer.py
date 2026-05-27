@@ -122,6 +122,8 @@ VARIABLES = [
     ("EP_NOVEH", "No Vehicle", "sensitivity", "Demographics"),
     ("EP_GROUPQ", "Group Quarters", "sensitivity", "Demographics"),
     ("EP_NOINT", "No Internet", "sensitivity", "Demographics"),
+    # Occupational exposure — ACS C24030 (ag + construction, residence-based)
+    ("pct_outdoor_workers", "Outdoor Workers (%)", "sensitivity", "Demographics"),
     # SVI Themes
     ("RPL_THEMES", "Overall SVI", "sensitivity", "Social Vulnerability Index (SVI)"),
     ("RPL_THEME1", "Socioeconomic Status", "sensitivity", "Social Vulnerability Index (SVI)"),
@@ -194,6 +196,7 @@ _SRC_LACE = "https://www.census.gov/newsroom/press-releases/2026/2023-lace.html"
 _SRC_ROMITTI = "https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629"
 _SRC_ACS_B25034 = "https://censusreporter.org/tables/B25034/"
 _SRC_ACS_B25003 = "https://censusreporter.org/tables/B25003/"
+_SRC_ACS_C24030 = "https://censusreporter.org/tables/C24030/"
 _SRC_SANGIS = "https://sdgis-sandag.opendata.arcgis.com/"
 _SRC_LANDSAT = "https://www.usgs.gov/landsat-missions"
 _SRC_HRRR = "https://rapidrefresh.noaa.gov/hrrr/"
@@ -232,6 +235,8 @@ VAR_SOURCES = {
     # Adaptive — ACS
     "pct_pre1980": _SRC_ACS_B25034, "pct_pre1960": _SRC_ACS_B25034,
     "pct_renter": _SRC_ACS_B25003,
+    # Sensitivity — ACS occupational exposure (ag + construction)
+    "pct_outdoor_workers": _SRC_ACS_C24030,
     # Adaptive — SanGIS
     "pct_green": _SRC_SANGIS,
     # HPI (adaptive + sensitivity)
@@ -398,12 +403,12 @@ def load_data():
         bldg["GEOID"] = bldg["GEOID"].str.zfill(11)
         tracts = _safe_merge(tracts, bldg, ["pct_pre1980", "pct_pre1960"])
 
-    # ── Adaptive — Renter occupancy (ACS demographics) ──
+    # ── Adaptive + Sensitivity — ACS demographics (renter occupancy, outdoor-worker share) ──
     acs_path = ROOT / "data/exposure/raw/census/acs_demographics_sd.csv"
     if acs_path.exists():
         acs = pd.read_csv(acs_path, dtype={"GEOID": str})
         acs["GEOID"] = acs["GEOID"].str.zfill(11)
-        tracts = _safe_merge(tracts, acs, ["pct_renter"])
+        tracts = _safe_merge(tracts, acs, ["pct_renter", "pct_outdoor_workers"])
 
     # ── Context — Land use (tract_exploration.csv) ──
     ctx_path = ROOT / "data/context/tract_exploration.csv"
@@ -1017,6 +1022,57 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 .wlc-btn.secondary{background:#fff;color:#2563eb}
 .wlc-btn.secondary:hover{background:#eff6ff;color:#1d4ed8}
 
+/* --- Guided tour (opt-in from welcome popup) ---
+   Dim the page with four fixed rects around the target's bounding rect so the
+   target itself stays interactive (the user advances by actually clicking it).
+   A separate spotlight ring sits over the target with pointer-events:none so
+   clicks pass through. */
+#tour-overlay{display:none;font-family:inherit}
+#tour-overlay.open{display:block}
+.tour-dim{position:fixed;background:rgba(15,23,42,0.55);z-index:2400;
+  transition:all 0.18s ease;backdrop-filter:blur(1px)}
+.tour-spotlight{position:fixed;z-index:2401;pointer-events:none;
+  border-radius:8px;box-shadow:0 0 0 3px #2563eb,0 0 16px 4px rgba(37,99,235,0.45);
+  transition:all 0.18s ease}
+.tour-card{position:fixed;z-index:2402;background:#fff;width:320px;max-width:92vw;
+  border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,0.30);
+  padding:14px 16px 12px;font-family:inherit;color:#1f2937;font-size:13px;
+  line-height:1.5;transition:opacity 0.12s ease}
+.tour-card.centered{left:50%;top:50%;transform:translate(-50%,-50%);width:380px}
+.tour-card .tc-progress{font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.06em;color:#6b7280;margin-bottom:4px}
+.tour-card .tc-title{font-size:15px;font-weight:700;color:#111;margin:0 0 6px;
+  line-height:1.3}
+.tour-card .tc-body{font-size:13px;color:#374151;margin:0 0 12px;line-height:1.55}
+.tour-card .tc-body b{color:#111}
+.tour-card .tc-prompt{display:flex;align-items:center;gap:6px;
+  background:#eff6ff;border-left:3px solid #2563eb;padding:7px 9px;
+  border-radius:6px;font-size:12px;color:#1d4ed8;font-weight:500;margin:0 0 12px}
+.tour-card .tc-prompt::before{content:"\\1F446";font-size:14px}
+.tour-card .tc-footer{display:flex;align-items:center;gap:6px}
+.tour-card .tc-footer .spacer{flex:1}
+.tour-card .tc-btn{padding:6px 12px;border-radius:7px;font-size:12px;
+  font-weight:600;cursor:pointer;font-family:inherit;border:1px solid #d1d5db;
+  background:#fff;color:#374151;transition:all 0.12s}
+.tour-card .tc-btn:hover{background:#f3f4f6}
+.tour-card .tc-btn.primary{border-color:#2563eb;background:#2563eb;color:#fff}
+.tour-card .tc-btn.primary:hover{background:#1d4ed8;border-color:#1d4ed8}
+.tour-card .tc-btn.primary:disabled{background:#9ca3af;border-color:#9ca3af;
+  cursor:not-allowed}
+.tour-card .tc-skip{background:none;border:none;color:#6b7280;font-size:11px;
+  cursor:pointer;font-family:inherit;padding:4px 6px;text-decoration:underline}
+.tour-card .tc-skip:hover{color:#374151}
+.tour-card .tc-arrow{position:absolute;width:0;height:0;
+  border:8px solid transparent}
+.tour-card.arrow-left .tc-arrow{left:-16px;top:24px;
+  border-right-color:#fff}
+.tour-card.arrow-right .tc-arrow{right:-16px;top:24px;
+  border-left-color:#fff}
+.tour-card.arrow-top .tc-arrow{top:-16px;left:24px;
+  border-bottom-color:#fff}
+.tour-card.arrow-bottom .tc-arrow{bottom:-16px;left:24px;
+  border-top-color:#fff}
+
 /* --- Tract detail modal (opened from address-search popup) --- */
 #detail-modal{display:none;position:fixed;inset:0;z-index:2000;
   background:rgba(15,23,42,0.55);justify-content:center;align-items:center;
@@ -1418,7 +1474,29 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     </div>
     <div class="wlc-footer">
       <a class="wlc-btn secondary" href="../userguide/index.html" target="_blank" rel="noopener noreferrer">User Guide</a>
+      <button class="wlc-btn secondary" id="wlc-take-tour">Take a tour</button>
       <button class="wlc-btn" id="wlc-got-it">Got it</button>
+    </div>
+  </div>
+</div>
+
+<div id="tour-overlay" role="dialog" aria-label="Guided tour">
+  <div class="tour-dim" id="tour-dim-top"></div>
+  <div class="tour-dim" id="tour-dim-right"></div>
+  <div class="tour-dim" id="tour-dim-bottom"></div>
+  <div class="tour-dim" id="tour-dim-left"></div>
+  <div class="tour-spotlight" id="tour-spotlight"></div>
+  <div class="tour-card" id="tour-card">
+    <div class="tc-arrow"></div>
+    <div class="tc-progress" id="tc-progress">Step 1 of 7</div>
+    <h3 class="tc-title" id="tc-title"></h3>
+    <div class="tc-body" id="tc-body"></div>
+    <div class="tc-prompt" id="tc-prompt" style="display:none"></div>
+    <div class="tc-footer">
+      <button class="tc-skip" id="tc-skip">Skip tour</button>
+      <span class="spacer"></span>
+      <button class="tc-btn" id="tc-back">Back</button>
+      <button class="tc-btn primary" id="tc-next">Next</button>
     </div>
   </div>
 </div>
@@ -2941,7 +3019,7 @@ function buildUI(){
   // ── Heat Exposure: single-select heat mode (radio), not a PCA blend ──
   (function(){
     var pm=PMETA.exposure;
-    html+='<div class="pillar-section">';
+    html+='<div class="pillar-section" data-tour="pillar-exposure">';
     html+='<div class="pillar-hdr" style="border-color:'+pm.color+';color:'+pm.color+'">'+pm.label+'</div>';
     html+='<div class="mode-help">Pick one heat hazard to map. Each is scored on its own &mdash; daytime and nighttime heat affect different places.</div>';
     HEAT_MODES.forEach(function(m){
@@ -2961,7 +3039,7 @@ function buildUI(){
   // ── Sensitivity & Adaptive Capacity: multi-toggle variables (PCA) ──
   ["sensitivity","adaptive"].forEach(function(pid){
     var pm=PMETA[pid];
-    html+='<div class="pillar-section">';
+    html+='<div class="pillar-section" data-tour="pillar-'+pid+'">';
     html+='<label class="pillar-hdr" style="border-color:'+pm.color+';color:'+pm.color+'" title="Toggle all variables in this pillar">'+
       '<input type="checkbox" id="pcb_'+pid+'" onchange="togPillar(\\''+pid+'\\',this.checked)">'+
       pm.label+'</label>';
@@ -5116,8 +5194,239 @@ function closeWelcome(){
   if(ok)ok.addEventListener('click',closeWelcome);
   var x=document.getElementById('wlc-close-btn');
   if(x)x.addEventListener('click',closeWelcome);
+  var tt=document.getElementById('wlc-take-tour');
+  if(tt)tt.addEventListener('click',function(){closeWelcome();startTour();});
   document.addEventListener('keydown',function(e){
     if(e.key==='Escape'&&m.classList.contains('open'))closeWelcome();
+  });
+})();
+
+/* ================================================================
+   GUIDED TOUR — opt-in walkthrough of the sidebar pillars.
+   Steps prompt the user to actually click the highlighted control;
+   the tour advances on that action (auto-advance) or on Next.
+   ================================================================ */
+var TOUR_STEPS=[
+  {key:"exposure",target:'[data-tour="pillar-exposure"]',side:"right",
+   title:"1. Heat Exposure",
+   body:"Heat Exposure is the hazard itself \\u2014 how hot the air or ground gets. Pick one of four modes: <b>Daytime</b>, <b>Nighttime</b>, <b>Humid Heat (WBGT)</b>, or <b>Surface Temperature</b>. Each affects different places, so you map them one at a time.",
+   prompt:"Click any heat mode to continue",
+   waitOn:function(){
+     return _tourWaitForChange('[data-tour="pillar-exposure"] input[type=radio]');
+   }},
+  {key:"sensitivity",target:'[data-tour="pillar-sensitivity"]',side:"right",
+   title:"2. Population Sensitivity",
+   body:"These are factors that make people more vulnerable to heat \\u2014 like age, income, language, or pre-existing health conditions. Click the <b>Population Sensitivity</b> header to turn on every variable, or expand a subsection to pick specific ones.",
+   prompt:"Toggle the pillar or a variable to continue",
+   waitOn:function(){
+     return _tourWaitForChange('[data-tour="pillar-sensitivity"] input[type=checkbox]');
+   }},
+  {key:"adaptive",target:'[data-tour="pillar-adaptive"]',side:"right",
+   title:"3. Adaptive Capacity",
+   body:"Adaptive Capacity is what helps people cope \\u2014 air conditioning, tree canopy, walkable access to cool spaces. <i>Low</i> adaptive capacity increases risk, so the tool inverts these when blending. Toggle on what you'd like included.",
+   prompt:"Toggle the pillar or a variable to continue",
+   waitOn:function(){
+     return _tourWaitForChange('[data-tour="pillar-adaptive"] input[type=checkbox]');
+   }},
+  {key:"build",target:'#compute-btn',side:"right",
+   title:"4. Build the map",
+   body:"Now blend everything you picked into one composite risk score for every census tract. The tool z-scores each layer, runs PCA on the Sensitivity and Adaptive pillars, and percentile-ranks the result countywide.",
+   prompt:"Click \\u201CBuild Composite Risk Map\\u201D",
+   waitOn:function(){
+     return _tourWaitForClick('#compute-btn');
+   }},
+  {key:"layer",target:'#layer-select',side:"right",
+   title:"5. Switch the map layer",
+   body:"Once built, you can switch views without rebuilding. <b>Composite Risk</b> is the overall blend. <b>Dominant Driver</b> colors each tract by whichever pillar contributes most. Each pillar score and individual variable is also available.",
+   prompt:"Click any layer button to continue",
+   waitOn:function(){
+     return _tourWaitForClick('#layer-buttons .lbtn');
+   }},
+  {key:"scenario",target:'#scenario-bar',side:"right",
+   title:"6. Climate scenarios",
+   body:"See how risk shifts under future warming. Pick <b>2050</b> or <b>2080</b> and a scenario (moderate, high, or very high emissions). The Heat Exposure pillar gets re-projected; sensitivity and adaptive capacity hold at present-day baselines.",
+   prompt:null},
+  {key:"done",target:null,side:"center",
+   title:"You're set",
+   body:"Click any tract on the map to see its composite score, pillar scores, and dominant driver. Use the <b>Find Address</b> box at the bottom of the sidebar to jump to a specific location. Refresh the page anytime to take the tour again.",
+   prompt:null}
+];
+var _tourIdx=0,_tourCleanup=null;
+
+function startTour(){_tourIdx=0;_showTourStep(0);}
+
+function endTour(){
+  _clearTourListener();
+  var ov=document.getElementById('tour-overlay');
+  if(ov)ov.classList.remove('open');
+}
+
+function _clearTourListener(){
+  if(typeof _tourCleanup==='function'){try{_tourCleanup();}catch(e){}}
+  _tourCleanup=null;
+}
+
+function _tourWaitForChange(selector){
+  var fired=false;
+  function handler(){if(fired)return;fired=true;_advanceTour();}
+  var nodes=document.querySelectorAll(selector);
+  for(var i=0;i<nodes.length;i++)nodes[i].addEventListener('change',handler);
+  return function(){
+    for(var i=0;i<nodes.length;i++)nodes[i].removeEventListener('change',handler);
+  };
+}
+
+function _tourWaitForClick(selector){
+  var fired=false;
+  function handler(){if(fired)return;fired=true;
+    // Defer so the click handler the user triggered runs first and the
+    // UI updates before we move to the next step.
+    setTimeout(_advanceTour,80);
+  }
+  // Delegate so newly-rendered buttons (e.g. after compute) are caught too.
+  function delegate(e){
+    var t=e.target;
+    while(t&&t!==document){
+      if(t.matches&&t.matches(selector)){handler();return;}
+      t=t.parentNode;
+    }
+  }
+  document.addEventListener('click',delegate,true);
+  return function(){document.removeEventListener('click',delegate,true);};
+}
+
+function _advanceTour(){
+  if(_tourIdx>=TOUR_STEPS.length-1){endTour();return;}
+  _tourIdx++;_showTourStep(_tourIdx);
+}
+
+function _tourBack(){
+  if(_tourIdx<=0)return;
+  _tourIdx--;_showTourStep(_tourIdx);
+}
+
+function _showTourStep(i){
+  _clearTourListener();
+  var step=TOUR_STEPS[i];if(!step)return endTour();
+  var ov=document.getElementById('tour-overlay');
+  ov.classList.add('open');
+  document.getElementById('tc-progress').textContent='Step '+(i+1)+' of '+TOUR_STEPS.length;
+  document.getElementById('tc-title').textContent=step.title;
+  document.getElementById('tc-body').innerHTML=step.body;
+  var pr=document.getElementById('tc-prompt');
+  if(step.prompt){pr.textContent=step.prompt;pr.style.display='flex';}
+  else pr.style.display='none';
+  // Footer buttons
+  var back=document.getElementById('tc-back');
+  back.disabled=(i===0);
+  back.style.visibility=(i===0?'hidden':'visible');
+  var next=document.getElementById('tc-next');
+  next.textContent=(i===TOUR_STEPS.length-1?'Finish':'Next');
+  // Position card + spotlight
+  if(step.target){
+    var el=document.querySelector(step.target);
+    if(!el){_positionCenter();}
+    else{
+      // Scroll into view inside sidebar if needed
+      try{el.scrollIntoView({behavior:'instant',block:'nearest'});}catch(e){el.scrollIntoView();}
+      // Defer a tick so layout settles after the scroll
+      setTimeout(function(){_positionAtTarget(el,step.side);},20);
+    }
+  }else{
+    _positionCenter();
+  }
+  // Hook up advance listener for this step
+  if(typeof step.waitOn==='function'){_tourCleanup=step.waitOn();}
+}
+
+function _positionCenter(){
+  // Hide dim rects and spotlight; center the card.
+  ['tour-dim-top','tour-dim-right','tour-dim-bottom','tour-dim-left'].forEach(function(id){
+    var d=document.getElementById(id);d.style.cssText='position:fixed;background:rgba(15,23,42,0.55);z-index:2400;left:0;top:0;width:0;height:0';
+  });
+  // Full-screen dim using the top rect
+  var top=document.getElementById('tour-dim-top');
+  top.style.cssText='position:fixed;background:rgba(15,23,42,0.55);z-index:2400;left:0;top:0;right:0;bottom:0;width:auto;height:auto';
+  document.getElementById('tour-spotlight').style.display='none';
+  var card=document.getElementById('tour-card');
+  card.className='tour-card centered';
+  card.style.left='';card.style.top='';card.style.right='';card.style.bottom='';
+}
+
+function _positionAtTarget(el,side){
+  var r=el.getBoundingClientRect();
+  // Pad the spotlight slightly so the ring sits proud of the element.
+  var pad=4;
+  var x=r.left-pad,y=r.top-pad,w=r.width+pad*2,h=r.height+pad*2;
+  var vw=window.innerWidth,vh=window.innerHeight;
+  // Four-rectangle dim
+  var top=document.getElementById('tour-dim-top'),
+      right=document.getElementById('tour-dim-right'),
+      bottom=document.getElementById('tour-dim-bottom'),
+      left=document.getElementById('tour-dim-left');
+  top.style.cssText='position:fixed;background:rgba(15,23,42,0.55);z-index:2400;left:0;top:0;width:'+vw+'px;height:'+Math.max(0,y)+'px;backdrop-filter:blur(1px)';
+  bottom.style.cssText='position:fixed;background:rgba(15,23,42,0.55);z-index:2400;left:0;top:'+(y+h)+'px;width:'+vw+'px;height:'+Math.max(0,vh-(y+h))+'px;backdrop-filter:blur(1px)';
+  left.style.cssText='position:fixed;background:rgba(15,23,42,0.55);z-index:2400;left:0;top:'+Math.max(0,y)+'px;width:'+Math.max(0,x)+'px;height:'+h+'px;backdrop-filter:blur(1px)';
+  right.style.cssText='position:fixed;background:rgba(15,23,42,0.55);z-index:2400;left:'+(x+w)+'px;top:'+Math.max(0,y)+'px;width:'+Math.max(0,vw-(x+w))+'px;height:'+h+'px;backdrop-filter:blur(1px)';
+  // Spotlight ring
+  var sp=document.getElementById('tour-spotlight');
+  sp.style.display='block';
+  sp.style.left=x+'px';sp.style.top=y+'px';
+  sp.style.width=w+'px';sp.style.height=h+'px';
+  // Card placement
+  var card=document.getElementById('tour-card');
+  card.className='tour-card';
+  card.style.right='';card.style.bottom='';
+  var cw=card.offsetWidth||320,ch=card.offsetHeight||200;
+  var gap=18;
+  var placeLeft=r.left,placeTop=r.top;
+  var pos=side||'right';
+  if(pos==='right'&&r.right+gap+cw<=vw-8){
+    placeLeft=r.right+gap;placeTop=Math.max(12,Math.min(r.top,vh-ch-12));
+    card.classList.add('arrow-left');
+  }else if(r.left-gap-cw>=8){
+    placeLeft=r.left-gap-cw;placeTop=Math.max(12,Math.min(r.top,vh-ch-12));
+    card.classList.add('arrow-right');
+  }else if(r.bottom+gap+ch<=vh-8){
+    placeLeft=Math.max(12,Math.min(r.left,vw-cw-12));placeTop=r.bottom+gap;
+    card.classList.add('arrow-top');
+  }else{
+    placeLeft=Math.max(12,Math.min(r.left,vw-cw-12));placeTop=Math.max(12,r.top-ch-gap);
+    card.classList.add('arrow-bottom');
+  }
+  card.style.left=placeLeft+'px';card.style.top=placeTop+'px';
+}
+
+// Tour control wiring + keyboard + resize handling
+(function(){
+  var nb=document.getElementById('tc-next');
+  if(nb)nb.addEventListener('click',_advanceTour);
+  var bb=document.getElementById('tc-back');
+  if(bb)bb.addEventListener('click',_tourBack);
+  var sb=document.getElementById('tc-skip');
+  if(sb)sb.addEventListener('click',endTour);
+  document.addEventListener('keydown',function(e){
+    var ov=document.getElementById('tour-overlay');
+    if(!ov||!ov.classList.contains('open'))return;
+    if(e.key==='Escape')endTour();
+    else if(e.key==='ArrowRight')_advanceTour();
+    else if(e.key==='ArrowLeft')_tourBack();
+  });
+  window.addEventListener('resize',function(){
+    var ov=document.getElementById('tour-overlay');
+    if(!ov||!ov.classList.contains('open'))return;
+    var step=TOUR_STEPS[_tourIdx];if(!step||!step.target){_positionCenter();return;}
+    var el=document.querySelector(step.target);
+    if(el)_positionAtTarget(el,step.side);
+  });
+  // Reposition while the sidebar scrolls (e.g. user scrolls between steps).
+  var sb2=document.getElementById('sidebar');
+  if(sb2)sb2.addEventListener('scroll',function(){
+    var ov=document.getElementById('tour-overlay');
+    if(!ov||!ov.classList.contains('open'))return;
+    var step=TOUR_STEPS[_tourIdx];if(!step||!step.target)return;
+    var el=document.querySelector(step.target);
+    if(el)_positionAtTarget(el,step.side);
   });
 })();
 

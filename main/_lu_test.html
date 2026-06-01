@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/protomaps-leaflet@4.1.1/dist/protomaps-leaflet.js"></script>
+<style>#map{width:600px;height:400px}</style></head>
+<body>
+<div id="status">PENDING</div>
+<div id="map"></div>
+<script>
+function setStatus(s){document.getElementById('status').textContent=s;}
+window.addEventListener('error',function(e){setStatus('WINDOW_ERROR: '+e.message);});
+(async function(){
+  try{
+    if(!window.protomapsL){setStatus('NO_PROTOMAPSL');return;}
+    if(!window.pmtiles && !window.protomapsL.PMTiles){ /* may be internal */ }
+    var map=L.map('map').setView([32.83,-117.13],15);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png').addTo(map);
+    // Directly probe the PMTiles header via the same library the viewer uses.
+    var layer=protomapsL.leafletLayer({
+      url:'../data/context/sandag_landuse.pmtiles',
+      paintRules:[{dataLayer:'landuse',symbolizer:new protomapsL.PolygonSymbolizer({fill:'#e8442a',opacity:0.8})}]
+    });
+    layer.addTo(map);
+    // Try to query the underlying pmtiles source header directly if exposed.
+    var probe='no-source-handle';
+    try{
+      // protomaps-leaflet stores a view/source; attempt a tile feature query after a delay.
+      setTimeout(async function(){
+        try{
+          if(typeof layer.queryTileFeaturesDebug==='function'){
+            var hits=layer.queryTileFeaturesDebug(-117.13,32.83,16);
+            var n=0; if(hits&&hits.forEach){hits.forEach(function(a){n+=(a&&a.length)||0;});}
+            setStatus('QUERY_OK hits='+n+' size='+(hits&&hits.size));
+          }else{
+            setStatus('NO_QUERY_FN');
+          }
+        }catch(qe){setStatus('QUERY_ERR: '+qe.message);}
+      }, 6000);
+    }catch(e){setStatus('SETUP2_ERR: '+e.message);}
+  }catch(e){setStatus('SETUP_ERR: '+e.message);}
+})();
+</script></body></html>

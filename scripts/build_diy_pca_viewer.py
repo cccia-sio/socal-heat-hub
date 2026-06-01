@@ -1205,6 +1205,9 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   padding:5px 10px;border:none;border-radius:4px;cursor:pointer;
   font-family:inherit}
 .popup-more-btn:hover{background:#1e40af}
+.popup-btn-row{display:flex;flex-direction:column;gap:6px;align-items:stretch;margin-top:8px}
+.popup-btn-row .popup-more-btn,.popup-btn-row .popup-compare-btn{margin:0;width:100%;
+  box-sizing:border-box;text-align:center;border-radius:6px}
 
 /* --- bottom-left control stack: address search + opacity + basemap --- */
 /* One anchored flex column so the three pieces share even spacing instead of
@@ -1301,9 +1304,13 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 
 /* ============================================================
    MOBILE / RESPONSIVE
-   One responsive page — there is no separate mobile build. Below
-   768px the controls collapse into a slide-in drawer and the
-   floating map controls reflow; everything else is inherited, so
+   One responsive page — there is no separate mobile build. The
+   mobile layout (slide-in drawer + reflowed floating controls)
+   triggers when the viewport is <=768px wide OR is a short
+   landscape viewport (<=500px tall). The height clause catches
+   large phones held sideways (e.g. iPhone Pro Max landscape is
+   ~932x430) without dragging tablets/desktop windows in — those
+   are >=744px tall in landscape. Everything else is inherited, so
    future viewer changes appear on phones automatically.
    ============================================================ */
 /* Hamburger that opens the controls drawer on small screens.
@@ -1321,7 +1328,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
    tapInfo() (JS, end of body) toggles .open. Harmless on desktop. */
 .info-ic.open .info-pop{display:block}
 
-@media (max-width:768px){
+@media (max-width:768px),(max-height:500px) and (orientation:landscape){
   body{overflow:hidden}
   #menu-toggle{display:flex}
   /* Sidebar becomes a left slide-in drawer, lifted out of normal flow
@@ -3164,8 +3171,7 @@ function drawTracts(){
       var jn=_tractJurisName[fi];
       var jurisLabel=jn?('City of '+jn):'Unincorporated San Diego County';
       var h='<div style="font-family:sans-serif;font-size:13px;line-height:1.6">'+
-        '<b>Tract '+p.GEOID.slice(-6)+'</b><br>'+
-        '<span style="color:#555;font-size:11.5px">'+_addrEsc(jurisLabel)+'</span><br>';
+        '<b>Tract '+p.GEOID.slice(-6)+'</b> <span style="color:#555;font-size:11.5px">('+_addrEsc(jurisLabel)+')</span><br>';
       if(rawVar){
         var rv=p[rawVar];
         var dArrTip=getDeltaArr(rawVar);
@@ -3184,7 +3190,10 @@ function drawTracts(){
         if(p._sensitivity!=null) h+='Population Sensitivity: '+p._sensitivity.toFixed(1)+'<br>';
         if(p._adaptive!=null) h+='Adaptive Cap: '+p._adaptive.toFixed(1)+'<br>';
       }
-      h+='<button class="popup-compare-btn" onclick="startCompare(\\''+p.GEOID+'\\')">Compare with another tract</button>';
+      h+='<div class="popup-btn-row">'+
+        '<button class="popup-more-btn" onclick="map.closePopup();openDetailDrawer(\\''+p.GEOID+'\\')">Show more info \\u25b8</button>'+
+        '<button class="popup-compare-btn" onclick="startCompare(\\''+p.GEOID+'\\')">Compare with another tract</button>'+
+      '</div>';
       h+='</div>';
       lyr.bindPopup(h);
     }
@@ -4000,6 +4009,7 @@ function _buildLanduseLayer(){
     return protomapsL.leafletLayer({
       url:LANDUSE_URL,
       pane:'landusePane',
+      levelDiff:0,
       paintRules:[{
         dataLayer:'landuse',
         symbolizer:new protomapsL.PolygonSymbolizer({

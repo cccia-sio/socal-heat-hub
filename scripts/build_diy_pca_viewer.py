@@ -100,7 +100,7 @@ VARIABLES = [
     ("casthma_prev", "Current Asthma", "sensitivity", "Health"),
     ("chd_prev", "Coronary Heart Disease", "sensitivity", "Health"),
     ("cognition_prev", "Cognitive Difficulty", "sensitivity", "Health"),
-    ("copd_prev", "COPD", "sensitivity", "Health"),
+    ("copd_prev", "Chronic Obstructive Pulmonary Disease (COPD)", "sensitivity", "Health"),
     ("depression_prev", "Depression", "sensitivity", "Health"),
     ("diabetes_prev", "Diabetes", "sensitivity", "Health"),
     ("stroke_prev", "Stroke", "sensitivity", "Health"),
@@ -110,11 +110,11 @@ VARIABLES = [
     ("EP_AGE17", "Age 17 & Under", "sensitivity", "Demographics"),
     ("EP_DISABL", "Disability", "sensitivity", "Demographics"),
     ("EP_LIMENG", "Limited English", "sensitivity", "Demographics"),
-    ("EP_SNGPNT", "Single-Parent HH", "sensitivity", "Demographics"),
+    ("EP_SNGPNT", "Single-Parent Household", "sensitivity", "Demographics"),
     ("EP_POV150", "Below 150% Poverty", "sensitivity", "Demographics"),
     ("EP_UNEMP", "Unemployed", "sensitivity", "Demographics"),
     ("EP_HBURD", "Housing Cost Burden", "sensitivity", "Demographics"),
-    ("EP_NOHSDP", "No HS Diploma", "sensitivity", "Demographics"),
+    ("EP_NOHSDP", "No High School Diploma", "sensitivity", "Demographics"),
     ("EP_UNINSUR", "Uninsured", "sensitivity", "Demographics"),
     ("EP_MINRTY", "Minority", "sensitivity", "Demographics"),
     ("EP_MUNIT", "Multi-Unit Structures", "sensitivity", "Demographics"),
@@ -129,7 +129,7 @@ VARIABLES = [
     # SVI Themes
     ("RPL_THEMES", "Overall SVI", "sensitivity", "Social Vulnerability Index (SVI)"),
     ("RPL_THEME1", "Socioeconomic Status", "sensitivity", "Social Vulnerability Index (SVI)"),
-    ("RPL_THEME2", "HH Disability/Language", "sensitivity", "Social Vulnerability Index (SVI)"),
+    ("RPL_THEME2", "Household Disability/Language", "sensitivity", "Social Vulnerability Index (SVI)"),
     ("RPL_THEME3", "Racial/Ethnic Minority", "sensitivity", "Social Vulnerability Index (SVI)"),
     ("RPL_THEME4", "Housing/Transportation", "sensitivity", "Social Vulnerability Index (SVI)"),
     # Heat-attributable hospitalization rate ratios (CalHeatScore-style
@@ -141,8 +141,8 @@ VARIABLES = [
     ("heat_hosp_night", "Warm-Night Hospitalization Rate Ratio", "sensitivity", "Health"),
     # ── Adaptive Capacity ────────────────────────────────────────────────
     # Air Conditioning
-    ("ac_prob", "AC Prevalence (LACE)", "adaptive", "Air Conditioning"),
-    ("ac_prob_romitti", "AC Prevalence (Romitti)", "adaptive", "Air Conditioning"),
+    ("ac_prob", "AC Prevalence (LACE)", "adaptive", "Air Conditioning (AC)"),
+    ("ac_prob_romitti", "AC Prevalence (Romitti)", "adaptive", "Air Conditioning (AC)"),
     # Built Environment
     ("treecanopy_pctile", "Tree Canopy", "adaptive", "Built Environment"),
     ("parkaccess_pctile", "Park Access", "adaptive", "Built Environment"),
@@ -1230,6 +1230,20 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   text-shadow:0 1px 2px rgba(0,0,0,0.5);font-family:inherit;
   letter-spacing:0.2px}
 
+/* --- land-use overlay toggle (main map) --- */
+#lu-toggle-btn{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.92);
+  padding:6px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);
+  border:1px solid rgba(0,0,0,0.12);font-family:inherit;font-size:11px;font-weight:600;
+  color:#374151;cursor:pointer;white-space:nowrap}
+#lu-toggle-btn:hover{background:rgba(255,255,255,1)}
+#lu-toggle-btn.active{background:rgba(139,69,19,0.1);border-color:#8b4513;color:#5a2d0c}
+#lu-main-legend{background:rgba(255,255,255,0.92);border:1px solid rgba(0,0,0,0.12);
+  border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);padding:8px 10px;
+  display:none;font-size:10px;line-height:1.5}
+#lu-main-legend.open{display:block}
+.lu-main-item{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.lu-main-swatch{width:10px;height:10px;border-radius:2px;flex-shrink:0;border:1px solid rgba(0,0,0,0.2)}
+
 /* --- composite-risk opacity slider (sits above the basemap picker) --- */
 #map-opacity-control{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.92);
   padding:6px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);
@@ -1345,6 +1359,10 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   .cmp-body,.scn-cmp-body{grid-template-columns:1fr;overflow-y:auto}
   /* Tooltip bubbles never wider than the screen. */
   .info-pop{width:min(220px,76vw)}
+  /* Push Leaflet's top-left zoom control below the hamburger. */
+  .leaflet-top.leaflet-left{margin-top:52px}
+  /* Keep the centered "select variables" prompt off the screen edges. */
+  #prompt{font-size:13px;line-height:1.4;padding:0 46px;text-align:center}
 }
 </style>
 </head>
@@ -1419,6 +1437,10 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 <div id="map-wrap">
   <div id="map"></div>
   <div id="map-controls-bl">
+    <div id="lu-main-legend"></div>
+    <button id="lu-toggle-btn" onclick="toggleMainLanduse()" title="Toggle SANDAG land use parcels">
+      <span>&#9638;</span> Land Use
+    </button>
     <div id="addr-search">
       <h3>Find address</h3>
       <div class="addr-row">
@@ -1869,6 +1891,63 @@ function setTractOpacity(pct){
   var lbl = document.getElementById('map-opacity-val');
   if(lbl) lbl.textContent = pct+'%';
   if(tLayer) tLayer.setStyle({fillOpacity: tractOpacity});
+}
+
+/* ---- Main-map land-use overlay ---- */
+if(!map.getPane('landusePane')){
+  map.createPane('landusePane');
+  map.getPane('landusePane').style.zIndex = 450;
+}
+var _mainLanduseLayer = null;
+var _mainLanduseShown = false;
+
+map.on('click', function(e){
+  if(!_mainLanduseShown || !_mainLanduseLayer) return;
+  if(typeof _mainLanduseLayer.queryTileFeaturesDebug !== 'function') return;
+  var hits;
+  try{ hits = _mainLanduseLayer.queryTileFeaturesDebug(e.latlng.lng, e.latlng.lat, 16); }catch(_){ return; }
+  if(!hits || !hits.size) return;
+  var feats = null;
+  hits.forEach(function(arr){ if(!feats && arr && arr.length) feats = arr; });
+  if(!feats || !feats.length) return;
+  var p = (feats[0].feature && feats[0].feature.props) || {};
+  var cat = _luCategoryName(p);
+  var label = p.Landuse || cat;
+  var lu = p.lu || '';
+  L.popup({offset:[0,-4]}).setLatLng(e.latlng)
+    .setContent('<div style="font-size:11px;line-height:1.35"><b>'+label+'</b><br>'+
+      '<span style="color:#888">'+cat+(lu?' &middot; LU '+lu:'')+'</span></div>')
+    .openOn(map);
+});
+
+function toggleMainLanduse(){
+  _mainLanduseShown = !_mainLanduseShown;
+  var btn = document.getElementById('lu-toggle-btn');
+  if(_mainLanduseShown){
+    if(!_mainLanduseLayer){
+      _mainLanduseLayer = _buildLanduseLayer();
+      if(_mainLanduseLayer) _mainLanduseLayer.addTo(map);
+    } else {
+      _mainLanduseLayer.addTo(map);
+    }
+    if(btn) btn.classList.add('active');
+  } else {
+    if(_mainLanduseLayer){ try{ map.removeLayer(_mainLanduseLayer); }catch(_){} }
+    if(btn) btn.classList.remove('active');
+  }
+  _renderMainLuLegend();
+}
+
+function _renderMainLuLegend(){
+  var el = document.getElementById('lu-main-legend');
+  if(!el) return;
+  if(!_mainLanduseShown){ el.classList.remove('open'); el.innerHTML=''; return; }
+  var cats = LU_CATS.concat([LU_WATER_CAT]);
+  el.innerHTML = '<div style="font-weight:700;margin-bottom:4px;color:#374151">Land Use (SANDAG)</div>' +
+    cats.map(function(c){
+      return '<div class="lu-main-item"><span class="lu-main-swatch" style="background:'+c.color+'"></span>'+c.name+'</div>';
+    }).join('');
+  el.classList.add('open');
 }
 
 /* ================================================================
@@ -2345,7 +2424,7 @@ function _dtRow(label, dispVal, pct, higherIsWorse){
     '<div class="dt-var-top"><span class="dt-var-label">'+_addrEsc(label)+'</span>'+
     '<span class="dt-var-val">'+_addrEsc(dispVal)+'</span></div>'+
     '<div class="dt-var-bar-wrap"><div class="dt-var-bar" style="width:'+width+'%;background:'+color+'"></div></div>'+
-    '<div class="dt-var-pct">'+Math.round(p)+'th pct \\u00b7 '+dirNote+'</div>'+
+    '<div class="dt-var-pct">'+Math.round(p)+'th percentile \\u00b7 '+dirNote+'</div>'+
   '</div>';
 }
 function _dtRowNA(label){
@@ -3081,8 +3160,12 @@ function drawTracts(){
           finishCompare(p.GEOID);
         }
       });
+      _ensureTractJuris();
+      var jn=_tractJurisName[fi];
+      var jurisLabel=jn?('City of '+jn):'Unincorporated San Diego County';
       var h='<div style="font-family:sans-serif;font-size:13px;line-height:1.6">'+
-        '<b>Tract '+p.GEOID.slice(-6)+'</b><br>';
+        '<b>Tract '+p.GEOID.slice(-6)+'</b><br>'+
+        '<span style="color:#555;font-size:11.5px">'+_addrEsc(jurisLabel)+'</span><br>';
       if(rawVar){
         var rv=p[rawVar];
         var dArrTip=getDeltaArr(rawVar);
@@ -3518,8 +3601,8 @@ function openCompareModal(geoidA,geoidB){
         // approximately preserved under uniform-ish CMIP6 deltas.
         var pA=(rawPct[v.key]&&rawPct[v.key][idxA]!=null)?rawPct[v.key][idxA]:null;
         var pB=(rawPct[v.key]&&rawPct[v.key][idxB]!=null)?rawPct[v.key][idxB]:null;
-        var dispPctA=(pA!=null)?(Math.round(pA)+'th pct'):'';
-        var dispPctB=(pB!=null)?(Math.round(pB)+'th pct'):'';
+        var dispPctA=(pA!=null)?(Math.round(pA)+'th percentile'):'';
+        var dispPctB=(pB!=null)?(Math.round(pB)+'th percentile'):'';
         // Highlight which is higher RISK (red) vs lower RISK (green) using
         // per-variable polarity. POLARITY[key]===false means higher value =
         // lower risk (e.g. tree canopy, AC prevalence).

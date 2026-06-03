@@ -30,6 +30,7 @@ OUTPUT_PATH = ROOT / "main" / "heat_risk_map.html"
 TRACTS_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "tracts_sd.geojson"
 JURIS_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "jurisdictions_sd.geojson"
 TRIBAL_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "tribal_lands_sd.geojson"
+UNINCORP_PATH = ROOT / "data" / "exposure" / "raw" / "census" / "unincorporated_sd.geojson"
 COOLZONES_PATH = ROOT / "data" / "cool_zones" / "coolzone_sites.csv"
 
 # ── CMIP6 / LOCA2 projection settings ──────────────────────────────────────
@@ -635,6 +636,16 @@ def main():
     else:
         logger.warning("No tribal lands file — tribal overlay will not be shown")
 
+    # Load unincorporated county boundary (optional) — SANGIS JUR_MUNICIPAL
+    # "S.D. COUNTY" (code CN) features, dissolved to one region. The unincorporated
+    # territory is ~85% of the county by area, so it's drawn as one outlined region.
+    unincorp_str = "null"
+    if UNINCORP_PATH.exists():
+        unincorp_str = UNINCORP_PATH.read_text().strip()
+        logger.info(f"Loaded unincorporated boundary from {UNINCORP_PATH.name}")
+    else:
+        logger.warning("No unincorporated file — unincorporated overlay will not be shown")
+
     # Load cool zone sites (optional) — county-published list of cooling sites
     # for hot-weather refuge. Extracted from CoolZoneSiteList.pdf and geocoded
     # via US Census + Nominatim. Inlined into the HTML so the static page is
@@ -672,6 +683,7 @@ def main():
     html = html.replace("__DELTAMAP_PLACEHOLDER__", delta_map_str)
     html = html.replace("__JURIS_PLACEHOLDER__", juris_str)
     html = html.replace("__TRIBAL_PLACEHOLDER__", tribal_str)
+    html = html.replace("__UNINCORP_PLACEHOLDER__", unincorp_str)
     html = html.replace("__COOLZONES_PLACEHOLDER__", coolzones_str)
     html = html.replace("__LST_PLACEHOLDER__", lst_str)
     html = html.replace("__POLARITY_PLACEHOLDER__", polarity_str)
@@ -1052,15 +1064,59 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 .scn-cmp-map{flex:1;background:#eef;min-height:0}
 .scn-cmp-meta{padding:6px 14px;font-size:11px;color:#888;border-top:1px solid #e5e7eb;
   background:#fafafa;flex-shrink:0;min-height:24px}
-.scn-cmp-legend{display:flex;align-items:center;gap:18px;padding:8px 18px;
-  border-top:1px solid #e5e7eb;background:#fafafa;font-size:11px;color:#555;
-  flex-shrink:0;flex-wrap:wrap}
-.scn-leg-block{display:flex;align-items:center;gap:8px;flex:1;min-width:260px}
-.scn-leg-scale{display:flex;flex-direction:column;gap:2px;flex:1;
-  min-width:120px;max-width:280px}
-.scn-leg-scale .cmp-lst-bar{width:100%;height:10px;border-radius:2px;border:1px solid #ddd}
-.scn-leg-scale .cmp-lst-ticks{display:flex;justify-content:space-between;width:100%;
-  color:#888;font-variant-numeric:tabular-nums}
+/* Per-map legend beneath each comparison map (replaces the old shared footer) */
+.scn-cmp-leg{padding:7px 14px 8px;border-top:1px solid #eef0f2;background:#fafafa;
+  flex-shrink:0;min-height:76px}
+.scn-leg-name{font-size:11px;font-weight:600;color:#374151;margin-bottom:5px}
+.scn-leg-name .scn-leg-sub{font-weight:400;color:#9ca3af}
+.scn-leg-dirs,.scn-leg-ends,.scn-leg-ticks{display:flex;justify-content:space-between;
+  font-size:10px;color:#9ca3af;font-variant-numeric:tabular-nums}
+.scn-leg-dirs{margin-bottom:3px;color:#6b7280;font-weight:500}
+.scn-leg-bar{height:11px;border-radius:3px;border:1px solid #ddd}
+.scn-leg-ends,.scn-leg-ticks{margin-top:3px}
+.scn-leg-unit{font-size:9px;color:#b0b4ba;text-align:center;margin-top:2px;
+  text-transform:uppercase;letter-spacing:0.04em}
+/* "How to read this" button in the compare-scenarios header */
+.scn-info-btn{background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;
+  font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;
+  padding:5px 10px;border-radius:7px;margin-right:8px;white-space:nowrap}
+.scn-info-btn:hover{background:#dbeafe}
+/* Compare-scenarios explainer infographic */
+#scn-info-modal{position:fixed;inset:0;z-index:2200;background:rgba(20,25,40,0.45);
+  display:none;align-items:center;justify-content:center;
+  backdrop-filter:blur(2px);font-family:inherit}
+#scn-info-modal.open{display:flex}
+.scn-info-panel{background:#fff;width:min(440px,94vw);max-height:90vh;
+  border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,0.32);
+  display:flex;flex-direction:column;overflow:hidden}
+.scn-info-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:13px 18px;border-bottom:1px solid #e5e7eb;flex-shrink:0}
+.scn-info-hdr h3{font-size:14px;font-weight:700;margin:0;color:#111}
+.scn-info-close{background:none;border:none;font-size:22px;color:#666;cursor:pointer;
+  padding:0 4px;line-height:1;font-family:inherit}
+.scn-info-close:hover{color:#111}
+.scn-info-body{padding:16px 18px;overflow-y:auto;font-size:13px;color:#374151;
+  line-height:1.55}
+.scn-info-row{display:flex;gap:11px;margin-bottom:13px}
+.scn-info-row b{color:#111}
+.scn-info-chip{flex-shrink:0;width:34px;height:34px;border-radius:7px;
+  border:1px solid rgba(0,0,0,0.12);margin-top:1px}
+.scn-info-chip.chip-left{background:linear-gradient(135deg,rgb(255,255,178),rgb(189,0,38))}
+.scn-info-chip.chip-right{background:linear-gradient(135deg,rgb(33,102,172),rgb(247,247,247) 50%,rgb(178,24,43))}
+.ink-blue{color:#2166ac}
+.ink-red{color:#b2182b}
+.scn-info-key{margin:2px 0 12px}
+.scn-info-keybar{height:12px;border-radius:3px;border:1px solid #ddd;
+  background:linear-gradient(to right,rgb(33,102,172),rgb(146,197,222),rgb(247,247,247),rgb(244,165,130),rgb(178,24,43))}
+.scn-info-keyends{display:flex;justify-content:space-between;font-size:10px;
+  color:#6b7280;margin-top:4px}
+.scn-info-note{font-size:11.5px;color:#6b7280;line-height:1.5;margin:0;
+  background:#f8fafc;border-left:3px solid #cbd5e1;padding:8px 11px;border-radius:6px}
+.scn-info-foot{padding:11px 18px;border-top:1px solid #e5e7eb;flex-shrink:0;
+  display:flex;justify-content:flex-end;background:#fafafa}
+.scn-info-ok{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:600;
+  cursor:pointer;font-family:inherit;border:1px solid #2563eb;background:#2563eb;color:#fff}
+.scn-info-ok:hover{background:#1d4ed8}
 
 /* Permanent city-name labels on jurisdiction layers */
 .juris-label{background:transparent;border:none;box-shadow:none;padding:0;
@@ -1449,6 +1505,10 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-tribal-all" onchange="toggleTribalAll(this.checked)"><span style="color:#8b5a2b;font-weight:600">Show all tribal lands</span></label></div>
       <div id="tribal-items" style="margin-top:2px"></div>
     </details>
+    <details class="subsec" id="unincorp-subsec" style="margin-top:6px"><summary>Unincorporated Area</summary>
+      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-unincorp" onchange="toggleUnincorp(this.checked)"><span style="color:#4f46e5;font-weight:600">Show unincorporated county</span></label></div>
+      <div style="font-size:10px;color:#666;margin:2px 0 0 6px">Land the County governs directly &mdash; everything outside the 18 incorporated cities (~85% of the county&#39;s area).</div>
+    </details>
     <details class="subsec" id="coolzones-subsec" style="margin-top:6px"><summary>Cool Zones</summary>
       <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-coolzones" onchange="toggleCoolZones(this.checked)">Show county cool-zone sites</label></div>
       <div style="font-size:10px;color:#666;margin:2px 0 0 6px">County-listed cooling sites (libraries, civic centers, malls). Click a marker for address &amp; phone.</div>
@@ -1630,7 +1690,9 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 <div id="scn-compare-modal" onclick="if(event.target===this)closeScnCompareModal()">
   <div class="cmp-panel scn-cmp-panel">
     <div class="cmp-hdr">
-      <h2>Compare Scenarios<span class="cmp-sub">Left = Composite Risk &middot; Right = Δ Heat Exposure (B − A)</span></h2>
+      <h2>Compare Scenarios<span class="cmp-sub">Left: full heat risk &middot; Right: change in heat exposure</span></h2>
+      <span style="flex:1"></span>
+      <button class="scn-info-btn" onclick="openScnInfo()" title="How to read this panel">? How to read this</button>
       <button class="cmp-close" onclick="closeScnCompareModal()" title="Close (ESC)">&times;</button>
     </div>
     <div class="scn-cmp-body">
@@ -1640,18 +1702,46 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
           <select id="scn-cmp-sel-a" onchange="setScnCompare('a',this.value)"></select>
         </div>
         <div class="scn-cmp-map" id="scn-cmp-map-a"></div>
+        <div class="scn-cmp-leg" id="scn-cmp-leg-a"></div>
         <div class="scn-cmp-meta" id="scn-cmp-meta-a"></div>
       </div>
       <div class="scn-cmp-col">
         <div class="scn-cmp-picker">
-          <label>Right (Δ)</label>
+          <label>Right</label>
           <select id="scn-cmp-sel-b" onchange="setScnCompare('b',this.value)"></select>
         </div>
         <div class="scn-cmp-map" id="scn-cmp-map-b"></div>
+        <div class="scn-cmp-leg" id="scn-cmp-leg-b"></div>
         <div class="scn-cmp-meta" id="scn-cmp-meta-b"></div>
       </div>
     </div>
-    <div class="scn-cmp-legend" id="scn-cmp-legend"></div>
+  </div>
+</div>
+
+<div id="scn-info-modal" onclick="if(event.target===this)closeScnInfo()">
+  <div class="scn-info-panel">
+    <div class="scn-info-hdr">
+      <h3>How to read this</h3>
+      <button class="scn-info-close" onclick="closeScnInfo()" title="Close (ESC)">&times;</button>
+    </div>
+    <div class="scn-info-body">
+      <div class="scn-info-row">
+        <span class="scn-info-chip chip-left"></span>
+        <div><b>Left map &mdash; the full heat risk.</b> How hot it gets, who is vulnerable, and how well they can cope, combined into one score. Darker red means higher risk.</div>
+      </div>
+      <div class="scn-info-row">
+        <span class="scn-info-chip chip-right"></span>
+        <div><b>Right map &mdash; the change.</b> How heat exposure shifts from the left scenario to the right one. <b class="ink-blue">Blue</b> means less exposed, <b class="ink-red">red</b> means more exposed, white means little change.</div>
+      </div>
+      <div class="scn-info-key">
+        <div class="scn-info-keybar"></div>
+        <div class="scn-info-keyends"><span>cooler &middot; less exposed</span><span>hotter &middot; more exposed</span></div>
+      </div>
+      <p class="scn-info-note">Only heat exposure responds to the climate scenario. Who is vulnerable and their ability to cope stay at today's levels, so the right map isolates the warming signal. The scale is percentile points &mdash; a tract's countywide exposure rank, 0 to 100.</p>
+    </div>
+    <div class="scn-info-foot">
+      <button class="scn-info-ok" onclick="closeScnInfo()">Got it</button>
+    </div>
   </div>
 </div>
 
@@ -1737,6 +1827,7 @@ var DELTAS = __DELTAS_PLACEHOLDER__;         // {period:{ssp:{tasmax:[...],tasmi
 var DELTA_MAP = __DELTAMAP_PLACEHOLDER__;    // {varKey:"tasmax"|"tasmin"}
 var JURIS = __JURIS_PLACEHOLDER__;           // city jurisdiction GeoJSON or null
 var TRIBAL = __TRIBAL_PLACEHOLDER__;         // tribal lands GeoJSON or null
+var UNINCORP = __UNINCORP_PLACEHOLDER__;     // unincorporated county boundary GeoJSON or null
 var COOLZONES = __COOLZONES_PLACEHOLDER__;   // [{name,address,city,zip,phone,lat,lon}, ...] or null
 var LST   = __LST_PLACEHOLDER__;             // Landsat LST overlay meta or null
 var POLARITY = __POLARITY_PLACEHOLDER__;     // {varKey: true if higher=worse(red)}
@@ -2898,6 +2989,30 @@ function syncTribalAllCheckbox(){
   all.indeterminate=(n>0&&n<keys.length);
 }
 
+// Unincorporated county boundary — SANGIS JUR_MUNICIPAL "S.D. COUNTY" (code CN),
+// dissolved to one region (~85% of the county). Drawn non-interactive so clicks
+// fall through to the tract underneath; it only provides visual context.
+var unincorpLayer=null;
+var UNINCORP_COLOR="#4f46e5";
+if(typeof UNINCORP!=='undefined'&&UNINCORP&&UNINCORP.features&&UNINCORP.features.length){
+  unincorpLayer=L.geoJSON(UNINCORP,{
+    interactive:false,
+    style:function(){return{color:UNINCORP_COLOR,weight:2,fillColor:UNINCORP_COLOR,fillOpacity:0.08};}
+  });
+  document.getElementById("overlay-toggles").style.display="block";
+}
+function toggleUnincorp(on){
+  if(!unincorpLayer)return;
+  if(on){
+    unincorpLayer.addTo(map);unincorpLayer.bringToFront();
+    // Keep city and tribal outlines above the unincorporated region.
+    Object.keys(jurisLayers).forEach(function(k){if(map.hasLayer(jurisLayers[k]))jurisLayers[k].bringToFront();});
+    if(typeof tribalLayers!=='undefined')Object.keys(tribalLayers).forEach(function(k){if(map.hasLayer(tribalLayers[k]))tribalLayers[k].bringToFront();});
+  } else {
+    map.removeLayer(unincorpLayer);
+  }
+}
+
 /* ================================================================
    Cool Zones — point overlay of county-published cooling sites
    ================================================================ */
@@ -3248,7 +3363,9 @@ function drawTracts(){
       lyr.bindPopup(h);
     }
   }).addTo(map);
-  // Keep jurisdiction boundaries on top of tracts
+  // Keep overlays on top of tracts: unincorporated region first (lowest), then
+  // city and tribal outlines above it.
+  if(typeof unincorpLayer!=='undefined'&&unincorpLayer&&map.hasLayer(unincorpLayer))unincorpLayer.bringToFront();
   Object.keys(jurisLayers).forEach(function(k){if(map.hasLayer(jurisLayers[k]))jurisLayers[k].bringToFront();});
   if(typeof tribalLayers!=='undefined'){
     Object.keys(tribalLayers).forEach(function(k){if(map.hasLayer(tribalLayers[k]))tribalLayers[k].bringToFront();});
@@ -3602,7 +3719,9 @@ function closeCompareModal(){
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
     var cityModal=document.getElementById('city-compare-modal');
-    if(document.getElementById('scn-compare-modal').classList.contains('open')){closeScnCompareModal();}
+    var scnInfo=document.getElementById('scn-info-modal');
+    if(scnInfo&&scnInfo.classList.contains('open')){closeScnInfo();}
+    else if(document.getElementById('scn-compare-modal').classList.contains('open')){closeScnCompareModal();}
     else if(document.getElementById('compare-modal').classList.contains('open')){closeCompareModal();}
     else if(cityModal&&cityModal.classList.contains('open')){closeCityCompareModal();}
     else if(compareMode==='awaiting'){cancelCompare();}
@@ -4237,6 +4356,13 @@ function openScnCompareModal(){
     }).join('');
   });
   document.getElementById('scn-compare-modal').classList.add('open');
+  // First-time visitors get the explainer automatically; afterwards it's on the "?" button.
+  try{
+    if(!localStorage.getItem('shrx_scn_info_seen')){
+      openScnInfo();
+      localStorage.setItem('shrx_scn_info_seen','1');
+    }
+  }catch(e){}
   setTimeout(function(){
     renderScnCompareSide('a');
     renderScnCompareSide('b');
@@ -4244,6 +4370,9 @@ function openScnCompareModal(){
     setTimeout(_initScnSync,40);
   },30);
 }
+
+function openScnInfo(){var m=document.getElementById('scn-info-modal');if(m)m.classList.add('open');}
+function closeScnInfo(){var m=document.getElementById('scn-info-modal');if(m)m.classList.remove('open');}
 
 function closeScnCompareModal(){
   document.getElementById('scn-compare-modal').classList.remove('open');
@@ -4378,33 +4507,34 @@ function renderScnCompareSide(side){
     } else {
       var aLab=null;
       for(var k2=0;k2<opts.length;k2++){if(opts[k2].val===scnCmpScn.a){aLab=opts[k2].label;break;}}
-      metaEl.innerHTML='Δ Heat Exposure pillar rank (percentile pts) vs. <b>'+(aLab||scnCmpScn.a)+'</b> &middot; '+(lab||'');
+      metaEl.innerHTML='Change from <b>'+(aLab||scnCmpScn.a)+'</b> to <b>'+(lab||'')+'</b>';
     }
   }
 }
 
 function _refreshScnCompareLegend(){
-  var lel=document.getElementById('scn-cmp-legend');
-  if(!lel)return;
-  var cr=pal('CR');
-  var crStops=cr.map(function(c){return'rgb('+c.join(',')+')'}).join(',');
-  var divStops=CDIV.map(function(c){return'rgb('+c.join(',')+')'}).join(',');
-  var dMax=(window._scnDeltaMax!=null?window._scnDeltaMax:0).toFixed(1);
-  lel.innerHTML=
-    '<div class="scn-leg-block">'+
-      '<span class="cmp-lst-title">Left — Composite Risk:</span>'+
-      '<span class="scn-leg-scale">'+
-        '<span class="cmp-lst-bar" style="background:linear-gradient(to right,'+crStops+')"></span>'+
-        '<span class="cmp-lst-ticks"><span>Lower</span><span>Higher</span></span>'+
-      '</span>'+
-    '</div>'+
-    '<div class="scn-leg-block">'+
-      '<span class="cmp-lst-title">Right — Δ Heat Exposure pillar rank (B − A, percentile pts):</span>'+
-      '<span class="scn-leg-scale">'+
-        '<span class="cmp-lst-bar" style="background:linear-gradient(to right,'+divStops+')"></span>'+
-        '<span class="cmp-lst-ticks"><span>−'+dMax+'</span><span>0</span><span>+'+dMax+'</span></span>'+
-      '</span>'+
-    '</div>';
+  var la=document.getElementById('scn-cmp-leg-a');
+  var lb=document.getElementById('scn-cmp-leg-b');
+  if(la){
+    var cr=pal('CR');
+    var crStops=cr.map(function(c){return'rgb('+c.join(',')+')'}).join(',');
+    la.innerHTML=
+      '<div class="scn-leg-name">Composite heat risk</div>'+
+      '<div class="scn-leg-bar" style="background:linear-gradient(to right,'+crStops+')"></div>'+
+      '<div class="scn-leg-ends"><span>Lower</span><span>Higher</span></div>';
+  }
+  if(lb){
+    var divStops=CDIV.map(function(c){return'rgb('+c.join(',')+')'}).join(',');
+    // 1px neutral tick overlaid at the 50% (zero) point of the diverging scale
+    var zeroMark='linear-gradient(to right,transparent calc(50% - 1px),#9ca3af calc(50% - 1px),#9ca3af calc(50% + 1px),transparent calc(50% + 1px)),';
+    var dMax=(window._scnDeltaMax!=null?window._scnDeltaMax:0).toFixed(1);
+    lb.innerHTML=
+      '<div class="scn-leg-name">Change in heat exposure <span class="scn-leg-sub">(vs left map)</span></div>'+
+      '<div class="scn-leg-dirs"><span>◀ cooler · less exposed</span><span>hotter · more exposed ▶</span></div>'+
+      '<div class="scn-leg-bar" style="background:'+zeroMark+'linear-gradient(to right,'+divStops+')"></div>'+
+      '<div class="scn-leg-ticks"><span>−'+dMax+'</span><span>0</span><span>+'+dMax+'</span></div>'+
+      '<div class="scn-leg-unit">percentile points</div>';
+  }
 }
 
 function _initScnSync(){
@@ -4714,6 +4844,7 @@ function _captureStudyAreaMap(opts){
           tribalRows.push({label:gk,color:TRIBAL_COLORS.reservation,dashed:false});
         });
       }
+      var unincorpOn=(!opts.jurisName&&typeof unincorpLayer!=='undefined'&&unincorpLayer&&map.hasLayer(unincorpLayer));
 
       var pad=14, gradW=200, gradH=14, swW=22, swH=14, rowH=22;
       var titleSize=18, subSize=12, bodySize=14, sectionGap=10;
@@ -4730,6 +4861,7 @@ function _captureStudyAreaMap(opts){
       if(driverRows)driverRows.forEach(function(r){var w=tw(r.label,fonts.body);if(w>maxLabelW)maxLabelW=w;});
       cityRows.forEach(function(r){var w=tw(r.label,fonts.body);if(w>maxLabelW)maxLabelW=w;});
       tribalRows.forEach(function(r){var w=tw(r.label,fonts.body);if(w>maxLabelW)maxLabelW=w;});
+      if(unincorpOn){var uw=tw('Unincorporated county',fonts.body);if(uw>maxLabelW)maxLabelW=uw;}
       var titleW=tw(title,fonts.title);
       var subW=subtitle?tw(subtitle,fonts.sub):0;
       var showSspLink=!!(subtitle && curScenario && curScenario!=='present');

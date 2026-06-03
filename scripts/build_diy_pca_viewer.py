@@ -5521,31 +5521,31 @@ function closeWelcome(){
 var TOUR_STEPS=[
   {key:"exposure",target:'[data-tour="pillar-exposure"]',side:"right",
    title:"1. Heat Exposure",
-   body:"How hot the air or ground gets. Pick one of four modes \\u2014 <b>Daytime</b>, <b>Nighttime</b>, <b>Humid Heat (WBGT)</b>, or <b>Surface Temperature</b>. Each affects different places, so they're mapped one at a time.",
-   prompt:"Pick a heat mode, then click Next."},
+   body:"The heat hazard itself. Choose one mode \\u2014 <b>Daytime</b>, <b>Nighttime</b>, <b>Humid Heat (WBGT)</b>, or <b>Surface Temperature</b>.",
+   prompt:"Pick a mode, then Next."},
   {key:"sensitivity",target:'[data-tour="pillar-sensitivity"]',side:"right",
    title:"2. Population Sensitivity",
-   body:"Factors that make people more vulnerable to heat \\u2014 age, income, language, pre-existing health conditions. Toggle the pillar header to enable everything, or expand a subsection to pick specific variables.",
-   prompt:"Toggle a variable or the pillar header, then click Next."},
+   body:"Who is more vulnerable \\u2014 age, income, language, health. Toggle the header for all of it, or open a subsection to choose variables.",
+   prompt:"Toggle a variable, then Next."},
   {key:"adaptive",target:'[data-tour="pillar-adaptive"]',side:"right",
    title:"3. Adaptive Capacity",
-   body:"What helps people cope \\u2014 air conditioning, tree canopy, walkable access to cool spaces. <i>Low</i> adaptive capacity raises risk, so these variables are inverted when blending.",
-   prompt:"Toggle a variable or the pillar header, then click Next."},
+   body:"What helps people cope \\u2014 air conditioning, tree canopy, access to cool spaces. Low capacity raises risk, so these are inverted in the blend.",
+   prompt:"Toggle a variable, then Next."},
   {key:"build",target:'#compute-btn',side:"right",
    title:"4. Build the map",
-   body:"Blends your selections into one composite risk score per census tract. Each variable is z-scored, Sensitivity and Adaptive Capacity run through PCA, and the result is percentile-ranked countywide.",
-   prompt:"Click \\u201CBuild Composite Risk Map\\u201D, then click Next."},
+   body:"Combines your selections into one risk score per tract. Variables are z-scored, Sensitivity and Adaptive Capacity reduced by PCA, then ranked countywide.",
+   prompt:"Build the map, then Next."},
   {key:"layer",target:'#layer-select',side:"right",
-   title:"5. Switch the map layer",
-   body:"Switch views without rebuilding. <b>Composite Risk</b> is the overall blend; <b>Dominant Driver</b> colors each tract by the pillar contributing most. Individual pillar scores and variables are also available.",
-   prompt:"Click a layer button, then click Next."},
+   title:"5. Map layer",
+   body:"Change views without rebuilding. <b>Composite Risk</b> is the blend; <b>Dominant Driver</b> colors each tract by its strongest pillar. Single pillars and variables are available too.",
+   prompt:"Pick a layer, then Next."},
   {key:"scenario",target:'#scenario-bar',side:"right",
    title:"6. Climate scenarios",
-   body:"See how risk shifts under future warming. Pick <b>2050</b> or <b>2080</b> and an emissions pathway (moderate, high, or very high). Only Heat Exposure is re-projected \\u2014 Sensitivity and Adaptive Capacity hold at present-day baselines.",
+   body:"Project risk under future warming. Pick <b>2050</b> or <b>2080</b> and an emissions pathway. Only Heat Exposure shifts \\u2014 Sensitivity and Adaptive Capacity stay at today's baseline.",
    prompt:null},
   {key:"done",target:null,side:"center",
-   title:"You're set",
-   body:"Click any tract for its composite score, pillar scores, and dominant driver. Use <b>Find address</b> (bottom-left of the map) to jump to a location. Refresh the page anytime to retake the tour.",
+   title:"Done",
+   body:"Click any tract for its scores and dominant driver. Use <b>Find address</b> (bottom-left) to jump to a place. Reload to retake the tour.",
    prompt:null}
 ];
 /* ----------------------------------------------------------------
@@ -5557,17 +5557,17 @@ var TOUR_STEPS=[
 var WE_STEPS=[
   {key:"we-intro",target:null,side:"center",
    title:"Worked example: where are children most at risk?",
-   body:"From the user guide. We'll narrow Population Sensitivity to one variable \\u2014 children under 18 \\u2014 to find tracts where kids face the most heat stress. Click <b>Next</b> at each step and the tool performs the action.",
+   body:"We'll narrow Population Sensitivity to one variable \\u2014 children under 18 \\u2014 to find where kids face the most heat stress. Click <b>Next</b> and the tool does each step.",
    prompt:null},
   {key:"we-clear",target:'[data-tour="pillar-sensitivity"]',side:"right",
    title:"1. Clear Population Sensitivity",
-   body:"Uncheck every variable in this pillar so we can isolate one factor.",
-   prompt:"Next will clear the pillar.",
+   body:"Uncheck every variable here so we can isolate one.",
+   prompt:"Next clears the pillar.",
    action:function(){togPillar('sensitivity',false);}},
   {key:"we-age",target:'#vr_EP_AGE17',side:"right",
-   title:"2. Enable only Age 17 & Under",
-   body:"Re-enable just the under-18 variable. Population Sensitivity is now driven entirely by where children live.",
-   prompt:"Next will enable this variable.",
+   title:"2. Enable Age 17 & Under",
+   body:"Turn on just the under-18 variable. Sensitivity now tracks where children live.",
+   prompt:"Next enables it.",
    // `prepare` runs before the spotlight positions, so the Demographics
    // subsection is open and the target row is laid out (non-zero height)
    // by the time getBoundingClientRect reads it.
@@ -5582,8 +5582,8 @@ var WE_STEPS=[
    action:function(){if(!enabled['EP_AGE17'])tog('EP_AGE17');}},
   {key:"we-build",target:'#compute-btn',side:"right",
    title:"3. Build the map",
-   body:"Blend Heat Exposure, Population Sensitivity (children-only), and Adaptive Capacity into the composite Heat Risk Index.",
-   prompt:"Next will build the map.",
+   body:"Blend Heat Exposure, children-only Sensitivity, and Adaptive Capacity into the risk index.",
+   prompt:"Next builds the map.",
    action:function(){
      // Safety net: ensure Adaptive Capacity has variables on so the
      // composite is meaningful (matches the user-guide instruction
@@ -5596,7 +5596,7 @@ var WE_STEPS=[
    }},
   {key:"we-done",target:null,side:"center",
    title:"Done \\u2014 children at risk",
-   body:"Dark-red tracts are where children face the most heat stress: hot, lots of kids under 18, and limited capacity to cope. Click any tract for its driver breakdown.",
+   body:"Dark-red tracts are where children face the most heat stress \\u2014 hot, many kids under 18, limited capacity to cope. Click any tract for its breakdown.",
    prompt:null}
 ];
 

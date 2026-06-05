@@ -1,0 +1,167 @@
+{
+  "url": "../data/context/overlays/canopy_4326.png",
+  "colormap": "Greens",
+  "legend": [
+    {
+      "t": 0.0,
+      "value": 0.0,
+      "rgb": [
+        247,
+        252,
+        245
+      ]
+    },
+    {
+      "t": 0.25,
+      "value": 15.0,
+      "rgb": [
+        199,
+        233,
+        192
+      ]
+    },
+    {
+      "t": 0.5,
+      "value": 30.0,
+      "rgb": [
+        115,
+        196,
+        118
+      ]
+    },
+    {
+      "t": 0.75,
+      "value": 45.0,
+      "rgb": [
+        34,
+        138,
+        68
+      ]
+    },
+    {
+      "t": 1.0,
+      "value": 60.0,
+      "rgb": [
+        0,
+        68,
+        27
+      ]
+    }
+  ],
+  "variants": {
+    "default": {
+      "url": "../data/context/overlays/canopy_4326.png",
+      "colormap": "Greens",
+      "legend": [
+        {
+          "t": 0.0,
+          "value": 0.0,
+          "rgb": [
+            247,
+            252,
+            245
+          ]
+        },
+        {
+          "t": 0.25,
+          "value": 15.0,
+          "rgb": [
+            199,
+            233,
+            192
+          ]
+        },
+        {
+          "t": 0.5,
+          "value": 30.0,
+          "rgb": [
+            115,
+            196,
+            118
+          ]
+        },
+        {
+          "t": 0.75,
+          "value": 45.0,
+          "rgb": [
+            34,
+            138,
+            68
+          ]
+        },
+        {
+          "t": 1.0,
+          "value": 60.0,
+          "rgb": [
+            0,
+            68,
+            27
+          ]
+        }
+      ]
+    },
+    "cb": {
+      "url": "../data/context/overlays/canopy_4326_cb.png",
+      "colormap": "cividis",
+      "legend": [
+        {
+          "t": 0.0,
+          "value": 0.0,
+          "rgb": [
+            0,
+            34,
+            78
+          ]
+        },
+        {
+          "t": 0.25,
+          "value": 15.0,
+          "rgb": [
+            67,
+            78,
+            108
+          ]
+        },
+        {
+          "t": 0.5,
+          "value": 30.0,
+          "rgb": [
+            125,
+            124,
+            120
+          ]
+        },
+        {
+          "t": 0.75,
+          "value": 45.0,
+          "rgb": [
+            188,
+            174,
+            108
+          ]
+        },
+        {
+          "t": 1.0,
+          "value": 60.0,
+          "rgb": [
+            254,
+            232,
+            56
+          ]
+        }
+      ]
+    }
+  },
+  "bounds": {
+    "south": 32.48891066444961,
+    "west": -117.9692056188863,
+    "north": 33.52959141857102,
+    "east": -116.5150625015074
+  },
+  "vmin": 0.0,
+  "vmax": 60.0,
+  "scale": "linear",
+  "label": "Tree canopy",
+  "units": "% canopy",
+  "source": "NLCD tree canopy cover, 100 m (heat-risk-sd)"
+}

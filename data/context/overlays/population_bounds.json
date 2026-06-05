@@ -1,0 +1,167 @@
+{
+  "url": "../data/context/overlays/population_4326.png",
+  "colormap": "inferno",
+  "legend": [
+    {
+      "t": 0.0,
+      "value": 0.0,
+      "rgb": [
+        0,
+        0,
+        4
+      ]
+    },
+    {
+      "t": 0.25,
+      "value": 0.72,
+      "rgb": [
+        87,
+        16,
+        110
+      ]
+    },
+    {
+      "t": 0.5,
+      "value": 1.95,
+      "rgb": [
+        188,
+        55,
+        84
+      ]
+    },
+    {
+      "t": 0.75,
+      "value": 4.07,
+      "rgb": [
+        249,
+        142,
+        9
+      ]
+    },
+    {
+      "t": 1.0,
+      "value": 7.71,
+      "rgb": [
+        252,
+        255,
+        164
+      ]
+    }
+  ],
+  "variants": {
+    "default": {
+      "url": "../data/context/overlays/population_4326.png",
+      "colormap": "inferno",
+      "legend": [
+        {
+          "t": 0.0,
+          "value": 0.0,
+          "rgb": [
+            0,
+            0,
+            4
+          ]
+        },
+        {
+          "t": 0.25,
+          "value": 0.72,
+          "rgb": [
+            87,
+            16,
+            110
+          ]
+        },
+        {
+          "t": 0.5,
+          "value": 1.95,
+          "rgb": [
+            188,
+            55,
+            84
+          ]
+        },
+        {
+          "t": 0.75,
+          "value": 4.07,
+          "rgb": [
+            249,
+            142,
+            9
+          ]
+        },
+        {
+          "t": 1.0,
+          "value": 7.71,
+          "rgb": [
+            252,
+            255,
+            164
+          ]
+        }
+      ]
+    },
+    "cb": {
+      "url": "../data/context/overlays/population_4326_cb.png",
+      "colormap": "cividis",
+      "legend": [
+        {
+          "t": 0.0,
+          "value": 0.0,
+          "rgb": [
+            0,
+            34,
+            78
+          ]
+        },
+        {
+          "t": 0.25,
+          "value": 0.72,
+          "rgb": [
+            67,
+            78,
+            108
+          ]
+        },
+        {
+          "t": 0.5,
+          "value": 1.95,
+          "rgb": [
+            125,
+            124,
+            120
+          ]
+        },
+        {
+          "t": 0.75,
+          "value": 4.07,
+          "rgb": [
+            188,
+            174,
+            108
+          ]
+        },
+        {
+          "t": 1.0,
+          "value": 7.71,
+          "rgb": [
+            254,
+            232,
+            56
+          ]
+        }
+      ]
+    }
+  },
+  "bounds": {
+    "south": 32.49808758978789,
+    "west": -117.62719322106479,
+    "north": 33.52362434318316,
+    "east": -116.03899137522698
+  },
+  "vmin": 0.0,
+  "vmax": 7.714,
+  "scale": "log",
+  "label": "Population density",
+  "units": "people per pixel",
+  "source": "EPA EnviroAtlas 2020 Dasymetric Population (30 m)"
+}

@@ -616,6 +616,18 @@ def main():
     else:
         logger.warning("No LST overlay metadata — compare-mode mini-maps will fall back to outline only")
 
+    # Load Data-Layer raster overlay metadata (optional) — population, impervious,
+    # canopy. Same JSON shape as the LST overlay; built by build_data_overlays.py.
+    overlay_meta = {}
+    for _ov in ("population", "impervious", "canopy"):
+        _p = ROOT / "data/context/overlays" / f"{_ov}_bounds.json"
+        if _p.exists():
+            overlay_meta[_ov] = _p.read_text().strip()
+            logger.info(f"Loaded {_ov} overlay metadata")
+        else:
+            overlay_meta[_ov] = "null"
+            logger.warning(f"No {_ov} overlay metadata — Data Layers entry will be unavailable")
+
     # Load city jurisdiction boundaries (optional)
     juris_str = "null"
     if JURIS_PATH.exists():
@@ -686,6 +698,9 @@ def main():
     html = html.replace("__UNINCORP_PLACEHOLDER__", unincorp_str)
     html = html.replace("__COOLZONES_PLACEHOLDER__", coolzones_str)
     html = html.replace("__LST_PLACEHOLDER__", lst_str)
+    html = html.replace("__POP_PLACEHOLDER__", overlay_meta["population"])
+    html = html.replace("__IMPERVIOUS_PLACEHOLDER__", overlay_meta["impervious"])
+    html = html.replace("__CANOPY_PLACEHOLDER__", overlay_meta["canopy"])
     html = html.replace("__POLARITY_PLACEHOLDER__", polarity_str)
 
     OUTPUT_PATH.write_text(html)
@@ -1331,6 +1346,21 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 .lu-main-item{display:flex;align-items:center;gap:5px;white-space:nowrap}
 .lu-main-swatch{width:10px;height:10px;border-radius:2px;flex-shrink:0;border:1px solid rgba(0,0,0,0.2)}
 
+/* --- Data Layers dropdown (informational reference overlays, main map) --- */
+#data-layers-control{display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,0.92);
+  padding:8px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);
+  border:1px solid rgba(0,0,0,0.12);width:200px;box-sizing:border-box}
+#data-layers-control .dl-ctl-lbl{font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.5px;color:#374151}
+#data-layer-select{width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;
+  font-family:inherit;font-size:12px;color:#374151;background:#fff;cursor:pointer}
+#data-layer-opacity-wrap{display:flex;align-items:center;gap:6px;color:#374151}
+#data-layer-opacity-wrap .opacity-lbl{font-weight:600;white-space:nowrap;font-size:10px}
+#data-layer-opacity-slider{flex:1;cursor:pointer;accent-color:#2563eb}
+#data-layer-opacity-val{font-variant-numeric:tabular-nums;color:#6b7280;min-width:32px;
+  text-align:right;font-size:10px}
+#data-layer-legend{font-size:10px;line-height:1.5;color:#374151}
+
 /* --- composite-risk opacity slider (sits above the basemap picker) --- */
 #map-opacity-control{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.92);
   padding:6px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);
@@ -1500,14 +1530,12 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     <details class="subsec" id="juris-subsec" style="margin-top:2px"><summary>Cities</summary>
       <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-juris-all" onchange="toggleJurisAll(this.checked)">Show all cities</label></div>
       <div id="juris-items" style="margin-top:2px"></div>
+      <div class="ov-row" style="margin-left:6px;margin-top:6px;border-top:1px solid #eee;padding-top:6px"><label><input type="checkbox" id="cb-unincorp" onchange="toggleUnincorp(this.checked)"><span style="color:#4f46e5;font-weight:600">Show unincorporated county</span></label></div>
+      <div style="font-size:10px;color:#666;margin:2px 0 0 6px">Land the County governs directly &mdash; everything outside the 18 incorporated cities (~85% of the county&#39;s area).</div>
     </details>
     <details class="subsec" id="tribal-subsec" style="margin-top:6px"><summary>Tribal Lands</summary>
       <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-tribal-all" onchange="toggleTribalAll(this.checked)"><span style="color:#8b5a2b;font-weight:600">Show all tribal lands</span></label></div>
       <div id="tribal-items" style="margin-top:2px"></div>
-    </details>
-    <details class="subsec" id="unincorp-subsec" style="margin-top:6px"><summary>Unincorporated Area</summary>
-      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-unincorp" onchange="toggleUnincorp(this.checked)"><span style="color:#4f46e5;font-weight:600">Show unincorporated county</span></label></div>
-      <div style="font-size:10px;color:#666;margin:2px 0 0 6px">Land the County governs directly &mdash; everything outside the 18 incorporated cities (~85% of the county&#39;s area).</div>
     </details>
     <details class="subsec" id="coolzones-subsec" style="margin-top:6px"><summary>Cool Zones</summary>
       <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-coolzones" onchange="toggleCoolZones(this.checked)">Show county cool-zone sites</label></div>
@@ -1554,10 +1582,25 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 <div id="map-wrap">
   <div id="map"></div>
   <div id="map-controls-bl">
+    <div id="data-layers-control">
+      <label class="dl-ctl-lbl" for="data-layer-select">Data Layers</label>
+      <select id="data-layer-select" onchange="setDataLayer(this.value)" title="Show an informational reference layer over the map (not part of the risk analysis)">
+        <option value="">None</option>
+        <option value="population">Population density</option>
+        <option value="impervious">Impervious surface</option>
+        <option value="canopy">Tree canopy</option>
+        <option value="landuse">Land use (SANDAG)</option>
+        <option value="lst">Land surface temp (LST)</option>
+        <option value="hosp_day">Heat hospitalizations</option>
+      </select>
+      <div id="data-layer-opacity-wrap" style="display:none">
+        <span class="opacity-lbl">Opacity</span>
+        <input type="range" id="data-layer-opacity-slider" min="0" max="100" value="80" oninput="setDataLayerOpacity(this.value)">
+        <span id="data-layer-opacity-val">80%</span>
+      </div>
+      <div id="data-layer-legend" style="display:none"></div>
+    </div>
     <div id="lu-main-legend"></div>
-    <button id="lu-toggle-btn" onclick="toggleMainLanduse()" title="Toggle SANDAG land use parcels">
-      <span>&#9638;</span> Land Use
-    </button>
     <div id="addr-search">
       <h3>Find address</h3>
       <div class="addr-row">
@@ -1766,7 +1809,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
         <li><b>Population Sensitivity / Adaptive Capacity</b> &mdash; two groups of factors that shape heat risk. Turn any on or off to include them in your map.</li>
         <li><b>Build Composite Risk Map</b> &mdash; combines the factors you picked into a single risk score for every census tract.</li>
         <li><b>Map Layer</b> &mdash; switch between the combined risk score, each group on its own, or any single factor.</li>
-        <li><b>Jurisdictions</b> &mdash; show city or tribal-land boundaries on the map.</li>
+        <li><b>Jurisdictions</b> &mdash; show city, unincorporated-county, or tribal-land boundaries on the map.</li>
         <li><b>Climate Scenario</b> &mdash; see how risk shifts under future warming, for the year 2050 or 2080.</li>
         <li><b>Accessibility</b> &mdash; switch to colorblind-friendly colors.</li>
         <li><b>Export</b> &mdash; save the current map as a PDF or download the data.</li>
@@ -1830,6 +1873,9 @@ var TRIBAL = __TRIBAL_PLACEHOLDER__;         // tribal lands GeoJSON or null
 var UNINCORP = __UNINCORP_PLACEHOLDER__;     // unincorporated county boundary GeoJSON or null
 var COOLZONES = __COOLZONES_PLACEHOLDER__;   // [{name,address,city,zip,phone,lat,lon}, ...] or null
 var LST   = __LST_PLACEHOLDER__;             // Landsat LST overlay meta or null
+var POP        = __POP_PLACEHOLDER__;        // population density overlay meta or null
+var IMPERVIOUS = __IMPERVIOUS_PLACEHOLDER__; // impervious surface overlay meta or null
+var CANOPY     = __CANOPY_PLACEHOLDER__;     // tree canopy overlay meta or null
 var POLARITY = __POLARITY_PLACEHOLDER__;     // {varKey: true if higher=worse(red)}
 var HEAT_MODES = __HEATMODES_PLACEHOLDER__;  // [{key,label,layers:[...],desc}] — exposure is single-select, not PCA
 
@@ -2039,6 +2085,110 @@ function setTractOpacity(pct){
   var lbl = document.getElementById('map-opacity-val');
   if(lbl) lbl.textContent = pct+'%';
   if(tLayer) tLayer.setStyle({fillOpacity: tractOpacity});
+}
+
+/* ===== Data Layers (informational reference overlays) =====================
+   Single-select dropdown of context layers drawn over the basemap, separate
+   from the PCA risk analysis. Rasters (population/impervious/canopy/LST) are
+   PNG imageOverlays; land use reuses the SANDAG PMTiles machinery; heat
+   hospitalizations is a tract choropleth. All sit in landusePane (z 450). */
+var RASTER_META = {population:POP, impervious:IMPERVIOUS, canopy:CANOPY, lst:LST};
+var _dataLayer = "";           // current selection id ("" = none)
+var _dataLayerObj = null;      // current non-landuse Leaflet layer (imageOverlay/geojson)
+var _dataLayerOpacity = 0.80;
+var HOSP_RAMP = [[255,247,236],[254,196,79],[217,95,14],[153,52,4]];  // sequential YlOrBr-ish
+var _hospDomain = null;
+
+function _ensureDataPane(){
+  if(!map.getPane('landusePane')){ map.createPane('landusePane'); map.getPane('landusePane').style.zIndex=450; }
+}
+function rasterVariant(id){
+  var m = RASTER_META[id];
+  if(!m) return null;
+  if(m.variants && m.variants[cbMode?'cb':'default']) return m.variants[cbMode?'cb':'default'];
+  return {url:m.url, colormap:m.colormap, legend:m.legend};
+}
+
+function setDataLayer(id){
+  _ensureDataPane();
+  if(_dataLayerObj){ try{map.removeLayer(_dataLayerObj);}catch(e){} _dataLayerObj=null; }
+  if(_mainLanduseShown && id!=='landuse'){ toggleMainLanduse(); }   // turn land use off
+  _dataLayer = id || "";
+  var opw = document.getElementById('data-layer-opacity-wrap');
+  var leg = document.getElementById('data-layer-legend');
+  if(leg){ leg.style.display='none'; leg.innerHTML=''; }
+  if(!_dataLayer){ if(opw) opw.style.display='none'; return; }
+
+  if(id==='landuse'){                       // reuse existing SANDAG land-use machinery
+    if(!_mainLanduseShown) toggleMainLanduse();
+    if(opw) opw.style.display='none';        // protomaps fill opacity is fixed
+    return;
+  }
+  if(opw) opw.style.display='';
+
+  if(id==='hosp_day'){
+    _dataLayerObj = buildHospChoropleth();
+    if(_dataLayerObj) _dataLayerObj.addTo(map);
+    renderDataLayerLegend('hosp_day');
+    return;
+  }
+  var meta = RASTER_META[id], v = rasterVariant(id);
+  if(!meta || !v){ if(leg){ leg.style.display='block'; leg.innerHTML='<i style="color:#999">layer unavailable</i>'; } return; }
+  var b = meta.bounds;
+  _dataLayerObj = L.imageOverlay(v.url, [[b.south,b.west],[b.north,b.east]],
+                                 {opacity:_dataLayerOpacity, pane:'landusePane'}).addTo(map);
+  renderDataLayerLegend(id);
+}
+
+function setDataLayerOpacity(pct){
+  _dataLayerOpacity = (+pct)/100;
+  var lbl = document.getElementById('data-layer-opacity-val'); if(lbl) lbl.textContent = pct+'%';
+  if(_dataLayerObj){
+    if(typeof _dataLayerObj.setOpacity==='function') _dataLayerObj.setOpacity(_dataLayerOpacity);
+    else if(typeof _dataLayerObj.setStyle==='function') _dataLayerObj.setStyle({fillOpacity:_dataLayerOpacity});
+  }
+}
+
+function _hospColor(v){
+  if(v==null||isNaN(v)) return '#cccccc';
+  var d=_hospDomain||[0,1], span=(d[1]-d[0])||1, t=Math.max(0,Math.min(1,(v-d[0])/span));
+  return toHex(interpC(HOSP_RAMP, t));
+}
+function buildHospChoropleth(){
+  if(typeof GJ==='undefined' || !GJ.features) return null;
+  var vals = GJ.features.map(function(f){return +f.properties.heat_hosp_day;}).filter(function(v){return !isNaN(v);});
+  if(!vals.length) return null;
+  vals.sort(function(a,b){return a-b;});
+  _hospDomain = [vals[0], vals[vals.length-1]];
+  return L.geoJSON(GJ,{pane:'landusePane',
+    style:function(f){return{fillColor:_hospColor(+f.properties.heat_hosp_day),color:'#fff',weight:0.3,fillOpacity:_dataLayerOpacity};},
+    onEachFeature:function(f,lyr){var v=+f.properties.heat_hosp_day;
+      lyr.bindPopup('<div style="font-size:11px"><b>Heat hospitalizations</b><br>Extreme-heat daytime rate ratio: '+(isNaN(v)?'n/a':v.toFixed(2))+'</div>');}
+  });
+}
+
+function renderDataLayerLegend(id){
+  var leg=document.getElementById('data-layer-legend'); if(!leg) return;
+  leg.style.display='block';
+  if(id==='hosp_day'){
+    var d=_hospDomain||[0,1];
+    var hstops=HOSP_RAMP.map(function(c){return 'rgb('+c.join(',')+')';}).join(',');
+    leg.innerHTML='<div style="font-weight:600;margin-bottom:2px">Heat hospitalizations</div>'+
+      '<div class="dt-lst-bar" style="background:linear-gradient(to right,'+hstops+')"></div>'+
+      '<div class="dt-lst-ticks"><span>'+d[0].toFixed(1)+'</span><span>rate ratio</span><span>'+d[1].toFixed(1)+'</span></div>';
+    return;
+  }
+  var meta=RASTER_META[id], v=rasterVariant(id);
+  if(!meta || !v){ leg.innerHTML=''; return; }
+  var label = meta.label || (id==='lst'?'Land surface temperature':id);
+  var units = meta.units || (id==='lst'?'annual mean':'');
+  var stops = v.legend || [];
+  var grad = stops.map(function(s){return 'rgb('+s.rgb.join(',')+')';}).join(',');
+  var lo = stops.length?stops[0].value:'', hi = stops.length?stops[stops.length-1].value:'';
+  leg.innerHTML='<div style="font-weight:600;margin-bottom:2px">'+label+
+    (units?' <span style="font-weight:400;color:#888">('+units+')</span>':'')+'</div>'+
+    '<div class="dt-lst-bar" style="background:linear-gradient(to right,'+grad+')"></div>'+
+    '<div class="dt-lst-ticks"><span>'+lo+'</span><span>'+hi+'</span></div>';
 }
 
 /* ---- Main-map land-use overlay ---- */
@@ -4895,6 +5045,13 @@ function _captureStudyAreaMap(opts){
         y+=bodySize+8;
         tribalRows.forEach(function(r){plan.push({op:'crow',y:y,label:r.label,color:r.color,dashed:r.dashed});y+=rowH;});
       }
+      if(unincorpOn){
+        y+=sectionGap;
+        plan.push({op:'sect',y:y,text:'Unincorporated'});
+        y+=bodySize+8;
+        plan.push({op:'crow',y:y,label:'Unincorporated county',color:UNINCORP_COLOR});
+        y+=rowH;
+      }
       var boxH=y+pad-4;
 
       var bx=TARGET_W-boxW-18, by=18;
@@ -5005,6 +5162,10 @@ function _captureStudyAreaMap(opts){
           drawFeature(f,fcolor(f.properties,idx),'#ffffff',0.5*SCALE,0.85);
         });
         if(clipFeats&&clipFeats.length)ctx.restore();
+      }
+      // Unincorporated region — above tracts, below city/tribal outlines (skipped on city-scoped exports)
+      if(!opts.jurisName&&typeof UNINCORP!=='undefined'&&UNINCORP&&typeof unincorpLayer!=='undefined'&&unincorpLayer&&map.hasLayer(unincorpLayer)){
+        UNINCORP.features.forEach(function(f){drawFeature(f,UNINCORP_COLOR,UNINCORP_COLOR,2*SCALE,0.08);});
       }
       // Jurisdiction outlines: just the focused city when scoped, else all visible
       if(typeof JURIS!=='undefined'&&JURIS){
@@ -5307,6 +5468,7 @@ function toggleCbMode(on){
       buildMiniMap('cmp-map-b','b',fB);
     }
   }
+  if(_dataLayer && RASTER_META[_dataLayer]) setDataLayer(_dataLayer);  // swap raster cb/default variant
 }
 
 /* ================================================================

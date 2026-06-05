@@ -865,6 +865,8 @@ details.pc-group[open]>summary::before{transform:rotate(90deg)}
 #legend .labels{display:flex;justify-content:space-between;font-size:10px;color:#888}
 .dl-row{display:flex;align-items:center;gap:6px;padding:1px 0}
 .dl-sw{width:12px;height:12px;border-radius:2px;flex-shrink:0}
+.tri-host{display:flex;justify-content:center;margin:5px 0 1px}
+.tri-host canvas{display:block}
 .info-ic{display:inline-flex;align-items:center;justify-content:center;
   width:15px;height:15px;border-radius:50%;background:#2563eb;color:#fff;
   font-size:11px;font-weight:700;font-style:italic;
@@ -2163,7 +2165,10 @@ function buildHospChoropleth(){
   return L.geoJSON(GJ,{pane:'landusePane',
     style:function(f){return{fillColor:_hospColor(+f.properties.heat_hosp_day),color:'#fff',weight:0.3,fillOpacity:_dataLayerOpacity};},
     onEachFeature:function(f,lyr){var v=+f.properties.heat_hosp_day;
-      lyr.bindPopup('<div style="font-size:11px"><b>Heat hospitalizations</b><br>Extreme-heat daytime rate ratio: '+(isNaN(v)?'n/a':v.toFixed(2))+'</div>');}
+      lyr.bindPopup('<div style="font-size:11px"><b>Heat hospitalizations</b><br>'+
+        'Standardized heat-day score: <b>'+(isNaN(v)?'n/a':v.toFixed(2))+'</b><br>'+
+        '<span style="color:#888">0 = county-area average; higher = more heat-day hospitalizations than typical</span><br>'+
+        '<span style="color:#888">ZIP-code resolution (CalHeatScore), shown per tract</span></div>');}
   });
 }
 
@@ -2175,7 +2180,8 @@ function renderDataLayerLegend(id){
     var hstops=HOSP_RAMP.map(function(c){return 'rgb('+c.join(',')+')';}).join(',');
     leg.innerHTML='<div style="font-weight:600;margin-bottom:2px">Heat hospitalizations</div>'+
       '<div class="dt-lst-bar" style="background:linear-gradient(to right,'+hstops+')"></div>'+
-      '<div class="dt-lst-ticks"><span>'+d[0].toFixed(1)+'</span><span>rate ratio</span><span>'+d[1].toFixed(1)+'</span></div>';
+      '<div class="dt-lst-ticks"><span>'+d[0].toFixed(1)+'</span><span>standardized score</span><span>'+d[1].toFixed(1)+'</span></div>'+
+      '<div style="font-size:9.5px;color:#888;margin-top:3px;line-height:1.3">0 = county-area average. ZIP-code resolution (CalHeatScore), shown per tract.</div>';
     return;
   }
   var meta=RASTER_META[id], v=rasterVariant(id);
@@ -3378,6 +3384,9 @@ function compute(){
       var aD=res.adaptive?(100-res.adaptive.scores[i]):0;
       pr._drv=(eS>=sS&&eS>=aD)?"exposure":(sS>=aD)?"sensitivity":"adaptive";
       pr._drvI=pr._comp/100;
+      // Per-pillar risk contributions (exposure, sensitivity, adaptive deficit)
+      // kept for the trivariate Driver Mix layer's barycentric blend.
+      pr._drvE=eS;pr._drvS=sS;pr._drvA=aD;
     }
     results=res;
     drawTracts();
@@ -3454,6 +3463,13 @@ function fcolor(pr,fi){
   if(curLayer==="driver"){var b=drgb[pr._drv]||[128,128,128];
     var intn=0.15+0.85*(pr._drvI||0.5);
     return toHex(b.map(function(c){return Math.round(255-intn*(255-c))}));}
+  if(curLayer==="drivermix"){
+    // Trivariate blend: white where the three drivers are balanced, each pillar
+    // hue toward its corner (see _triMix), then whitened by composite intensity
+    // (lighter = lower overall risk, matching the Dominant Driver layer).
+    var base=_triMix(pr._drvE||0,pr._drvS||0,pr._drvA||0,drgb);
+    var intnM=0.15+0.85*(pr._drvI||0.5);
+    return toHex(base.map(function(c){return Math.round(255-intnM*(255-c))}));}
   var m=curLayer.match(/^(exposure|sensitivity|adaptive)_pc(\\d+)$/);
   if(m){var v=pr["_"+m[1]+"_pc"+m[2]];if(v==null)return"#ccc";
     return toHex(interpC(pcc[m[1]]||cr,(v-2)/96));}
@@ -3528,6 +3544,56 @@ function drawTracts(){
 // throw ReferenceError and silently nuke the PC dropdown render.
 function ic(t){return ' <span class="info-ic" tabindex="0">i<span class="info-pop">'+t+'</span></span>';}
 
+// Trivariate (ternary) color for the Driver Mix layer. White at the centroid
+// (the three drivers contribute equally, so no single one dominates) and each
+// pillar's pure hue at its corner. We subtract the most-balanced share (min)
+// from each, so the "excess" measures how far one driver pulls ahead; the rest
+// is white. e,s,a are the raw per-pillar risk contributions; dg is pal('DRGB').
+function _triMix(e,s,a,dg){
+  var tot=e+s+a;
+  if(tot<1e-6)return[230,230,230];                 // no enabled drivers -> neutral
+  var we=e/tot,ws=s/tot,wa=a/tot,m=Math.min(we,ws,wa);
+  var xe=we-m,xs=ws-m,xa=wa-m,wt=3*m*255;          // wt = white share = (1-Σexcess)*255
+  return[wt+xe*dg.exposure[0]+xs*dg.sensitivity[0]+xa*dg.adaptive[0],
+         wt+xe*dg.exposure[1]+xs*dg.sensitivity[1]+xa*dg.adaptive[1],
+         wt+xe*dg.exposure[2]+xs*dg.sensitivity[2]+xa*dg.adaptive[2]];
+}
+
+// Render the trivariate colorbar for the Driver Mix layer: a triangle whose
+// corners are the three pillar hues and whose center is white, filled via
+// _triMix. Returns a fresh <canvas> at the requested backing size, so the same
+// routine serves both the live legend and the hi-res PNG/PDF export. Honors
+// cbMode via pal().
+function _triCanvas(w,h){
+  var dg=pal('DRGB');
+  var cv=document.createElement('canvas');cv.width=w;cv.height=h;
+  var c=cv.getContext('2d');
+  var fs=Math.max(9,Math.round(h*0.115));
+  var padT=fs+3,padB=fs+3,padX=Math.round(w*0.07);
+  var Ex=w/2,Ey=padT,Sx=padX,Sy=h-padB,Ax=w-padX,Ay=h-padB;       // E top, S bl, A br
+  var det=(Sy-Ay)*(Ex-Ax)+(Ax-Sx)*(Ey-Ay);
+  var img=c.createImageData(w,h),dt=img.data;
+  for(var py=0;py<h;py++){for(var px=0;px<w;px++){
+    var l1=((Sy-Ay)*(px-Ax)+(Ax-Sx)*(py-Ay))/det;                 // weight: exposure
+    var l2=((Ay-Ey)*(px-Ax)+(Ex-Ax)*(py-Ay))/det;                 // weight: sensitivity
+    var l3=1-l1-l2,o=(py*w+px)*4;                                 // weight: adaptive
+    if(l1>=-0.005&&l2>=-0.005&&l3>=-0.005){
+      var rgb=_triMix(l1,l2,l3,dg);                               // shares sum to 1 here
+      dt[o]=rgb[0];dt[o+1]=rgb[1];dt[o+2]=rgb[2];dt[o+3]=255;
+    }
+  }}
+  c.putImageData(img,0,0);
+  // Abbreviated corner labels, each in its pillar hue with a white halo.
+  c.font='700 '+fs+'px -apple-system,Segoe UI,Roboto,sans-serif';
+  c.lineWidth=Math.max(2,fs*0.28);c.strokeStyle='rgba(255,255,255,0.95)';c.lineJoin='round';
+  function lab(txt,x,y,align,base,rgb){c.textAlign=align;c.textBaseline=base;
+    c.strokeText(txt,x,y);c.fillStyle='rgb('+rgb.join(',')+')';c.fillText(txt,x,y);}
+  lab('Heat',Ex,1,'center','top',dg.exposure);
+  lab('Sens.',1,h-1,'left','bottom',dg.sensitivity);
+  lab('Adapt.',w-1,h-1,'right','bottom',dg.adaptive);
+  return cv;
+}
+
 function showLegend(){
   var el=document.getElementById("legend");
   // Raw variable preview legend
@@ -3572,6 +3638,13 @@ function showLegend(){
       '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.adaptive)+'"></div>Adaptive Capacity</div>'+
       '<div style="font-size:10px;color:#999;margin-top:3px;font-style:italic">Lighter = lower risk</div>';
     el.style.display="block";
+  }else if(curLayer==="drivermix"){
+    el.innerHTML='<div style="font-weight:600;margin-bottom:4px">Driver Mix'+ic('A trivariate blend: each tract mixes the three drivers in proportion to how much each adds to its risk &mdash; Heat Exposure, Population Sensitivity, and low Adaptive Capacity. Near a corner of the triangle one driver clearly dominates; a white or pale tract is driven about equally by all three, with no single dominant driver. Lightness also tracks overall composite risk (lighter = lower).')+'</div>'+
+      '<div class="tri-host"></div>'+
+      '<div style="font-size:10px;color:#999;margin-top:1px;font-style:italic">Corner = one dominant driver &middot; white = balanced mix &middot; lighter = lower risk</div>';
+    el.style.display="block";
+    var th=el.querySelector('.tri-host');
+    if(th){var tcv=_triCanvas(300,234);tcv.style.width='150px';tcv.style.height='117px';th.appendChild(tcv);}
   }else{
     var m=curLayer.match(/^(exposure|sensitivity|adaptive)_pc(\\d+)$/);
     if(m){var cs=pal('PCC')[m[1]]||pal('CR');
@@ -3785,7 +3858,8 @@ function _patternBlurb(r,k){
 function showLayerBtns(){
   var el=document.getElementById("layer-buttons"),html="";
   [{id:"composite",label:"Composite Risk",dot:"#bd0026"},
-   {id:"driver",label:"Dominant Driver",dot:"#2c3e50"}].forEach(function(b){
+   {id:"driver",label:"Dominant Driver",dot:"#2c3e50"},
+   {id:"drivermix",label:"Driver Mix",dot:"conic-gradient(#c0392b 0deg 120deg,#6a51a3 120deg 240deg,#16a052 240deg 360deg)"}].forEach(function(b){
     html+='<button class="lbtn'+(curLayer===b.id?" active":"")+'" onclick="setLyr(\\''+b.id+'\\')">'+
       '<span class="ldot" style="background:'+b.dot+'"></span>'+b.label+'</button>';});
   // Exposure mode score (its own map — exposure is a heat mode, not PCA patterns)
@@ -4736,6 +4810,7 @@ function _layerLabel(){
   if(curLayer==='composite')return'Composite Risk';
   if(curLayer==='exposure')return'Heat Exposure — '+((results&&results.exposure&&results.exposure.label)||'heat mode');
   if(curLayer==='driver')return'Dominant Driver';
+  if(curLayer==='drivermix')return'Driver Mix';
   var m=curLayer.match(/^(exposure|sensitivity|adaptive)_pc(\\d+)$/);
   if(m)return PMETA[m[1]].label+' — Pattern '+m[2];
   return curLayer;
@@ -4936,7 +5011,7 @@ function _captureStudyAreaMap(opts){
       var sl={'ssp245':'SSP2-4.5','ssp370':'SSP3-7.0','ssp585':'SSP5-8.5'};
       var title='', subtitle='', stops=null;
       var lowLabel='Low', highLabel='High';
-      var driverRows=null;
+      var driverRows=null, triMix=false;
 
       if(rawVar){
         if(typeof getDeltaArr==='function'&&getDeltaArr(rawVar)&&window._deltaRange){
@@ -4968,6 +5043,10 @@ function _captureStudyAreaMap(opts){
           {label:'Population Sensitivity',rgb:d.sensitivity},
           {label:'Adaptive Capacity',rgb:d.adaptive}
         ];
+      }else if(curLayer==='drivermix'){
+        title='Driver Mix';
+        subtitle=_scenarioLabel();
+        triMix=true;
       }else{
         var m=curLayer.match(/^(exposure|sensitivity|adaptive)_pc(\\d+)$/);
         if(m){
@@ -5031,6 +5110,13 @@ function _captureStudyAreaMap(opts){
       if(driverRows){
         driverRows.forEach(function(r){plan.push({op:'drow',y:y,label:r.label,rgb:r.rgb});y+=rowH;});
         plan.push({op:'note',y:y+2,text:'Lighter = lower risk'});
+        y+=subSize+8;
+      }
+      if(triMix){
+        var triLW=Math.min(gradW,150), triLH=Math.round(triLW*0.78);
+        plan.push({op:'triangle',y:y,w:triLW,h:triLH});
+        y+=triLH+6;
+        plan.push({op:'note',y:y,text:'Lighter = lower risk'});
         y+=subSize+8;
       }
       if(cityRows.length){
@@ -5105,6 +5191,8 @@ function _captureStudyAreaMap(opts){
         }else if(L.op==='note'){
           ctx.fillStyle='#94a3b8'; ctx.font=fonts.note;
           ctx.fillText(L.text, px*SCALE, py*SCALE);
+        }else if(L.op==='triangle'){
+          ctx.drawImage(_triCanvas(Math.round(L.w*SCALE),Math.round(L.h*SCALE)), px*SCALE, py*SCALE);
         }else if(L.op==='sect'){
           ctx.fillStyle='#0f172a'; ctx.font=fonts.sect;
           ctx.fillText(L.text, px*SCALE, py*SCALE);

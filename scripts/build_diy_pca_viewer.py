@@ -3477,6 +3477,104 @@ function fcolor(pr,fi){
 }
 
 /* ================================================================
+   TRACT POPUP RADAR
+   ================================================================ */
+// Sectored heat-vulnerability radar for the tract click popup. The circle is
+// split into three 120-degree wedges, one per pillar (tinted by PMETA color).
+// Each wedge holds one big "main" dot — the pillar score — plus four smaller
+// variable dots. Everything is a county percentile (0-100) from rawPct, and
+// adaptive-capacity values are plotted as DEFICITS (100 - percentile) so the
+// shape grows outward with risk in every wedge. Small dots carry a <title>
+// hover tooltip; short labels sit just outside the ring.
+var _RADAR_SECTORS=[
+  {pillar:'exposure',    label:'Heat Exposure', c:-90, scoreKey:'_exposure',    invScore:false, vars:[
+    {key:'mean_tmax',           s:'Day',   full:'Daytime heat',      inv:false},
+    {key:'mean_tmin_overnight', s:'Night', full:'Nighttime heat',    inv:false},
+    {key:'mean_lst',            s:'Surf',  full:'Surface temp',      inv:false},
+    {key:'p99_wbgt',            s:'Humid', full:'Humid heat (WBGT)', inv:false}]},
+  {pillar:'sensitivity', label:'Sensitivity',   c:30,  scoreKey:'_sensitivity', invScore:false, vars:[
+    {key:'EP_AGE65',   s:'65+',  full:'Seniors',            inv:false},
+    {key:'EP_AGE17',   s:'Kids', full:'Children',           inv:false},
+    {key:'RPL_THEMES', s:'SVI',  full:'Social Vuln. Index', inv:false},
+    {key:'EP_POV150',  s:'Pov',  full:'Poverty',            inv:false}]},
+  {pillar:'adaptive',    label:'Low Capacity',  c:150, scoreKey:'_adaptive',    invScore:true,  vars:[
+    {key:'ac_prob',           s:'AC',    full:'Low AC access',   inv:true},
+    {key:'treecanopy_pctile', s:'Tree',  full:'Low tree canopy', inv:true},
+    {key:'income_pctile',     s:'Inc',   full:'Low income',      inv:true},
+    {key:'pct_green',         s:'Green', full:'Low green space', inv:true}]}
+];
+// County percentile for one variable, flipped to a deficit when inv (capacity).
+function _radarPct(key,inv,fi){
+  var arr=rawPct[key]||[]; var b=(arr[fi]!=null)?arr[fi]:null;
+  return (b==null)?null:(inv?100-b:b);
+}
+function radarSVG(fi,pr){
+  var cx=180, cy=150, R=82, W=360, H=300, OFF=[-42,-18,18,42];
+  function P(deg,r){var a=deg*Math.PI/180;return[cx+r*Math.cos(a),cy+r*Math.sin(a)];}
+  function PX(deg,r){return P(deg,r)[0].toFixed(1);}
+  function PY(deg,r){return P(deg,r)[1].toFixed(1);}
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="288" height="240" xmlns="http://www.w3.org/2000/svg">';
+  s+='<style>text{font-family:-apple-system,BlinkMacSystemFont,sans-serif}</style>';
+  // tinted wedges (the "thirds")
+  _RADAR_SECTORS.forEach(function(sec){
+    var col=PMETA[sec.pillar]?PMETA[sec.pillar].color:'#888';
+    s+='<path d="M'+cx+','+cy+' L'+PX(sec.c-60,R)+','+PY(sec.c-60,R)+' A'+R+','+R+' 0 0 1 '+
+      PX(sec.c+60,R)+','+PY(sec.c+60,R)+' Z" fill="'+col+'" fill-opacity="0.07"/>';
+  });
+  // concentric ring guides + wedge boundary spokes
+  [0.25,0.5,0.75,1].forEach(function(f){
+    s+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(R*f).toFixed(1)+'" fill="none" stroke="#d9dce1" stroke-width="'+(f===1?1.2:1)+'"/>';
+  });
+  [-30,90,210].forEach(function(b){
+    s+='<line x1="'+cx+'" y1="'+cy+'" x2="'+PX(b,R)+'" y2="'+PY(b,R)+'" stroke="#cfd3d9" stroke-width="1"/>';
+  });
+  // per-sector fans, dots, labels
+  _RADAR_SECTORS.forEach(function(sec){
+    var col=PMETA[sec.pillar]?PMETA[sec.pillar].color:'#888';
+    var vp=sec.vars.map(function(v){return _radarPct(v.key,v.inv,fi);});
+    var score, sv=pr[sec.scoreKey];
+    if(sv!=null){score=sec.invScore?100-sv:sv;}
+    else{var sm=0,cn=0;for(var j=0;j<vp.length;j++)if(vp[j]!=null){sm+=vp[j];cn++;}score=cn?sm/cn:0;}
+    var pts=[
+      {deg:sec.c+OFF[0],pct:vp[0],main:false,vi:0},
+      {deg:sec.c+OFF[1],pct:vp[1],main:false,vi:1},
+      {deg:sec.c,       pct:score,main:true},
+      {deg:sec.c+OFF[2],pct:vp[2],main:false,vi:2},
+      {deg:sec.c+OFF[3],pct:vp[3],main:false,vi:3}
+    ];
+    pts.forEach(function(pt){
+      s+='<line x1="'+cx+'" y1="'+cy+'" x2="'+PX(pt.deg,R)+'" y2="'+PY(pt.deg,R)+'" stroke="'+col+
+        '" stroke-opacity="'+(pt.main?0.35:0.16)+'" stroke-width="'+(pt.main?1.4:1)+'"/>';
+    });
+    var poly=[cx.toFixed(1)+','+cy.toFixed(1)];
+    pts.forEach(function(pt){var pc=(pt.pct==null?0:pt.pct);poly.push(PX(pt.deg,R*pc/100)+','+PY(pt.deg,R*pc/100));});
+    s+='<polygon points="'+poly.join(' ')+'" fill="'+col+'" fill-opacity="0.22" stroke="'+col+
+      '" stroke-width="1.4" stroke-linejoin="round"/>';
+    pts.forEach(function(pt){
+      var pc=(pt.pct==null?0:pt.pct), title;
+      if(pt.main){title=sec.label+' score: '+Math.round(pc);}
+      else{
+        var vd=sec.vars[pt.vi], rv=pr[vd.key];
+        var rs=(!vd.inv && rv!=null && !isNaN(rv))?(': '+fmtCmpRaw(vd.key,rv)):'';
+        title=vd.full+rs+' ('+(pt.pct==null?'n/a':Math.round(pt.pct)+' pctile')+')';
+      }
+      s+='<circle cx="'+PX(pt.deg,R*pc/100)+'" cy="'+PY(pt.deg,R*pc/100)+'" r="'+(pt.main?5.5:2.9)+
+        '" fill="'+col+'" stroke="#fff" stroke-width="'+(pt.main?1.4:1)+'"><title>'+title+'</title></circle>';
+      if(!pt.main){
+        var ca=Math.cos(pt.deg*Math.PI/180), anc=Math.abs(ca)<0.30?'middle':(ca>0?'start':'end');
+        s+='<text x="'+PX(pt.deg,R+11)+'" y="'+(P(pt.deg,R+11)[1]+3).toFixed(1)+'" text-anchor="'+anc+
+          '" font-size="10" font-weight="600" fill="'+col+'" fill-opacity="0.9">'+sec.vars[pt.vi].s+'</text>';
+      }
+    });
+    var cam=Math.cos(sec.c*Math.PI/180), anc2=Math.abs(cam)<0.30?'middle':(cam>0?'start':'end'), mp=P(sec.c,R+22);
+    s+='<text text-anchor="'+anc2+'">'+
+      '<tspan x="'+mp[0].toFixed(1)+'" y="'+mp[1].toFixed(1)+'" font-size="11.5" font-weight="700" fill="'+col+'">'+sec.label+'</tspan>'+
+      '<tspan x="'+mp[0].toFixed(1)+'" y="'+(mp[1]+12).toFixed(1)+'" font-size="11.5" font-weight="700" fill="#374151">'+Math.round(score)+'</tspan></text>';
+  });
+  return s+'</svg>';
+}
+
+/* ================================================================
    MAP DRAW
    ================================================================ */
 function drawTracts(){
@@ -3516,17 +3614,20 @@ function drawTracts(){
           h+=(varLabel[rawVar]||rawVar)+': '+(rv!=null?rv:'—')+'<br>';
         }
       }else{
-        if(p._comp!=null) h+='Composite: '+p._comp.toFixed(1)+'<br>';
-        if(p._exposure!=null) h+='Heat Exposure: '+p._exposure.toFixed(1)+'<br>';
-        if(p._sensitivity!=null) h+='Population Sensitivity: '+p._sensitivity.toFixed(1)+'<br>';
-        if(p._adaptive!=null) h+='Adaptive Cap: '+p._adaptive.toFixed(1)+'<br>';
+        if(p._comp!=null){
+          var _pc=_dtRiskColor(p._comp);
+          h+='<div style="display:inline-block;margin:2px 0 4px;font-size:11px;font-weight:600;'+
+            'padding:3px 9px;border-radius:999px;color:#fff;background:'+_pc+'">Composite risk '+
+            p._comp.toFixed(0)+'/100</div>';
+        }
+        h+='<div style="margin:2px 0 0;text-align:center">'+radarSVG(fi,p)+'</div>';
       }
       h+='<div class="popup-btn-row">'+
         '<button class="popup-more-btn" onclick="map.closePopup();openDetailDrawer(\\''+p.GEOID+'\\')">Show more info \\u25b8</button>'+
         '<button class="popup-compare-btn" onclick="startCompare(\\''+p.GEOID+'\\')">Compare with another tract</button>'+
       '</div>';
       h+='</div>';
-      lyr.bindPopup(h);
+      lyr.bindPopup(h,{maxWidth:320,minWidth:300});
     }
   }).addTo(map);
   // Keep overlays on top of tracts: unincorporated region first (lowest), then

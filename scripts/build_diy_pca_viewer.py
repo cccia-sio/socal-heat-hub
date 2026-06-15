@@ -3484,24 +3484,26 @@ function fcolor(pr,fi){
 // Each wedge holds one big "main" dot — the pillar score — plus four smaller
 // variable dots. Everything is a county percentile (0-100) from rawPct, and
 // adaptive-capacity values are plotted as DEFICITS (100 - percentile) so the
-// shape grows outward with risk in every wedge. Small dots carry a <title>
-// hover tooltip; short labels sit just outside the ring.
+// shape grows outward with risk in every wedge. Each variable label shows its
+// name plus a value the popup's Percentile/Value toggle switches between the
+// county percentile rank and the real-world reading; dots also carry a <title>.
+var radarValMode='pct';   // 'pct' = percentile rank, 'abs' = real-world value
 var _RADAR_SECTORS=[
   {pillar:'exposure',    label:'Heat Exposure', c:-90, scoreKey:'_exposure',    invScore:false, vars:[
-    {key:'mean_tmax',           s:'Day',   full:'Daytime heat',      inv:false},
-    {key:'mean_tmin_overnight', s:'Night', full:'Nighttime heat',    inv:false},
-    {key:'mean_lst',            s:'Surf',  full:'Surface temp',      inv:false},
-    {key:'p99_wbgt',            s:'Humid', full:'Humid heat (WBGT)', inv:false}]},
+    {key:'mean_tmax',           s:'Daytime',   full:'Daytime heat',      inv:false},
+    {key:'mean_tmin_overnight', s:'Nighttime', full:'Nighttime heat',    inv:false},
+    {key:'mean_lst',            s:'Surface',   full:'Surface temp',      inv:false},
+    {key:'p99_wbgt',            s:'Humid',     full:'Humid heat (WBGT)', inv:false}]},
   {pillar:'sensitivity', label:'Sensitivity',   c:30,  scoreKey:'_sensitivity', invScore:false, vars:[
-    {key:'EP_AGE65',   s:'65+',  full:'Seniors',            inv:false},
-    {key:'EP_AGE17',   s:'Kids', full:'Children',           inv:false},
-    {key:'RPL_THEMES', s:'SVI',  full:'Social Vuln. Index', inv:false},
-    {key:'EP_POV150',  s:'Pov',  full:'Poverty',            inv:false}]},
+    {key:'EP_AGE65',   s:'Seniors',  full:'Seniors',            inv:false},
+    {key:'EP_AGE17',   s:'Children', full:'Children',           inv:false},
+    {key:'RPL_THEMES', s:'SVI',      full:'Social Vuln. Index', inv:false},
+    {key:'EP_POV150',  s:'Poverty',  full:'Poverty',            inv:false}]},
   {pillar:'adaptive',    label:'Low Capacity',  c:150, scoreKey:'_adaptive',    invScore:true,  vars:[
-    {key:'ac_prob',           s:'AC',    full:'Low AC access',   inv:true},
-    {key:'treecanopy_pctile', s:'Tree',  full:'Low tree canopy', inv:true},
-    {key:'income_pctile',     s:'Inc',   full:'Low income',      inv:true},
-    {key:'pct_green',         s:'Green', full:'Low green space', inv:true}]}
+    {key:'ac_prob',           s:'AC',         full:'Low AC access',   inv:true},
+    {key:'treecanopy_pctile', s:'Canopy',     full:'Low tree canopy', inv:true},
+    {key:'income_pctile',     s:'Income',     full:'Low income',      inv:true},
+    {key:'pct_green',         s:'Greenspace', full:'Low green space', inv:true}]}
 ];
 // County percentile for one variable, flipped to a deficit when inv (capacity).
 function _radarPct(key,inv,fi){
@@ -3509,11 +3511,11 @@ function _radarPct(key,inv,fi){
   return (b==null)?null:(inv?100-b:b);
 }
 function radarSVG(fi,pr){
-  var cx=180, cy=150, R=82, W=360, H=300, OFF=[-42,-18,18,42];
+  var cx=200, cy=158, R=84, W=400, H=320, OFF=[-42,-18,18,42];
   function P(deg,r){var a=deg*Math.PI/180;return[cx+r*Math.cos(a),cy+r*Math.sin(a)];}
   function PX(deg,r){return P(deg,r)[0].toFixed(1);}
   function PY(deg,r){return P(deg,r)[1].toFixed(1);}
-  var s='<svg viewBox="0 0 '+W+' '+H+'" width="288" height="240" xmlns="http://www.w3.org/2000/svg">';
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="336" height="269" xmlns="http://www.w3.org/2000/svg">';
   s+='<style>text{font-family:-apple-system,BlinkMacSystemFont,sans-serif}</style>';
   // tinted wedges (the "thirds")
   _RADAR_SECTORS.forEach(function(sec){
@@ -3551,27 +3553,44 @@ function radarSVG(fi,pr){
     s+='<polygon points="'+poly.join(' ')+'" fill="'+col+'" fill-opacity="0.22" stroke="'+col+
       '" stroke-width="1.4" stroke-linejoin="round"/>';
     pts.forEach(function(pt){
-      var pc=(pt.pct==null?0:pt.pct), title;
-      if(pt.main){title=sec.label+' score: '+Math.round(pc);}
-      else{
-        var vd=sec.vars[pt.vi], rv=pr[vd.key];
-        var rs=(!vd.inv && rv!=null && !isNaN(rv))?(': '+fmtCmpRaw(vd.key,rv)):'';
-        title=vd.full+rs+' ('+(pt.pct==null?'n/a':Math.round(pt.pct)+' pctile')+')';
+      var pc=(pt.pct==null?0:pt.pct);
+      if(pt.main){
+        s+='<circle cx="'+PX(pt.deg,R*pc/100)+'" cy="'+PY(pt.deg,R*pc/100)+'" r="5.5" fill="'+col+
+          '" stroke="#fff" stroke-width="1.4"><title>'+sec.label+' score: '+Math.round(pc)+'</title></circle>';
+        return;
       }
-      s+='<circle cx="'+PX(pt.deg,R*pc/100)+'" cy="'+PY(pt.deg,R*pc/100)+'" r="'+(pt.main?5.5:2.9)+
-        '" fill="'+col+'" stroke="#fff" stroke-width="'+(pt.main?1.4:1)+'"><title>'+title+'</title></circle>';
-      if(!pt.main){
-        var ca=Math.cos(pt.deg*Math.PI/180), anc=Math.abs(ca)<0.30?'middle':(ca>0?'start':'end');
-        s+='<text x="'+PX(pt.deg,R+11)+'" y="'+(P(pt.deg,R+11)[1]+3).toFixed(1)+'" text-anchor="'+anc+
-          '" font-size="10" font-weight="600" fill="'+col+'" fill-opacity="0.9">'+sec.vars[pt.vi].s+'</text>';
-      }
+      var vd=sec.vars[pt.vi], rv=pr[vd.key];
+      var rs=(!vd.inv && rv!=null && !isNaN(rv))?(': '+fmtCmpRaw(vd.key,rv)):'';
+      var title=vd.full+rs+' ('+(pt.pct==null?'n/a':Math.round(pt.pct)+' pctile')+')';
+      s+='<circle cx="'+PX(pt.deg,R*pc/100)+'" cy="'+PY(pt.deg,R*pc/100)+'" r="2.9" fill="'+col+
+        '" stroke="#fff" stroke-width="1"><title>'+title+'</title></circle>';
+      var ca=Math.cos(pt.deg*Math.PI/180), anc=Math.abs(ca)<0.30?'middle':(ca>0?'start':'end');
+      var lx=PX(pt.deg,R+12), ly=P(pt.deg,R+12)[1];
+      var valStr=(radarValMode==='abs')?fmtCmpRaw(vd.key,rv):(pt.pct==null?'-':String(Math.round(pt.pct)));
+      s+='<text x="'+lx+'" y="'+(ly-1).toFixed(1)+'" text-anchor="'+anc+'" font-size="9.5" font-weight="700" fill="'+col+'">'+vd.s+'</text>';
+      s+='<text x="'+lx+'" y="'+(ly+9).toFixed(1)+'" text-anchor="'+anc+'" font-size="9" font-weight="500" fill="#6b7280">'+valStr+'</text>';
     });
-    var cam=Math.cos(sec.c*Math.PI/180), anc2=Math.abs(cam)<0.30?'middle':(cam>0?'start':'end'), mp=P(sec.c,R+22);
-    s+='<text text-anchor="'+anc2+'">'+
-      '<tspan x="'+mp[0].toFixed(1)+'" y="'+mp[1].toFixed(1)+'" font-size="11.5" font-weight="700" fill="'+col+'">'+sec.label+'</tspan>'+
-      '<tspan x="'+mp[0].toFixed(1)+'" y="'+(mp[1]+12).toFixed(1)+'" font-size="11.5" font-weight="700" fill="#374151">'+Math.round(score)+'</tspan></text>';
+    var cam=Math.cos(sec.c*Math.PI/180), anc2=Math.abs(cam)<0.30?'middle':(cam>0?'start':'end'), mp=P(sec.c,R+26);
+    s+='<text x="'+mp[0].toFixed(1)+'" y="'+mp[1].toFixed(1)+'" text-anchor="'+anc2+'" font-size="11.5" font-weight="700">'+
+      '<tspan fill="'+col+'">'+sec.label+' </tspan><tspan fill="#374151">'+Math.round(score)+'</tspan></text>';
   });
   return s+'</svg>';
+}
+// Segmented-button styles for the in-popup Percentile/Value toggle.
+function _hvtgStyle(active,side){
+  return 'border:1px solid #cbd5e1;font-family:inherit;font-size:10.5px;font-weight:600;'+
+    'padding:3px 12px;cursor:pointer;'+
+    (side==='l'?'border-radius:6px 0 0 6px;border-right:none;':'border-radius:0 6px 6px 0;')+
+    (active?'background:#2563eb;color:#fff;border-color:#2563eb;':'background:#fff;color:#475569;');
+}
+// Flip the radar between percentile and real-value labels, re-rendering in place.
+function setRadarMode(m){
+  radarValMode=m;
+  var holder=document.getElementById('hv-radar-holder');
+  if(holder){var fi=+holder.getAttribute('data-fi'); var f=GJ.features[fi]; if(f) holder.innerHTML=radarSVG(fi,f.properties);}
+  var a=document.getElementById('hv-tg-pct'), b=document.getElementById('hv-tg-abs');
+  if(a) a.style.cssText=_hvtgStyle(m==='pct','l');
+  if(b) b.style.cssText=_hvtgStyle(m==='abs','r');
 }
 
 /* ================================================================
@@ -3620,14 +3639,18 @@ function drawTracts(){
             'padding:3px 9px;border-radius:999px;color:#fff;background:'+_pc+'">Composite risk '+
             p._comp.toFixed(0)+'/100</div>';
         }
-        h+='<div style="margin:2px 0 0;text-align:center">'+radarSVG(fi,p)+'</div>';
+        h+='<div style="display:flex;justify-content:center;margin:8px 0 2px">'+
+          '<button id="hv-tg-pct" onclick="setRadarMode(\\'pct\\')" style="'+_hvtgStyle(radarValMode==='pct','l')+'">Percentile</button>'+
+          '<button id="hv-tg-abs" onclick="setRadarMode(\\'abs\\')" style="'+_hvtgStyle(radarValMode==='abs','r')+'">Value</button>'+
+        '</div>';
+        h+='<div id="hv-radar-holder" data-fi="'+fi+'" style="text-align:center">'+radarSVG(fi,p)+'</div>';
       }
       h+='<div class="popup-btn-row">'+
         '<button class="popup-more-btn" onclick="map.closePopup();openDetailDrawer(\\''+p.GEOID+'\\')">Show more info \\u25b8</button>'+
         '<button class="popup-compare-btn" onclick="startCompare(\\''+p.GEOID+'\\')">Compare with another tract</button>'+
       '</div>';
       h+='</div>';
-      lyr.bindPopup(h,{maxWidth:320,minWidth:300});
+      lyr.bindPopup(h,{maxWidth:360,minWidth:344});
     }
   }).addTo(map);
   // Keep overlays on top of tracts: unincorporated region first (lowest), then

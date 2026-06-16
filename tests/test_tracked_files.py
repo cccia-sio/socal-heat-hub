@@ -15,13 +15,15 @@ import pytest
 ALLOWED_SCRIPT_FILES = {
     "build_diy_pca_viewer.py",
     "build_lst_overlay.py",
+    "build_data_overlays.py",
     "build_userguide_pdf.sh",
 }
 
-# Tracked data files. The landsat directory is wholly tracked; other entries
-# are explicit allow-listed singletons (see .gitignore).
+# Tracked data files. The landsat and context/overlays directories are wholly
+# tracked; other entries are explicit allow-listed singletons (see .gitignore).
 ALLOWED_DATA_PREFIXES = (
     "data/exposure/processed/landsat/",
+    "data/context/overlays/",
 )
 ALLOWED_DATA_FILES = {
     "data/context/sandag_landuse.pmtiles",

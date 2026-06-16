@@ -6,40 +6,49 @@ is built and deployed.
 ## What the repo ships
 
 The public artifact is a static GitHub Pages site at
-`https://cccia-sio.github.io/socal-heat-hub/`. Three pages:
+`https://cccia-sio.github.io/socal-heat-hub/`. Linked pages:
 
 - `/` — landing page (`index.html`).
 - `/main/heat_risk_map.html` — the interactive heat-risk viewer (single self-contained HTML).
 - `/userguide/` — plain-language user guide (`userguide/index.html`).
 
-The viewer runs entirely in the browser. There is no backend, no API, and no
-runtime data fetching beyond the Leaflet basemap tiles.
+One more page deploys but is **not linked from the landing nav**:
+
+- `/main/hospitalizations.html` — standalone "Heat-attributable hospitalizations
+  by ZIP" viewer. (Distinct from the tract-level "Heat hospitalizations" Data
+  Layer inside the main viewer.) It ships only because it's tracked under
+  `main/`; if it isn't meant to be public, untrack it.
+
+The viewers run entirely in the browser. There is no backend, no API, and no
+runtime data fetching beyond the Leaflet basemap tiles and the deployed
+PNG / PMTiles overlays.
 
 ## What's tracked vs. what's not
 
-`.gitignore` excludes the entire **build pipeline** — `scripts/` and `data/`
-live on disk locally but are never committed. Only the **rendered**
-deliverables ship to the repo. This keeps the public surface small (one HTML
-file per page) and avoids publishing raw source data.
+`.gitignore` treats `scripts/` and `data/` as **allow-lists**, not blanket
+excludes: everything under them is ignored *except* a named set of build scripts
+and rendered data products, which are committed and deployed. Raw source data
+(CSV / GeoJSON / GeoTIFF inputs) and local-only tooling stay on disk and never
+ship.
 
-```
-git ls-files                           gitignored (local-only)
-─────────────                          ────────────────────────
-.github/workflows/pages.yml            scripts/build_diy_pca_viewer.py
-.gitignore                             scripts/build_lst_overlay.py
-.nojekyll                              scripts/build_userguide_pdf.sh
-README.md                              data/**
-ARCHITECTURE.md (this file)            __pycache__/
-index.html                             .venv/, venv/
-main/heat_risk_map.html         ◄── built    *.aux, *.log, *.out, *.toc (LaTeX)
-userguide/index.html                   .DS_Store, .vscode/, .idea/
-docs/userguide/*.pdf, *.tex
-docs/writing_guidelines/*.md
-assets/{ccsd,sio,usd-...}.png
-```
+**Tracked build scripts** (un-ignored via `!scripts/...`):
+`build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`,
+`build_userguide_pdf.sh`. Everything else in `scripts/` is local-only.
 
-The GitHub Pages workflow further excludes `scripts/` and `data/` at deploy
-time (belt-and-suspenders — see `.github/workflows/pages.yml`).
+**Tracked data products** (un-ignored via `!data/...`):
+`data/exposure/processed/landsat/` (LST overlay PNGs + bounds JSON),
+`data/context/sandag_landuse.pmtiles`, and `data/context/overlays/` (Data-Layer
+raster PNGs + bounds JSON). All other `data/**` is local-only.
+
+Also tracked at the root: `CLAUDE.md`, `pytest.ini`, `tests/`, plus `docs/`,
+`assets/`, and the site pages. **Gitignored local-only:** raw `data/` inputs,
+non-allow-listed `scripts/`, `literature/` (the research corpus — see below),
+`__pycache__/`, `.venv/`, LaTeX aux files, `.DS_Store`, editor dirs, and
+`decks/`.
+
+The GitHub Pages workflow re-applies the same allow-list at deploy time through
+its rsync include/exclude rules (belt-and-suspenders — see
+`.github/workflows/pages.yml` and the **Deployment** section below).
 
 ## Top-level layout
 
@@ -48,43 +57,60 @@ socal-heat-hub/
 ├── index.html                ← landing page
 ├── README.md                 ← short project blurb + launch link
 ├── ARCHITECTURE.md           ← this file
+├── CLAUDE.md                 ← repo conventions for Claude Code
+├── pytest.ini                ← test config
 ├── .nojekyll                 ← tells GitHub Pages to skip Jekyll processing
 ├── .gitignore
 │
 ├── main/
-│   └── heat_risk_map.html          ← the viewer (built; ~2.3 MB single-file HTML)
+│   ├── heat_risk_map.html         ← the viewer (built; single-file HTML)
+│   └── hospitalizations.html      ← standalone hospitalizations-by-ZIP viewer (built)
 │
 ├── userguide/
-│   └── index.html            ← user guide page
+│   ├── index.html            ← user guide page
+│   └── figure_*.png          ← figures embedded in the guide
 │
-├── assets/                   ← logos shown in the viewer's top-right card
-│   ├── ccsd_logo.png         ← Climate Collaborative — San Diego Region
-│   ├── sio_logo.png          ← UC San Diego / Scripps Institution of Oceanography
-│   └── usd-logo-horizontal.png ← University of San Diego
+├── assets/                   ← logos (viewer top-right card) + comment PDFs
 │
-├── docs/                     ← ancillary docs (not part of the deployed site root)
-│   ├── userguide/
-│   │   ├── user_guide_external.pdf  ← printable PDF rendered from userguide/index.html
-│   │   ├── userguide.tex            ← LaTeX source of an earlier PDF version
-│   │   └── userguide.pdf, *.aux/.log/.out/.toc
-│   └── writing_guidelines/
-│       ├── AvoidAIWritingPatterns.md
-│       └── ScientificAIWritingGuardrails.md
+├── tests/                    ← (tracked) pytest suite guarding build output & deploy config
+│   ├── conftest.py
+│   ├── test_build_script.py        ← build script constants / invariants
+│   ├── test_generated_html.py      ← generated viewer has expected structure
+│   ├── test_landsat_assets.py      ← LST overlay PNGs + bounds present/valid
+│   ├── test_pages_workflow.py      ← pages.yml include/exclude rules
+│   ├── test_static_links.py        ← internal links resolve
+│   └── test_tracked_files.py       ← gitignore allow-list stays correct
+│
+├── docs/                     ← ancillary docs (deployed, but not linked from nav)
+│   ├── userguide/            ← external/draft PDFs + older LaTeX guide
+│   ├── pca_overview/         ← LaTeX beamer deck + figures on the PCA method
+│   ├── writing_guidelines/   ← AI-writing guardrail notes
+│   └── uhi_index_methodology.md
 │
 ├── .github/
 │   └── workflows/
 │       └── pages.yml         ← deploys to GitHub Pages on push to main
 │
-├── scripts/                  ← (gitignored) build pipeline
-│   ├── build_diy_pca_viewer.py     ← main builder: data → main/heat_risk_map.html
-│   ├── build_lst_overlay.py        ← Landsat LST → PNG overlay + bounds JSON
-│   └── build_userguide_pdf.sh      ← userguide/index.html → docs/userguide/*.pdf
+├── scripts/                  ← build pipeline (allow-listed scripts tracked; rest local-only)
+│   ├── build_diy_pca_viewer.py    ← [tracked] main builder → main/heat_risk_map.html
+│   ├── build_lst_overlay.py       ← [tracked] Landsat LST → PNG overlay + bounds JSON
+│   ├── build_data_overlays.py     ← [tracked] Data-Layer rasters → data/context/overlays/
+│   ├── build_userguide_pdf.sh     ← [tracked] userguide/index.html → docs/userguide PDF
+│   └── …                          ← (local-only) slide/figure builders, data fetchers, mockups
 │
-└── data/                     ← (gitignored) source data for the build pipeline
-    ├── exposure/
-    ├── sensitivity/
-    ├── adaptive_capacity/
-    └── context/
+├── data/                     ← source data + rendered products (only allow-listed products tracked)
+│   ├── exposure/
+│   │   ├── raw/, processed/…        ← raw inputs (local-only)
+│   │   └── processed/landsat/       ← [tracked] LST overlay PNGs + bounds JSON
+│   ├── sensitivity/                 ← raw inputs (local-only)
+│   ├── adaptive_capacity/           ← raw inputs (local-only)
+│   └── context/
+│       ├── overlays/                ← [tracked] Data-Layer PNGs + bounds JSON
+│       └── sandag_landuse.pmtiles   ← [tracked] SANDAG land-use vector tiles
+│
+└── literature/               ← (gitignored) markdown RAG corpus — see "Literature corpus"
+    ├── INDEX.md  TAXONOMY.md  README.md  build_index.py  refs.bib
+    └── sources/  pdfs/  reports/  synthesis/
 ```
 
 ## The viewer build pipeline
@@ -106,22 +132,28 @@ What it does (top-down through the script):
    - `DELTA_VAR_MAP` — which DIY-PCA variables receive a `tasmax`/`tasmin` delta
    - `VARIABLES` — the canonical list of `(key, label, pillar, subsection)` tuples
    - `VAR_SOURCES` — per-variable source URLs displayed in the legend
-2. **`load_data()`** (lines ~267–382) — reads each CSV under `data/`, joins on
-   `GEOID`, imputes NaN with the column median, simplifies geometry, returns
-   one GeoDataFrame keyed by tract.
-3. **`compute_tract_deltas(tracts)`** (lines ~385–452) — interpolates LOCA2
+2. **`load_data()`** (lines ~334–495) — reads each CSV under `data/`, joins on
+   `GEOID` (via the `_safe_merge` helper), imputes NaN with the column median,
+   simplifies geometry, returns one GeoDataFrame keyed by tract.
+3. **`compute_tract_deltas(tracts)`** (lines ~497–565) — interpolates LOCA2
    ensemble `.nc` deltas to tract centroids; returns
    `{period: {ssp: {var: [delta_per_tract]}}}`.
-4. **`main()`** (lines ~455–527) — serializes everything to JSON, splices it
-   into the `HTML_TEMPLATE` string at `__GEOJSON_PLACEHOLDER__`,
-   `__VARMETA_PLACEHOLDER__`, `__VARSOURCES_PLACEHOLDER__`,
-   `__DELTAS_PLACEHOLDER__`, `__DELTAMAP_PLACEHOLDER__`,
-   `__JURIS_PLACEHOLDER__`, `__LST_PLACEHOLDER__`, `__POLARITY_PLACEHOLDER__`,
-   and writes the result to `main/heat_risk_map.html`.
-5. **`HTML_TEMPLATE`** (lines ~533–end) — a single triple-quoted string
-   containing the full HTML, CSS, and JavaScript for the viewer (Leaflet UI,
-   client-side PCA via Jacobi eigendecomposition, choropleth rendering, the
-   compare-two-tracts modal, the legend, etc.).
+4. **`main()`** (lines ~567–715) — serializes everything to JSON and splices it
+   into the `HTML_TEMPLATE` string at the `__*_PLACEHOLDER__` tokens, then writes
+   the result to `main/heat_risk_map.html`. The 15 placeholders group as:
+   - tract data & polarity: `__GEOJSON_PLACEHOLDER__`, `__VARMETA_PLACEHOLDER__`,
+     `__VARSOURCES_PLACEHOLDER__`, `__POLARITY_PLACEHOLDER__`
+   - climate deltas: `__DELTAS_PLACEHOLDER__`, `__DELTAMAP_PLACEHOLDER__`
+   - boundary / point overlays: `__JURIS_PLACEHOLDER__`,
+     `__UNINCORP_PLACEHOLDER__`, `__TRIBAL_PLACEHOLDER__`,
+     `__COOLZONES_PLACEHOLDER__` (county cool-zone sites)
+   - raster-overlay bounds (shape matches the LST sidecar): `__LST_PLACEHOLDER__`,
+     `__POP_PLACEHOLDER__`, `__IMPERVIOUS_PLACEHOLDER__`, `__CANOPY_PLACEHOLDER__`
+   - preset layer bundles: `__HEATMODES_PLACEHOLDER__` (from the `HEAT_MODES` list)
+5. **`HTML_TEMPLATE`** (lines ~718–end; the file is ~6,340 lines total) — a single
+   triple-quoted string containing the full HTML, CSS, and JavaScript for the
+   viewer (Leaflet UI, client-side PCA via Jacobi eigendecomposition, choropleth
+   rendering, the compare-two-tracts modal, the legend, etc.).
 
 ### Editing the viewer
 
@@ -156,12 +188,35 @@ data/exposure/processed/landsat/
 inlines the bounds + legend into the viewer. The PNGs are fetched at runtime
 by the browser (relative paths to `data/exposure/processed/landsat/`).
 
-The relative path means **the LST PNGs are deployed alongside the HTML**,
-even though the rest of `data/` is excluded — see the rsync exclude list in
-`.github/workflows/pages.yml`. (Currently the workflow excludes all of
-`data/`, so LST overlays only show in local development. If overlays should
-ship to production, the workflow needs an explicit include for
-`data/exposure/processed/landsat/`.)
+The relative path means **the LST PNGs are deployed alongside the HTML**, even
+though the rest of `data/` is excluded: `pages.yml` explicitly includes
+`data/exposure/processed/landsat/**` ahead of the catch-all `data/**` exclude,
+so the overlays ship to production. (rsync is "first match wins" — the includes
+must precede the exclude; don't reorder them. The same applies to the Data-Layer
+overlays and the PMTiles file below.)
+
+## The Data-Layer overlays pipeline
+
+`scripts/build_data_overlays.py` renders the viewer's informational "Data Layers"
+context rasters to `data/context/overlays/` as EPSG:4326 RGBA PNGs (default +
+colorblind variant) plus a `*_bounds.json` sidecar whose shape matches
+`build_lst_overlay.py`'s output, so the viewer consumes them through the same
+code path (the `__POP_/__IMPERVIOUS_/__CANOPY_PLACEHOLDER__` bounds + relative
+PNG fetch).
+
+```
+scripts/build_data_overlays.py
+   ↓
+data/context/overlays/
+   ├── population_4326.png / _cb.png / population_bounds.json   ← EPA EnviroAtlas dasymetric 2020 (log-scaled)
+   ├── impervious_4326.png / _cb.png / impervious_bounds.json   ← heat-risk-sd NLCD impervious_100m.tif
+   └── canopy_4326.png / _cb.png / canopy_bounds.json           ← heat-risk-sd NLCD treecanopy_100m.tif
+```
+
+Population self-downloads from the EPA EnviroAtlas ImageServer (cached locally
+under `data/context/population/`, gitignored). Impervious and canopy read the
+sibling `heat-risk-sd` repo, located via `$HEAT_RISK_SD_DIR` or fallback
+candidate paths. Only the PNG + JSON products are committed and deployed.
 
 ## The user guide PDF pipeline
 
@@ -215,9 +270,17 @@ data/
 │   └── building_age/
 │       └── acs_b25034_year_built_sd_tracts.csv ← pct_pre1980, pct_pre1960
 │
-└── context/
-    ├── Land_Use_2023_20260313.csv           ← reference data, not currently merged
-    └── tract_exploration.csv                ← pct_green
+├── context/
+│   ├── overlays/                            ← [tracked, deployed] Data-Layer PNGs + bounds JSON
+│   │   ├── population_4326{,_cb}.png + population_bounds.json
+│   │   ├── impervious_4326{,_cb}.png + impervious_bounds.json
+│   │   └── canopy_4326{,_cb}.png + canopy_bounds.json
+│   ├── sandag_landuse.pmtiles               ← [tracked, deployed] SANDAG land-use vector tiles
+│   ├── Land_Use_2023_20260313.csv           ← reference data, not currently merged
+│   └── tract_exploration.csv                ← pct_green
+│
+└── cool_zones/
+    └── coolzone_sites.csv                   ← county cool-zone sites (COOLZONES overlay)
 ```
 
 The mapping from CSV columns → variables shown in the viewer is in
@@ -260,18 +323,81 @@ scenario-adjustment math runs entirely in JavaScript at viewer runtime
 (`getAdj(varKey, i)` in the HTML template); the build script just supplies
 the per-tract delta tables.
 
+## Tests
+
+A `pytest` suite (`pytest.ini` + `tests/`, both tracked) guards the build output
+and deploy config rather than the build internals. Run from repo root:
+
+```
+python3 -m pytest
+```
+
+- `test_build_script.py` — constants/invariants in `build_diy_pca_viewer.py`.
+- `test_generated_html.py` — the committed viewer has the expected structure
+  (no leftover `__*_PLACEHOLDER__` tokens, required elements present).
+- `test_landsat_assets.py` — the LST overlay PNGs + bounds JSON exist and parse.
+- `test_pages_workflow.py` — `pages.yml` keeps its include-before-exclude rsync
+  ordering (the deploy gotcha above).
+- `test_static_links.py` — internal links across the pages resolve.
+- `test_tracked_files.py` — the `.gitignore` allow-list still tracks exactly the
+  intended scripts/data products.
+
+These are the guardrails that catch the kinds of drift this document is prone to.
+
 ## Deployment
 
-`.github/workflows/pages.yml` triggers on push to `main`:
+`.github/workflows/pages.yml` triggers on push to `main` (and
+`workflow_dispatch`):
 
-1. `actions/checkout@v4`
-2. `actions/configure-pages@v5`
+1. `actions/checkout@v6`
+2. `actions/configure-pages@v6`
 3. `rsync` the repo into `_site/`, excluding `.git`, `.github`, `scripts`,
-   `data`, `_site`, `.gitignore`, `README.md`.
-4. `actions/upload-pages-artifact@v3` and `actions/deploy-pages@v4`.
+   `_site`, `.gitignore`, `README.md`, and `data/**` — but with `--include`
+   rules placed *before* the `data/**` exclude that re-admit three subtrees:
+   `data/exposure/processed/landsat/**`, `data/context/sandag_landuse.pmtiles`,
+   and `data/context/overlays/**`. rsync is **first-match-wins**, so these
+   includes must stay ahead of the `data/**` exclude — do not reorder.
+4. `actions/upload-pages-artifact@v5` and `actions/deploy-pages@v5`.
 
 Result: GitHub Pages serves `index.html`, `main/`, `userguide/`, `assets/`,
-`docs/`, and `.nojekyll` from the root of the deployed site.
+`docs/`, the three allow-listed `data/` subtrees, and `.nojekyll` from the root
+of the deployed site. (`scripts/` and all other `data/` are not deployed;
+`literature/` is gitignored and never reaches the workflow.)
+
+## Literature corpus (gitignored)
+
+`literature/` is a **local-only research corpus** — a markdown "RAG proxy" for
+heat-island / urban-heat-risk / urban-downscaling literature. It is *not* part of
+the site, never deploys, and is gitignored in full. Retrieval is plain
+`grep` + `read` over structured markdown, driven by frontmatter and an
+auto-generated index — no vector database.
+
+```
+literature/
+├── README.md            ← conventions + how to add a source
+├── INDEX.md             ← AUTO-GENERATED retrieval entry point (do not hand-edit)
+├── TAXONOMY.md          ← controlled vocab: themes, tags, methods, enums
+├── build_index.py       ← rebuilds INDEX.md from source frontmatter (stdlib only)
+├── refs.bib             ← Zotero Better BibTeX auto-export (citekey source of truth)
+├── sources/             ← one .md per paper (frontmatter + notes); _TEMPLATE.md to start
+├── pdfs/                ← open-access PDFs only, fetched programmatically
+├── reports/             ← raw deep-research outputs before decomposition
+└── synthesis/           ← optional per-theme synthesis notes citing sources/
+```
+
+How it works:
+
+- Each source is one `sources/<citekey>.md` with YAML frontmatter (`themes`,
+  `tags`, `methods`, `relevance`, `status`, …). Filenames/citekeys mirror the
+  Zotero Better BibTeX keys in `refs.bib`.
+- `python3 literature/build_index.py` scans every source's frontmatter, groups
+  by theme, and regenerates `INDEX.md` (each entry's hook is the source's
+  `## TL;DR` first line). Run it after adding or editing sources.
+- deep-research output lands in `reports/`, is decomposed into `sources/` stubs
+  (`status: to-import`) + a `synthesis/` note, and OA PDFs are pulled into
+  `pdfs/`.
+
+See `literature/README.md` for the full workflow.
 
 ## Working on this repo
 
@@ -283,8 +409,11 @@ Result: GitHub Pages serves `index.html`, `main/`, `userguide/`, `assets/`,
 | Add or remove a viewer variable       | `VARIABLES` + `VAR_SOURCES` (+ source-file load in `load_data()`) | rebuild + commit |
 | Change polarity of a variable         | `INVERTED_VARS` in build script                | rebuild + commit                  |
 | Update Landsat LST overlay            | run `scripts/build_lst_overlay.py`             | rebuild viewer + commit           |
+| Update a Data-Layer overlay           | run `scripts/build_data_overlays.py`           | rebuild viewer + commit           |
 | Add a logo to the top-right card      | drop PNG in `assets/`, edit logo block in `HTML_TEMPLATE` | rebuild + commit       |
-| Change deployment behavior            | `.github/workflows/pages.yml`                  | commit                            |
+| Change deployment behavior            | `.github/workflows/pages.yml`                  | commit (rerun `pytest`)           |
+| Add / curate a literature source      | `literature/sources/<citekey>.md`              | `python3 literature/build_index.py` (local-only, no commit) |
+| Run the test suite                    | n/a                                            | `python3 -m pytest`               |
 
 Local preview: open any HTML file directly in a browser, or run
 `python3 -m http.server 8000` from the repo root and visit

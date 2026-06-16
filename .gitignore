@@ -40,3 +40,6 @@ venv/
 
 # Local slide decks (not deployed)
 decks/
+
+# Literature corpus / markdown RAG proxy — local only, never committed
+literature/

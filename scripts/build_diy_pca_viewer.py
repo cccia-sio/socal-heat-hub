@@ -178,11 +178,11 @@ VARIABLES = [
     ("commute_pctile", "Commute Time", "adaptive", "Socioeconomic"),
     ("voting_pctile", "Voter Participation", "adaptive", "Socioeconomic"),
     ("retail_pctile", "Retail Food Access", "adaptive", "Socioeconomic"),
-    # Environment
-    ("pollution_pctile", "Pollution (Inv.)", "sensitivity", "Environment"),
-    ("ozone_pctile", "Ozone", "sensitivity", "Environment"),
-    ("pm25_pctile", "PM 2.5", "sensitivity", "Environment"),
-    ("dieselpm_pctile", "Diesel PM", "sensitivity", "Environment"),
+    # Pollution Burden
+    ("pollution_pctile", "Pollution (Inv.)", "sensitivity", "Pollution Burden"),
+    ("ozone_pctile", "Ozone", "sensitivity", "Pollution Burden"),
+    ("pm25_pctile", "PM 2.5", "sensitivity", "Pollution Burden"),
+    ("dieselpm_pctile", "Diesel PM", "sensitivity", "Pollution Burden"),
 ]
 
 # ── Exposure heat modes ──────────────────────────────────────────────────
@@ -223,7 +223,7 @@ _SRC_ACS_B11007 = "https://censusreporter.org/tables/B11007/"
 _SRC_SANGIS = "https://sdgis-sandag.opendata.arcgis.com/"
 _SRC_LANDSAT = "https://www.usgs.gov/landsat-missions"
 _SRC_HRRR = "https://rapidrefresh.noaa.gov/hrrr/"
-_SRC_CALHEATSCORE = "https://discovery.cdph.ca.gov/ohe/CalHeatScore/"
+_SRC_CALHEATSCORE = "https://calheatscore.calepa.ca.gov/"
 
 VAR_SOURCES = {
     # Exposure — MesoWest/Synoptic + CIMIS

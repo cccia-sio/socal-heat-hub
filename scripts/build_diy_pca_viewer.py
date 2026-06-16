@@ -738,8 +738,14 @@ h1{font-size:17px;font-weight:700;letter-spacing:-0.3px}
 .subtitle{font-size:12px;color:#888;margin:4px 0 16px;line-height:1.4}
 
 #scenario-bar{margin:18px 0 0;padding:14px 0 0;border-top:1px solid #e0e0e0;display:none}
-.scenario-label{font-size:11px;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.5px;color:#666;margin-bottom:8px}
+#scenario-bar>summary{font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.5px;color:#666;cursor:pointer;user-select:none;list-style:none;
+  display:flex;align-items:center;gap:6px}
+#scenario-bar>summary::-webkit-details-marker{display:none}
+#scenario-bar>summary::before{content:"\\25B6";font-size:8px;display:inline-block;
+  transition:transform 0.15s;color:#999}
+#scenario-bar[open]>summary::before{transform:rotate(90deg)}
+.scenario-body{margin-top:10px}
 .scenario-btns{display:flex;flex-direction:column;gap:6px}
 .scn-btn{padding:8px 12px;border:1px solid #ddd;border-radius:6px;
   background:#fff;font-size:12px;font-weight:500;cursor:pointer;
@@ -1310,14 +1316,28 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 .popup-btn-row .popup-more-btn,.popup-btn-row .popup-compare-btn{margin:0;width:100%;
   box-sizing:border-box;text-align:center;border-radius:6px}
 
-/* --- bottom-left control stack: address search + opacity + basemap --- */
-/* One anchored flex column so the three pieces share even spacing instead of
-   each carrying its own hand-tuned bottom offset. The Leaflet scale bar is
-   moved to the bottom-right (see L.control.scale) so this corner stays clean. */
+/* --- bottom-left control stack -------------------------------------------
+   One anchored flex column holding every on-map control. Cards are ordered
+   narrowest-first (see the HTML), so width grows top-to-bottom: left edges
+   align and right edges cascade outward into a waterfall, the widest card
+   resting in the bottom-left corner. The Leaflet scale bar is moved to the
+   bottom-right (see L.control.scale) so this corner stays clean. On mobile the
+   whole stack reparents into the drawer (see the reparenting JS at body end). */
 #map-controls-bl{position:absolute;left:10px;bottom:12px;z-index:500;
   display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+/* Bottom-right stack: basemap picker + colorblind toggle, anchored above the
+   SIO logo and right-aligned so both cards hug the corner. */
+#map-controls-br{position:absolute;right:14px;bottom:86px;z-index:999;
+  display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+/* Colorblind-friendly toggle, a small floating card in the stack. */
+#cbmode-control{background:rgba(255,255,255,0.92);border:1px solid rgba(0,0,0,0.12);
+  border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);padding:7px 10px}
+#cbmode-control label{display:flex;align-items:center;gap:7px;font-family:inherit;
+  font-size:11px;font-weight:600;color:#374151;cursor:pointer;white-space:nowrap}
+#cbmode-control input[type=checkbox]{width:14px;height:14px;accent-color:#2563eb;
+  cursor:pointer;flex-shrink:0;margin:0}
 
-/* --- on-map basemap picker --- */
+/* --- on-map basemap picker (top of the bottom-right stack) --- */
 #basemap-picker{display:flex;gap:8px;background:rgba(255,255,255,0.92);
   padding:6px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.15);
   border:1px solid rgba(0,0,0,0.12)}
@@ -1497,7 +1517,11 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     padding-top:10px;margin-top:10px}
   #drawer-tools-slot>h3{font-size:12px;font-weight:700;text-transform:uppercase;
     letter-spacing:0.5px;margin-bottom:8px;color:#666}
-  #drawer-tools-slot #map-controls-bl{position:static;width:auto;z-index:auto;gap:12px}
+  #drawer-tools-slot #map-controls-bl,
+  #drawer-tools-slot #map-controls-br{position:static;width:auto;z-index:auto;
+    gap:12px;align-items:flex-start}
+  #drawer-tools-slot #data-layers-control,
+  #drawer-tools-slot #cbmode-control,
   #drawer-tools-slot #addr-search,
   #drawer-tools-slot #map-opacity-control{background:none;border:none;
     box-shadow:none;padding:0;width:auto}
@@ -1544,8 +1568,9 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <div style="font-size:10px;color:#666;margin:2px 0 0 6px">County-listed cooling sites (libraries, civic centers, malls). Click a marker for address &amp; phone.</div>
     </details>
   </div>
-  <div id="scenario-bar">
-    <div class="scenario-label">Climate Scenario</div>
+  <details id="scenario-bar">
+    <summary>Climate Scenario</summary>
+    <div class="scenario-body">
     <div class="scn-period-row">
       <button class="scn-period-btn active" data-scn-period="present" onclick="selectScnPeriod('present')">Present Day</button>
       <button class="scn-period-btn" data-scn-period="2050" data-period-block="2050" onclick="selectScnPeriod('2050')">2050</button>
@@ -1569,11 +1594,8 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     </div>
     <div id="scenario-info" class="scenario-info"></div>
     <button id="scn-cmp-btn" onclick="openScnCompareModal()" title="Open a side-by-side composite-risk map (left) plus Heat Exposure pillar-rank change in percentile points (right) under two climate scenarios">Compare Scenarios Side-by-Side</button>
-  </div>
-  <div id="accessibility" style="border-top:1px solid #e0e0e0;padding-top:10px;margin-top:14px">
-    <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;color:#666">Accessibility</h3>
-    <div class="ov-row"><label title="Swap red/green palettes for Okabe-Ito + viridis (deuteranopia/protanopia/tritanopia safe)"><input type="checkbox" id="cb-cbmode" onchange="toggleCbMode(this.checked)">Colorblind-friendly colors</label></div>
-  </div>
+    </div>
+  </details>
   <div id="export-section" style="border-top:1px solid #e0e0e0;padding-top:10px;margin-top:14px">
     <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;color:#666">Export</h3>
     <button id="dl-pdf-btn" onclick="downloadMapPdf()" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s">Download Map as PDF</button>
@@ -1583,6 +1605,8 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 
 <div id="map-wrap">
   <div id="map"></div>
+  <!-- Bottom-left control stack, ordered narrowest-first so panel width grows
+       top-to-bottom and the right edges cascade into a waterfall (see CSS). -->
   <div id="map-controls-bl">
     <div id="data-layers-control">
       <label class="dl-ctl-lbl" for="data-layer-select">Data Layers</label>
@@ -1615,12 +1639,14 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <div id="addr-status"></div>
       <button id="addr-clear" onclick="clearAddressMarker()">Clear marker</button>
     </div>
-    <div id="map-opacity-control" title="Fade the composite-risk choropleth to see the basemap underneath">
-      <span class="opacity-lbl">Map opacity</span>
-      <input type="range" id="map-opacity-slider" min="0" max="100" value="80"
-             oninput="setTractOpacity(this.value)">
-      <span id="map-opacity-val">80%</span>
-    </div>
+  </div>
+  <div id="logos">
+    <img src="../assets/usd-logo-horizontal.png" alt="University of San Diego">
+    <img src="../assets/ccsd_logo.png" alt="Climate Collaborative — San Diego Region">
+  </div>
+  <!-- Bottom-right stack: basemap picker with the colorblind toggle beneath it,
+       anchored above the SIO logo. Reparented into the mobile drawer. -->
+  <div id="map-controls-br">
     <div id="basemap-picker">
       <button class="bm-thumb" data-bm="light" onclick="setBasemap('light')" title="Light basemap"
               style="background-image:url('https://a.basemaps.cartocdn.com/light_all/11/358/825.png')">
@@ -1631,10 +1657,15 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
         <span class="bm-thumb-lbl">Satellite</span>
       </button>
     </div>
-  </div>
-  <div id="logos">
-    <img src="../assets/usd-logo-horizontal.png" alt="University of San Diego">
-    <img src="../assets/ccsd_logo.png" alt="Climate Collaborative — San Diego Region">
+    <div id="cbmode-control">
+      <label title="Swap red/green palettes for Okabe-Ito + viridis (deuteranopia/protanopia/tritanopia safe)"><input type="checkbox" id="cb-cbmode" onchange="toggleCbMode(this.checked)">Colorblind-friendly colors</label>
+    </div>
+    <div id="map-opacity-control" title="Fade the composite-risk choropleth to see the basemap underneath">
+      <span class="opacity-lbl">Map opacity</span>
+      <input type="range" id="map-opacity-slider" min="0" max="100" value="100"
+             oninput="setTractOpacity(this.value)">
+      <span id="map-opacity-val">100%</span>
+    </div>
   </div>
   <div id="logo-sio">
     <img src="../assets/sio_logo.png" alt="UC San Diego — Scripps Institution of Oceanography">
@@ -1813,7 +1844,6 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
         <li><b>Map Layer</b> &mdash; switch between the combined risk score, each group on its own, or any single factor.</li>
         <li><b>Jurisdictions</b> &mdash; show city, unincorporated-county, or tribal-land boundaries on the map.</li>
         <li><b>Climate Scenario</b> &mdash; see how risk shifts under future warming, for the year 2050 or 2080.</li>
-        <li><b>Accessibility</b> &mdash; switch to colorblind-friendly colors.</li>
         <li><b>Export</b> &mdash; save the current map as a PDF or download the data.</li>
       </ul>
     </div>
@@ -1901,7 +1931,22 @@ var curPeriod   = "";        // "" (present) | "2050" | "2080"
 var cbMode = (function(){try{return localStorage.getItem('hrv-cb-mode')==='1';}catch(e){return false;}})();
 // Exposure is a single-select heat mode, so its raw variables are excluded from
 // the `enabled` toggle set — only Sensitivity and Adaptive Capacity use toggles.
-VM.forEach(function(v){ enabled[v.key] = (v.pillar!=="exposure"); });
+// Open with a curated, high-contrast default rather than every variable: turning
+// on all ~60 makes each pillar's PCA collapse toward a generic "everything
+// correlates" axis and washes out spatial contrast. Defaults below are one
+// composite signal + a couple of focused drivers per pillar (exposure stays on
+// the daytime heat mode). Every other variable stays in the panel, unchecked.
+var DEFAULT_ON = {
+  // Sensitivity
+  RPL_THEMES:1,        // Overall SVI
+  EP_AGE65:1,          // Age 65+
+  heat_hosp_day:1,     // Heat-Day Hospitalization Rate Ratio
+  // Adaptive Capacity
+  ac_prob:1,           // AC Prevalence (LACE)
+  treecanopy_pctile:1, // Tree Canopy
+  income_pctile:1      // Income
+};
+VM.forEach(function(v){ enabled[v.key] = (v.pillar!=="exposure") && !!DEFAULT_ON[v.key]; });
 
 // Resolve a heat-mode key to its definition object.
 function heatModeDef(key){
@@ -2067,7 +2112,7 @@ L.control.scale({position:'bottomright'}).addTo(map);
 var tLayer = null;
 // User-adjustable opacity for the composite-risk choropleth (see #map-opacity-slider).
 // Read by the tract style function in drawTracts() so changes survive resetStyle().
-var tractOpacity = 0.8;
+var tractOpacity = 1;
 
 function setBasemap(name){
   if(!BASEMAPS[name] || name===currentBasemap) return;
@@ -3673,11 +3718,19 @@ function ic(t){return ' <span class="info-ic" tabindex="0">i<span class="info-po
 // pillar's pure hue at its corner. We subtract the most-balanced share (min)
 // from each, so the "excess" measures how far one driver pulls ahead; the rest
 // is white. e,s,a are the raw per-pillar risk contributions; dg is pal('DRGB').
+// Saturation boost for the Driver Mix ternary blend (_triMix). Percentile
+// pillar scores cluster in magnitude, so the raw excess over the most-balanced
+// share is usually tiny and the map reads near-white. gamma<1 expands that
+// dynamic range (lower = more saturated); endpoints are fixed (balanced tract
+// stays white, single-driver tract stays its pure pillar hue).
+var _TRI_SAT_GAMMA=0.5;
 function _triMix(e,s,a,dg){
   var tot=e+s+a;
   if(tot<1e-6)return[230,230,230];                 // no enabled drivers -> neutral
   var we=e/tot,ws=s/tot,wa=a/tot,m=Math.min(we,ws,wa);
-  var xe=we-m,xs=ws-m,xa=wa-m,wt=3*m*255;          // wt = white share = (1-Σexcess)*255
+  // Boost saturation (sum of excesses) via gamma; hue direction unchanged.
+  var S=1-3*m,k=(S>1e-6)?Math.pow(S,_TRI_SAT_GAMMA)/S:0;
+  var xe=(we-m)*k,xs=(ws-m)*k,xa=(wa-m)*k,wt=(1-(xe+xs+xa))*255;          // wt = white share = (1-Σexcess)*255
   return[wt+xe*dg.exposure[0]+xs*dg.sensitivity[0]+xa*dg.adaptive[0],
          wt+xe*dg.exposure[1]+xs*dg.sensitivity[1]+xa*dg.adaptive[1],
          wt+xe*dg.exposure[2]+xs*dg.sensitivity[2]+xa*dg.adaptive[2]];
@@ -3756,14 +3809,14 @@ function showLegend(){
   }else if(curLayer==="driver"){
     var dr=pal('DRGB');
     var rgb=function(arr){return"rgb("+arr.join(",")+")"};
-    el.innerHTML='<div style="font-weight:600;margin-bottom:4px">Dominant Driver'+ic('Each tract is colored by whichever pillar contributes most to its risk: Heat Exposure, Population Sensitivity, or low Adaptive Capacity. This identifies the leading driver of heat risk for each tract.')+'</div>'+
+    el.innerHTML='<div style="font-weight:600;margin-bottom:4px">Dominant Driver'+ic('Each tract is colored by whichever driver it ranks highest on within San Diego County: Heat Exposure, Population Sensitivity, or low Adaptive Capacity. Each driver is a county percentile rank (where the tract sits relative to all other county tracts), so this flags the driver the tract stands out most on, not an absolute share of its risk.')+'</div>'+
       '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.exposure)+'"></div>Heat Exposure</div>'+
       '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.sensitivity)+'"></div>Population Sensitivity</div>'+
       '<div class="dl-row"><div class="dl-sw" style="background:'+rgb(dr.adaptive)+'"></div>Adaptive Capacity</div>'+
       '<div style="font-size:10px;color:#999;margin-top:3px;font-style:italic">Lighter = lower risk</div>';
     el.style.display="block";
   }else if(curLayer==="drivermix"){
-    el.innerHTML='<div style="font-weight:600;margin-bottom:4px">Driver Mix'+ic('A trivariate blend: each tract mixes the three drivers in proportion to how much each adds to its risk &mdash; Heat Exposure, Population Sensitivity, and low Adaptive Capacity. Near a corner of the triangle one driver clearly dominates; a white or pale tract is driven about equally by all three, with no single dominant driver. Lightness also tracks overall composite risk (lighter = lower).')+'</div>'+
+    el.innerHTML='<div style="font-weight:600;margin-bottom:4px">Driver Mix'+ic('A trivariate blend of how this tract ranks within San Diego County on the three drivers &mdash; Heat Exposure, Population Sensitivity, and low Adaptive Capacity. Each driver is a county percentile rank (0&ndash;100): where the tract sits relative to all other county tracts, not an absolute share of its risk. The blend compares those three ranks, so a tract leans toward the corner of whichever driver it ranks highest on relative to its own other two. A white or pale tract ranks about evenly across all three, with no single dominant driver. Lightness also tracks overall composite risk (lighter = lower).')+'</div>'+
       '<div class="tri-host"></div>'+
       '<div style="font-size:10px;color:#999;margin-top:1px;font-style:italic">Corner = one dominant driver &middot; white = balanced mix &middot; lighter = lower risk</div>';
     el.style.display="block";
@@ -6315,18 +6368,23 @@ document.addEventListener('click', function tapInfo(e){
     if(!willOpen) ic.blur();
   }
 });
-/* On mobile the bottom-left control stack is reparented into the drawer
-   (#drawer-tools-slot) so the map is unobstructed; on desktop it lives on
-   the map. Re-runs on viewport changes such as phone rotation. */
+/* On mobile the on-map controls are reparented into the drawer
+   (#drawer-tools-slot) so the map is unobstructed; on desktop they live on the
+   map (bottom-left stack + bottom-right stack). The bottom-left stack is appended
+   first so the bottom-right controls land last in the drawer. Re-runs on viewport
+   changes such as phone rotation. */
 (function(){
   var mq = window.matchMedia('(max-width:768px),(max-height:500px) and (orientation:landscape)');
-  var stack = document.getElementById('map-controls-bl');
+  var els = ['map-controls-bl','map-controls-br']
+    .map(function(id){return document.getElementById(id);}).filter(Boolean);
   var slot = document.getElementById('drawer-tools-slot');
   var mapWrap = document.getElementById('map-wrap');
-  if(!stack || !slot || !mapWrap) return;
+  if(!els.length || !slot || !mapWrap) return;
   function place(){
     var target = mq.matches ? slot : mapWrap;
-    if(stack.parentNode !== target) target.appendChild(stack);
+    els.forEach(function(el){
+      if(el.parentNode !== target) target.appendChild(el);
+    });
   }
   if(mq.addEventListener) mq.addEventListener('change', place);
   else if(mq.addListener) mq.addListener(place);

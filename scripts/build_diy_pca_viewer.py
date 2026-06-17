@@ -58,6 +58,7 @@ INVERTED_VARS = {
     "pct_pre1980",
     "pct_pre1960",
     "pct_renter",
+    "pct_impervious",
 }
 
 # Which DIY PCA variables get which LOCA2 delta applied (ΔK = ΔC for differences)
@@ -167,6 +168,7 @@ VARIABLES = [
     ("pct_pre1960", "Pre-1960 Housing (%)", "adaptive", "Built Environment"),
     ("pct_renter", "Renter-Occupied (%)", "adaptive", "Built Environment"),
     ("pct_green", "Green Space (%)", "adaptive", "Built Environment"),
+    ("pct_impervious", "Impervious Surface (%)", "adaptive", "Built Environment"),
     # Socioeconomic — HPI
     ("income_pctile", "Income", "adaptive", "Socioeconomic"),
     ("abovepoverty_pctile", "Above Poverty", "adaptive", "Socioeconomic"),
@@ -228,7 +230,8 @@ _SRC_SANGIS = "https://sdgis-sandag.opendata.arcgis.com/"
 _SRC_LANDSAT = "https://www.usgs.gov/landsat-missions"
 _SRC_HRRR = "https://rapidrefresh.noaa.gov/hrrr/"
 _SRC_CALHEATSCORE = "https://calheatscore.calepa.ca.gov/"
-_SRC_LEAD = "https://www.energy.gov/scep/lead-tool"
+_SRC_LEAD = "https://data.openei.org/submissions/6219"
+_SRC_NLCD = "https://www.mrlc.gov/data"
 
 VAR_SOURCES = {
     # Exposure — MesoWest/Synoptic + CIMIS
@@ -282,6 +285,7 @@ VAR_SOURCES = {
     "pct_senior_alone": _SRC_ACS_B11007,
     # Adaptive — SanGIS
     "pct_green": _SRC_SANGIS,
+    "pct_impervious": _SRC_NLCD,
     # HPI (adaptive + sensitivity)
     "treecanopy_pctile": _SRC_HPI, "parkaccess_pctile": _SRC_HPI,
     "income_pctile": _SRC_HPI, "abovepoverty_pctile": _SRC_HPI,
@@ -446,6 +450,16 @@ def load_data():
         bldg["GEOID"] = bldg["GEOID"].str.zfill(11)
         tracts = _safe_merge(tracts, bldg, ["pct_pre1980", "pct_pre1960"])
 
+    # ── Adaptive — Impervious surface (NLCD, tract zonal mean) ──
+    # Mean % impervious cover per tract; see scripts/build_impervious_tracts.py
+    # (same NLCD raster as the Data-Layer overlay). More impervious → less
+    # natural cooling → lower adaptive capacity (a vulnerability; INVERTED_VARS).
+    imperv_path = ROOT / "data/adaptive_capacity/impervious/impervious_pct_sd_tracts.csv"
+    if imperv_path.exists():
+        imperv = pd.read_csv(imperv_path, dtype={"GEOID": str})
+        imperv["GEOID"] = imperv["GEOID"].str.zfill(11)
+        tracts = _safe_merge(tracts, imperv, ["pct_impervious"])
+
     # ── Adaptive + Sensitivity — ACS demographics (renter occupancy, outdoor-worker share) ──
     acs_path = ROOT / "data/exposure/raw/census/acs_demographics_sd.csv"
     if acs_path.exists():
@@ -488,6 +502,16 @@ def load_data():
         ctx["GEOID"] = ctx["geoid"].astype(str).str.zfill(11)
         tracts = _safe_merge(tracts, ctx, ["pct_green"])
 
+    # ── Exploratory — UCLA Heat Maps excess-ER + CalHeatScore thresholds (ZIP→tract) ──
+    # Display-only Data Layers (not PCA variables); built by
+    # scripts/build_ucla_heat_tract_xwalk.py (centroid-in-polygon crosswalk).
+    ucla_path = ROOT / "data/context/ucla_heat_tract.csv"
+    ucla_cols = ["excess_er_rate", "chs1_th", "chs2_th", "chs3_th", "chs4_th"]
+    if ucla_path.exists():
+        ucla = pd.read_csv(ucla_path, dtype={"GEOID": str})
+        ucla["GEOID"] = ucla["GEOID"].str.zfill(11)
+        tracts = _safe_merge(tracts, ucla, ucla_cols)
+
     # ── Impute & simplify ──
     var_cols = [v[0] for v in VARIABLES]
     loaded = [c for c in var_cols if c in tracts.columns]
@@ -501,6 +525,9 @@ def load_data():
         extra = ["E_TOTPOP"]
     else:
         extra = []
+
+    # UCLA exploratory display columns (Data Layers only, not PCA variables).
+    extra += [c for c in ucla_cols if c in tracts.columns]
 
     tracts = tracts.to_crs(epsg=4326)
     tracts["geometry"] = tracts.geometry.simplify(0.0003)
@@ -636,7 +663,7 @@ def main():
     # Load Data-Layer raster overlay metadata (optional) — population, impervious,
     # canopy. Same JSON shape as the LST overlay; built by build_data_overlays.py.
     overlay_meta = {}
-    for _ov in ("population", "impervious", "canopy", "excess_er"):
+    for _ov in ("population", "impervious", "canopy"):
         _p = ROOT / "data/context/overlays" / f"{_ov}_bounds.json"
         if _p.exists():
             overlay_meta[_ov] = _p.read_text().strip()
@@ -743,7 +770,6 @@ def main():
     html = html.replace("__DS_DENS_PLACEHOLDER__", ds_dens_uri)
     html = html.replace("__IMPERVIOUS_PLACEHOLDER__", overlay_meta["impervious"])
     html = html.replace("__CANOPY_PLACEHOLDER__", overlay_meta["canopy"])
-    html = html.replace("__EXCESS_ER_PLACEHOLDER__", overlay_meta["excess_er"])
     html = html.replace("__POLARITY_PLACEHOLDER__", polarity_str)
 
     OUTPUT_PATH.write_text(html)
@@ -1673,11 +1699,21 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
         <option value="lst">Land surface temp (LST)</option>
         <option value="hosp_day">Heat hospitalizations</option>
         <option value="excess_er">Excess heat ER visits</option>
+        <option value="threshold">Heat-risk threshold (°F)</option>
       </select>
       <div id="data-layer-opacity-wrap" style="display:none">
         <span class="opacity-lbl">Opacity</span>
         <input type="range" id="data-layer-opacity-slider" min="0" max="100" value="80" oninput="setDataLayerOpacity(this.value)">
         <span id="data-layer-opacity-val">80%</span>
+      </div>
+      <div id="chs-level-wrap" style="display:none;align-items:center;gap:6px">
+        <span class="opacity-lbl">CalHeatScore</span>
+        <select id="chs-level-select" onchange="setThresholdLevel(this.value)" style="flex:1;font-size:11px;padding:3px;border:1px solid #d1d5db;border-radius:5px">
+          <option value="1">1 — Mild (onset)</option>
+          <option value="2">2 — Moderate</option>
+          <option value="3">3 — High</option>
+          <option value="4">4 — Severe</option>
+        </select>
       </div>
       <div id="data-layer-legend" style="display:none"></div>
     </div>
@@ -1966,7 +2002,6 @@ var DS_GEOIDS  = __DS_GEOIDS_PLACEHOLDER__;  // [GEOID,...] in encoded-tract-ind
 var DS_DENS    = __DS_DENS_PLACEHOLDER__;    // base64 PNG: R=log-scaled population density (0-255), A=255
 var IMPERVIOUS = __IMPERVIOUS_PLACEHOLDER__; // impervious surface overlay meta or null
 var CANOPY     = __CANOPY_PLACEHOLDER__;     // tree canopy overlay meta or null
-var EXCESS_ER  = __EXCESS_ER_PLACEHOLDER__;  // UCLA excess heat-ER overlay meta or null
 var POLARITY = __POLARITY_PLACEHOLDER__;     // {varKey: true if higher=worse(red)}
 var HEAT_MODES = __HEATMODES_PLACEHOLDER__;  // [{key,label,layers:[...],desc}] — exposure is single-select, not PCA
 
@@ -2352,7 +2387,7 @@ function setTractOpacity(pct){
    from the PCA risk analysis. Rasters (population/impervious/canopy/LST) are
    PNG imageOverlays; land use reuses the SANDAG PMTiles machinery; heat
    hospitalizations is a tract choropleth. All sit in landusePane (z 450). */
-var RASTER_META = {population:POP, impervious:IMPERVIOUS, canopy:CANOPY, lst:LST, excess_er:EXCESS_ER};
+var RASTER_META = {population:POP, impervious:IMPERVIOUS, canopy:CANOPY, lst:LST};
 var _dataLayer = "";           // current selection id ("" = none)
 var _dataLayerObj = null;      // current non-landuse Leaflet layer (imageOverlay/geojson)
 var _dataLayerOpacity = 0.80;
@@ -2376,7 +2411,9 @@ function setDataLayer(id){
   _dataLayer = id || "";
   var opw = document.getElementById('data-layer-opacity-wrap');
   var leg = document.getElementById('data-layer-legend');
+  var chw = document.getElementById('chs-level-wrap');
   if(leg){ leg.style.display='none'; leg.innerHTML=''; }
+  if(chw){ chw.style.display='none'; }
   if(!_dataLayer){ if(opw) opw.style.display='none'; return; }
 
   if(id==='landuse'){                       // reuse existing SANDAG land-use machinery
@@ -2390,6 +2427,19 @@ function setDataLayer(id){
     _dataLayerObj = buildHospChoropleth();
     if(_dataLayerObj) _dataLayerObj.addTo(map);
     renderDataLayerLegend('hosp_day');
+    return;
+  }
+  if(id==='excess_er'){
+    _dataLayerObj = buildExcessErChoropleth();
+    if(_dataLayerObj) _dataLayerObj.addTo(map);
+    renderDataLayerLegend('excess_er');
+    return;
+  }
+  if(id==='threshold'){
+    if(chw) chw.style.display='flex';
+    _dataLayerObj = buildThresholdChoropleth();
+    if(_dataLayerObj) _dataLayerObj.addTo(map);
+    renderDataLayerLegend('threshold');
     return;
   }
   var meta = RASTER_META[id], v = rasterVariant(id);
@@ -2430,6 +2480,71 @@ function buildHospChoropleth(){
   });
 }
 
+/* UCLA Heat Maps — excess-ER + CalHeatScore thresholds, ZIP→tract centroid xwalk */
+var EXR_RAMP = [[255,255,178],[254,204,92],[253,141,60],[240,59,32],[189,0,38]];   // YlOrRd
+var TH_RAMP  = [[44,123,182],[171,217,233],[255,255,191],[253,174,97],[215,25,28]]; // cool->hot
+var _exrDomain = null, _thDomain = null, _thLevel = 1, _thSharedDomain = null;
+var CHS_NAME = {1:'1 — Mild (onset)', 2:'2 — Moderate', 3:'3 — High', 4:'4 — Severe'};
+
+function _rampColor(ramp, v, d){
+  if(v==null||isNaN(v)) return '#cccccc';
+  d=d||[0,1]; var span=(d[1]-d[0])||1, t=Math.max(0,Math.min(1,(v-d[0])/span));
+  return toHex(interpC(ramp, t));
+}
+function _uclaPopup(p){
+  var er=+p.excess_er_rate;
+  function f(x){return (x==null||isNaN(+x))?'n/a':(+x).toFixed(0)+'°F';}
+  return '<div style="font-size:11px"><b>UCLA Heat Maps</b><br>'+
+    'Excess ER visits: <b>'+(isNaN(er)?'n/a':er.toFixed(1))+'</b> per 10,000<br>'+
+    '<span style="color:#888">(CalHeatScore 4, 2008–2018)</span>'+
+    '<div style="margin-top:3px">Heat-risk onset temperature:</div>'+
+    'CHS1 '+f(p.chs1_th)+' · CHS2 '+f(p.chs2_th)+'<br>CHS3 '+f(p.chs3_th)+' · CHS4 '+f(p.chs4_th)+'<br>'+
+    '<span style="color:#888">ZIP-resolution (UCLA/CalHeatScore), per tract</span></div>';
+}
+function buildExcessErChoropleth(){
+  if(typeof GJ==='undefined' || !GJ.features) return null;
+  var vals = GJ.features.map(function(f){return +f.properties.excess_er_rate;}).filter(function(v){return !isNaN(v);});
+  if(!vals.length) return null;
+  vals.sort(function(a,b){return a-b;});
+  _exrDomain = [vals[0], vals[vals.length-1]];
+  return L.geoJSON(GJ,{pane:'landusePane',
+    style:function(f){return{fillColor:_rampColor(EXR_RAMP,+f.properties.excess_er_rate,_exrDomain),color:'#fff',weight:0.3,fillOpacity:_dataLayerOpacity};},
+    onEachFeature:function(f,lyr){lyr.bindPopup(_uclaPopup(f.properties));}});
+}
+function _thSharedDom(){   // min(CHS1)..max(CHS4) — fixed scale so switching levels visibly warms the map
+  if(_thSharedDomain) return _thSharedDomain;
+  var lo=Infinity, hi=-Infinity;
+  if(typeof GJ!=='undefined' && GJ.features){
+    GJ.features.forEach(function(f){
+      for(var k=1;k<=4;k++){ var v=+f.properties['chs'+k+'_th'];
+        if(!isNaN(v)){ if(v<lo)lo=v; if(v>hi)hi=v; } }
+    });
+  }
+  _thSharedDomain = (lo<hi)?[lo,hi]:[70,110];
+  return _thSharedDomain;
+}
+function buildThresholdChoropleth(){
+  if(typeof GJ==='undefined' || !GJ.features) return null;
+  var key='chs'+_thLevel+'_th';
+  var vals = GJ.features.map(function(f){return +f.properties[key];}).filter(function(v){return !isNaN(v);});
+  if(!vals.length) return null;
+  vals.sort(function(a,b){return a-b;});
+  _thDomain = [vals[0], vals[vals.length-1]];   // this level's own span (for the legend note)
+  var dom = _thSharedDom();                      // fixed color scale across CHS 1–4
+  return L.geoJSON(GJ,{pane:'landusePane',
+    style:function(f){return{fillColor:_rampColor(TH_RAMP,+f.properties[key],dom),color:'#fff',weight:0.3,fillOpacity:_dataLayerOpacity};},
+    onEachFeature:function(f,lyr){lyr.bindPopup(_uclaPopup(f.properties));}});
+}
+function setThresholdLevel(lv){
+  _thLevel=+lv;
+  if(_dataLayer==='threshold'){
+    if(_dataLayerObj){ try{map.removeLayer(_dataLayerObj);}catch(e){} }
+    _dataLayerObj=buildThresholdChoropleth();
+    if(_dataLayerObj) _dataLayerObj.addTo(map);
+    renderDataLayerLegend('threshold');
+  }
+}
+
 function renderDataLayerLegend(id){
   var leg=document.getElementById('data-layer-legend'); if(!leg) return;
   leg.style.display='block';
@@ -2440,6 +2555,24 @@ function renderDataLayerLegend(id){
       '<div class="dt-lst-bar" style="background:linear-gradient(to right,'+hstops+')"></div>'+
       '<div class="dt-lst-ticks"><span>'+d[0].toFixed(1)+'</span><span>standardized score</span><span>'+d[1].toFixed(1)+'</span></div>'+
       '<div style="font-size:9.5px;color:#888;margin-top:3px;line-height:1.3">0 = county-area average. ZIP-code resolution (CalHeatScore), shown per tract.</div>';
+    return;
+  }
+  if(id==='excess_er'){
+    var de=_exrDomain||[0,1];
+    var es=EXR_RAMP.map(function(c){return 'rgb('+c.join(',')+')';}).join(',');
+    leg.innerHTML='<div style="font-weight:600;margin-bottom:2px">Excess heat-related ER visits</div>'+
+      '<div class="dt-lst-bar" style="background:linear-gradient(to right,'+es+')"></div>'+
+      '<div class="dt-lst-ticks"><span>'+de[0].toFixed(1)+'</span><span>per 10,000 · CHS 4 · 2008–2018</span><span>'+de[1].toFixed(1)+'</span></div>'+
+      '<div style="font-size:9.5px;color:#888;margin-top:3px;line-height:1.3">UCLA Heat Maps. ZIP-resolution (CalHeatScore), shown per tract.</div>';
+    return;
+  }
+  if(id==='threshold'){
+    var sd=_thSharedDom(), lv=_thDomain||sd;
+    var ts=TH_RAMP.map(function(c){return 'rgb('+c.join(',')+')';}).join(',');
+    leg.innerHTML='<div style="font-weight:600;margin-bottom:2px">Heat-risk threshold — CalHeatScore '+CHS_NAME[_thLevel]+'</div>'+
+      '<div class="dt-lst-bar" style="background:linear-gradient(to right,'+ts+')"></div>'+
+      '<div class="dt-lst-ticks"><span>'+sd[0].toFixed(0)+'°F</span><span>daily high temp (fixed scale)</span><span>'+sd[1].toFixed(0)+'°F</span></div>'+
+      '<div style="font-size:9.5px;color:#888;margin-top:3px;line-height:1.3">This level: SD tracts '+lv[0].toFixed(0)+'–'+lv[1].toFixed(0)+'°F. Scale fixed across CHS 1–4, so higher levels shade warmer. UCLA Heat Maps, per tract.</div>';
     return;
   }
   var meta=RASTER_META[id], v=rasterVariant(id);

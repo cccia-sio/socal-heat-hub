@@ -1,0 +1,167 @@
+{
+  "url": "../data/context/overlays/excess_er_4326.png",
+  "colormap": "YlOrRd",
+  "legend": [
+    {
+      "t": 0.0,
+      "value": 0.0,
+      "rgb": [
+        255,
+        255,
+        204
+      ]
+    },
+    {
+      "t": 0.25,
+      "value": 3.5,
+      "rgb": [
+        254,
+        217,
+        118
+      ]
+    },
+    {
+      "t": 0.5,
+      "value": 7.0,
+      "rgb": [
+        253,
+        140,
+        60
+      ]
+    },
+    {
+      "t": 0.75,
+      "value": 10.5,
+      "rgb": [
+        226,
+        25,
+        28
+      ]
+    },
+    {
+      "t": 1.0,
+      "value": 14.0,
+      "rgb": [
+        128,
+        0,
+        38
+      ]
+    }
+  ],
+  "variants": {
+    "default": {
+      "url": "../data/context/overlays/excess_er_4326.png",
+      "colormap": "YlOrRd",
+      "legend": [
+        {
+          "t": 0.0,
+          "value": 0.0,
+          "rgb": [
+            255,
+            255,
+            204
+          ]
+        },
+        {
+          "t": 0.25,
+          "value": 3.5,
+          "rgb": [
+            254,
+            217,
+            118
+          ]
+        },
+        {
+          "t": 0.5,
+          "value": 7.0,
+          "rgb": [
+            253,
+            140,
+            60
+          ]
+        },
+        {
+          "t": 0.75,
+          "value": 10.5,
+          "rgb": [
+            226,
+            25,
+            28
+          ]
+        },
+        {
+          "t": 1.0,
+          "value": 14.0,
+          "rgb": [
+            128,
+            0,
+            38
+          ]
+        }
+      ]
+    },
+    "cb": {
+      "url": "../data/context/overlays/excess_er_4326_cb.png",
+      "colormap": "cividis",
+      "legend": [
+        {
+          "t": 0.0,
+          "value": 0.0,
+          "rgb": [
+            0,
+            34,
+            78
+          ]
+        },
+        {
+          "t": 0.25,
+          "value": 3.5,
+          "rgb": [
+            67,
+            78,
+            108
+          ]
+        },
+        {
+          "t": 0.5,
+          "value": 7.0,
+          "rgb": [
+            125,
+            124,
+            120
+          ]
+        },
+        {
+          "t": 0.75,
+          "value": 10.5,
+          "rgb": [
+            188,
+            174,
+            108
+          ]
+        },
+        {
+          "t": 1.0,
+          "value": 14.0,
+          "rgb": [
+            254,
+            232,
+            56
+          ]
+        }
+      ]
+    }
+  },
+  "bounds": {
+    "south": 32.5302526145829,
+    "west": -117.56954710096447,
+    "north": 33.50613755165365,
+    "east": -116.07642294258913
+  },
+  "vmin": 0.0,
+  "vmax": 14.0,
+  "scale": "linear",
+  "label": "Excess heat-related ER visits",
+  "units": "per 10,000 \u00b7 CalHeatScore 4 \u00b7 2008\u20132018",
+  "source": "UCLA Heat Maps (Center for Healthy Climate Solutions) / CalHeatScore"
+}

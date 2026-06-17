@@ -9,8 +9,12 @@ the same code path:
               (2020 dasymetric residential population, 30 m), log-scaled
   impervious  heat-risk-sd NLCD impervious_100m.tif  (0-100 %, linear)
   canopy      heat-risk-sd NLCD treecanopy_100m.tif  (0-100 %, linear)
+  excess_er   reproducible pull from the UCLA Heat Maps public ArcGIS service
+              (excess heat-related ER visits per 10,000, CalHeatScore 4,
+              2008-2018), SD ZIP polygons rasterized to 100 m, linear
 
-Population is self-contained (downloads from EPA). Impervious/canopy read the
+Population and excess_er are self-contained (download at build time).
+Impervious/canopy read the
 sibling heat-risk-sd repo, located via $HEAT_RISK_SD_DIR or a few candidate
 paths. Outputs (PNG + JSON) are the only committed/deployed artifacts; the
 downloaded population GeoTIFF is cached locally under data/context/population/.
@@ -25,6 +29,7 @@ import socket
 import time
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlencode
 
 import matplotlib
 matplotlib.use("Agg")
@@ -33,7 +38,7 @@ import numpy as np
 import rasterio
 from PIL import Image
 from pyproj import Transformer
-from rasterio.features import geometry_mask
+from rasterio.features import geometry_mask, rasterize
 from rasterio.io import MemoryFile
 from rasterio.transform import from_origin
 from rasterio.warp import Resampling, calculate_default_transform, reproject
@@ -54,6 +59,15 @@ EPA_EXPORT = ("https://enviroatlas.epa.gov/arcgis/rest/services/Rasters/"
 SD_BBOX_4326 = (-117.62, 32.50, -116.05, 33.52)
 
 LEGEND_STOPS = [0.0, 0.25, 0.5, 0.75, 1.0]
+
+# UCLA Heat Maps public service — San Diego excess heat-related ER visits.
+# Slice shown: Rate (per 10,000 residents), CalHeatScore level 4, 2008-2018.
+# Change the categry / NumRate / Years filters below to show a different slice.
+EXCESS_ER_QUERY = ("https://services7.arcgis.com/2hYXmwteFLemN5bW/arcgis/rest/"
+                   "services/zip_ER/FeatureServer/0/query")
+EXCESS_ER_WHERE = ("cnty_nm='San Diego' AND categry=4 AND NumRate='Rate' "
+                   "AND Years='2008-2018'")
+EXCESS_ER_CACHE = ROOT / "data" / "context" / "excess_er" / "excess_er_rate_chs4_2008_2018_utm11n.tif"
 
 
 def resolve_heat_risk_sd():
@@ -255,10 +269,63 @@ def build_canopy(hrs, land_geoms):
         land_geoms=land_geoms)
 
 
+def build_excess_er(land_geoms):
+    """UCLA Heat Maps excess heat-related ER visits overlay (self-contained).
+
+    Fetches the SD ZIP slice (see EXCESS_ER_WHERE) live from the public UCLA
+    ArcGIS service, rasterizes the ZIP choropleth to a 100 m UTM-11N grid, and
+    renders it through the shared overlay path so the viewer consumes it exactly
+    like the other Data Layers. Skips gracefully (returns None) if the service is
+    unreachable, mirroring the optional impervious/canopy layers.
+    """
+    url = EXCESS_ER_QUERY + "?" + urlencode({
+        "where": EXCESS_ER_WHERE, "outFields": "zip,excs_ER",
+        "returnGeometry": "true", "outSR": 4326, "f": "geojson"})
+    socket.setdefaulttimeout(120)
+    try:
+        gj = json.loads(urllib.request.urlopen(url).read())
+        gdf = gpd.GeoDataFrame.from_features(gj["features"], crs=4326)
+    except Exception as e:
+        logger.warning(f"excess-ER fetch failed ({e}) — overlay skipped")
+        return None
+    gdf = gdf[gdf["excs_ER"].notna() & gdf.geometry.notna()].to_crs(32611)
+    if gdf.empty:
+        logger.warning("excess-ER: no features returned — overlay skipped")
+        return None
+
+    res = 100.0
+    xmin, ymin, xmax, ymax = gdf.total_bounds
+    xmin, ymin = np.floor(xmin / res) * res, np.floor(ymin / res) * res
+    xmax, ymax = np.ceil(xmax / res) * res, np.ceil(ymax / res) * res
+    w, h = int((xmax - xmin) / res), int((ymax - ymin) / res)
+    transform = from_origin(xmin, ymax, res, res)
+    arr = rasterize(((g, v) for g, v in zip(gdf.geometry, gdf["excs_ER"])),
+                    out_shape=(h, w), transform=transform, fill=-9999.0,
+                    all_touched=False, dtype="float32")
+    EXCESS_ER_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    prof = dict(driver="GTiff", dtype="float32", count=1, width=w, height=h,
+                crs="EPSG:32611", transform=transform, nodata=-9999.0,
+                compress="deflate", tiled=True)
+    with rasterio.open(EXCESS_ER_CACHE, "w", **prof) as dst:
+        dst.write(arr, 1)
+    logger.info(f"excess-ER: {len(gdf)} SD ZIPs rasterized {w}x{h} @100 m")
+
+    vmax = float(np.ceil(gdf["excs_ER"].quantile(0.98)))
+    return render_overlay(
+        EXCESS_ER_CACHE, name="excess_er",
+        label="Excess heat-related ER visits",
+        units="per 10,000 · CalHeatScore 4 · 2008–2018",
+        scale="linear", vmin=0, vmax=vmax,
+        cmap_default="YlOrRd", cmap_cb="cividis",
+        source="UCLA Heat Maps (Center for Healthy Climate Solutions) / CalHeatScore",
+        land_geoms=land_geoms)
+
+
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     land_geoms = load_land_geoms()
     build_population(land_geoms)
+    build_excess_er(land_geoms)
     hrs = resolve_heat_risk_sd()
     if hrs is None:
         logger.warning("heat-risk-sd not found (set $HEAT_RISK_SD_DIR) — "

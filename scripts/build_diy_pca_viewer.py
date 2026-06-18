@@ -301,6 +301,12 @@ VAR_SOURCES = {
     "dieselpm_pctile": _SRC_HPI,
 }
 
+# Sources whose terms bar unrestricted (commercial) redistribution. Their raw
+# values are dropped from the "Download Data" export so the downloadable dataset
+# stays CC BY-clean; they still render on the map, used under each source's own
+# terms with attribution. HPI is non-commercial, which conflicts with CC BY.
+RESTRICTED_EXPORT_SOURCES = {_SRC_HPI}
+
 # ── Column groupings for loading ─────────────────────────────────────────
 # Columns from tract_heat_risk_all.csv
 _EXP_CSV_COLS = [
@@ -626,6 +632,13 @@ def main():
         {k: v for k, v in VAR_SOURCES.items() if k in tracts.columns},
         ensure_ascii=True,
     )
+    # Variable keys excluded from the Download Data export (restricted source
+    # terms). They stay on the map; only the bulk download omits them.
+    no_export_str = json.dumps(
+        sorted(k for k, v in VAR_SOURCES.items()
+               if v in RESTRICTED_EXPORT_SOURCES and k in tracts.columns),
+        ensure_ascii=True,
+    )
     # Heat modes: drop any layer missing from the data, then any empty mode.
     heat_modes_str = json.dumps(
         [{"key": k, "label": lbl, "layers": [c for c in cols if c in tracts.columns],
@@ -756,6 +769,7 @@ def main():
     html = html.replace("__GEOJSON_PLACEHOLDER__", geojson_str)
     html = html.replace("__VARMETA_PLACEHOLDER__", var_meta_str)
     html = html.replace("__VARSOURCES_PLACEHOLDER__", var_sources_str)
+    html = html.replace("__NOEXPORT_PLACEHOLDER__", no_export_str)
     html = html.replace("__HEATMODES_PLACEHOLDER__", heat_modes_str)
     html = html.replace("__DELTAS_PLACEHOLDER__", deltas_str)
     html = html.replace("__DELTAMAP_PLACEHOLDER__", delta_map_str)
@@ -911,6 +925,8 @@ details.subsec[open] summary::before{transform:rotate(90deg)}
    right edge to the icon and let it grow leftward into the sidebar. */
 .lbtn .info-pop{left:auto;right:0}
 .lbtn .info-pop::after{left:auto;right:5px}
+.popwt .info-pop{left:auto;right:0}
+.popwt .info-pop::after{left:auto;right:5px}
 details.pc-group{margin-top:4px;border-top:1px dashed #e5e5e5;padding-top:4px}
 details.pc-group>summary{list-style:none;cursor:pointer;
   padding:6px 10px;border-radius:8px;font-size:11px;font-weight:600;
@@ -1798,7 +1814,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <div class="exp-section">
         <div class="exp-section-label">Columns</div>
         <label class="exp-radio" style="cursor:pointer"><input type="checkbox" id="exp-incl-pctile" checked>Include within-county percentile ranks<span class="exp-radio-desc">adds <code>&lt;var&gt;_sd_pctile</code></span></label>
-        <div class="exp-note">Raw source values are always included. Percentile ranks (0&ndash;100) are computed within San Diego County and match the values used by the map and PCA.</div>
+        <div class="exp-note">Raw source values are included, except <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy&nbsp;Places&nbsp;Index</a> variables (tree canopy, park access, income, education, life expectancy, pollution, &amp;c.), which are shown on the map but omitted from download under HPI's non-commercial terms &mdash; get those from HPI directly. Percentile ranks (0&ndash;100) are computed within San Diego County and match the map and PCA.</div>
       </div>
       <div class="exp-section">
         <div class="exp-section-label">Scope</div>
@@ -1937,6 +1953,12 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
         <li><b>Climate Scenario</b> &mdash; see how risk shifts under future warming, for the year 2050 or 2080.</li>
         <li><b>Export</b> &mdash; save the current map as a PDF or download the data.</li>
       </ul>
+      <p style="margin-top:14px;font-size:11.5px;color:#6b7280;line-height:1.5">
+        &copy;&nbsp;2026 Southern California Extreme Heat Research Hub &amp; San Diego Regional Climate Collaborative.
+        Code <a href="https://github.com/cccia-sio/socal-heat-hub/blob/main/LICENSE" target="_blank" rel="noopener" style="color:#6b7280;text-decoration:underline">MIT</a>;
+        data &amp; content <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener" style="color:#6b7280;text-decoration:underline">CC&nbsp;BY&nbsp;4.0</a>,
+        each source under its own terms.
+      </p>
     </div>
     <div class="wlc-footer">
       <a class="wlc-btn secondary" href="../userguide/index.html" target="_blank" rel="noopener noreferrer">User Guide</a>
@@ -1989,6 +2011,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 var GJ  = __GEOJSON_PLACEHOLDER__;
 var VM  = __VARMETA_PLACEHOLDER__;
 var VSRC = __VARSOURCES_PLACEHOLDER__;
+var NO_EXPORT = __NOEXPORT_PLACEHOLDER__;     // var keys omitted from Download Data (restricted source terms; still shown on map)
 var DELTAS = __DELTAS_PLACEHOLDER__;         // {period:{ssp:{tasmax:[...],tasmin:[...]}}} or null
 var DELTA_MAP = __DELTAMAP_PLACEHOLDER__;    // {varKey:"tasmax"|"tasmin"}
 var JURIS = __JURIS_PLACEHOLDER__;           // city jurisdiction GeoJSON or null
@@ -3288,7 +3311,7 @@ function _dtRenderLuLegend(){
 // Close drawer on Esc
 document.addEventListener('keydown', function(e){
   if(e.key==='Escape'){
-    var dr=document.getElementById('detail-drawer');
+    var dr=document.getElementById('detail-modal');
     if(dr&&dr.classList.contains('open')) closeDetailDrawer();
   }
 });
@@ -3848,7 +3871,7 @@ function fcolor(pr,fi){
     var cs=pcc[varPillar[rawVar]]||cr;
     return toHex(interpC(cs,(pct-2)/96));
   }
-  if(curLayer==="composite")return toHex(interpC(cr,(pr._comp-2)/96));
+  if(curLayer==="composite"){if(pr._comp==null)return"#ccc";return toHex(interpC(cr,(pr._comp-2)/96));}
   if(curLayer==="exposure"){var ev=pr._exposure;if(ev==null)return"#ccc";
     return toHex(interpC(pcc.exposure||cr,(ev-2)/96));}
   if(curLayer==="driver"){var b=drgb[pr._drv]||[128,128,128];
@@ -4394,7 +4417,7 @@ function showLayerBtns(){
   if(DS_ENC && DS_LAYERS[curLayer]){
     var dsInfo=ic('How the downscaling works: the Heat Exposure pillar is rendered at ~100 m from a machine-learned downscaled land-surface-temperature field (the heat-risk-sd model), ranked to a county percentile. Population Sensitivity and Adaptive Capacity have no sub-tract data, so each tract keeps its current score. The composite (or driver) is then recomputed per pixel and masked to where people actually live (EPA dasymetric population, 30 m). Only the exposure pillar genuinely varies within a tract.');
     html+='<div class="popwt"><label><input type="checkbox" '+(dsRenderOn?"checked":"")+
-      ' onchange="setDsRender(this.checked)"><span>Downscaled (~100\\u202fm, on population)</span></label>'+dsInfo+'</div>';
+      ' onchange="setDsRender(this.checked)"><span>Show populated areas</span></label>'+dsInfo+'</div>';
   }
   // Primary Spatial Patterns dropdown: the PCA pattern layers per pillar, PLUS the
   // Heat Exposure mode score nested inside it.
@@ -6258,20 +6281,23 @@ function _selectedTractIndices(scope,jurisNames){
 }
 
 function _exportColumnSpec(){
+  // Some sources bar redistribution (e.g. HPI is non-commercial); their columns
+  // are omitted from the download though they stay visible on the map.
+  var skip={}; (NO_EXPORT||[]).forEach(function(k){skip[k]=1;});
   var cols=[{key:'GEOID',label:'GEOID'},{key:'jurisdiction',label:'jurisdiction'}];
-  VM.forEach(function(v){cols.push({key:v.key,label:v.key,vm:true});});
+  VM.forEach(function(v){if(!skip[v.key])cols.push({key:v.key,label:v.key,vm:true});});
   var inclPctile=true;
   var pctileBox=document.getElementById('exp-incl-pctile');
   if(pctileBox)inclPctile=!!pctileBox.checked;
   if(inclPctile){
     VM.forEach(function(v){
-      cols.push({key:v.key+'_sd_pctile',label:v.key+'_sd_pctile',pctOf:v.key});
+      if(!skip[v.key])cols.push({key:v.key+'_sd_pctile',label:v.key+'_sd_pctile',pctOf:v.key});
     });
   }
   var hasScn=(curScenario!=='present'&&curPeriod);
   if(hasScn){
     VM.forEach(function(v){
-      if(DELTA_MAP[v.key])cols.push({key:v.key+'_adj',label:v.key+'_adj',adjOf:v.key});
+      if(DELTA_MAP[v.key]&&!skip[v.key])cols.push({key:v.key+'_adj',label:v.key+'_adj',adjOf:v.key});
     });
     cols.push({key:'scenario',label:'scenario'});
     cols.push({key:'period',label:'period'});

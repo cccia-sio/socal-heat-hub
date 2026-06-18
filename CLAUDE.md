@@ -12,7 +12,7 @@ python3 scripts/build_diy_pca_viewer.py
 
 ## `scripts/` and `data/` are gitignored except allow-list entries
 
-Tracked scripts: `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`, `build_userguide_pdf.sh`. Tracked data: `data/exposure/processed/landsat/`, `data/context/sandag_landuse.pmtiles`, and `data/context/overlays/` (Data-Layer raster PNGs + `*_bounds.json`). Source CSV/GeoJSON/raster inputs live under `data/` locally but aren't committed — files dropped elsewhere under `data/` won't deploy.
+Tracked scripts: `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`, `build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`. Tracked data: `data/exposure/processed/landsat/`, `data/context/sandag_landuse.pmtiles`, and `data/context/overlays/` (Data-Layer raster PNGs + `*_bounds.json`). Source CSV/GeoJSON/raster inputs live under `data/` locally but aren't committed — files dropped elsewhere under `data/` won't deploy.
 
 ## Deployment gotcha: rsync rule order
 
@@ -22,4 +22,5 @@ Tracked scripts: `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_
 
 - LST overlay: `python3 scripts/build_lst_overlay.py` (when raw Landsat inputs change)
 - Data Layer overlays: `python3 scripts/build_data_overlays.py` (population pulled from EPA EnviroAtlas; impervious/canopy from the sibling `heat-risk-sd` NLCD rasters via `$HEAT_RISK_SD_DIR` or a fallback path)
+- UCLA excess-ER + CalHeatScore thresholds (tract crosswalk): `python3 scripts/build_ucla_heat_tract_xwalk.py` (fetches the SD slice live from the UCLA Heat Maps ArcGIS service, crosswalks ZIP→tract by centroid → `data/context/ucla_heat_tract.csv`, baked into the viewer's Exploratory Data Layers at build time)
 - User guide PDF: `bash scripts/build_userguide_pdf.sh` (when `userguide/index.html` changes)

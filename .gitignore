@@ -5,6 +5,7 @@ scripts/*
 !scripts/build_lst_overlay.py
 !scripts/build_userguide_pdf.sh
 !scripts/build_data_overlays.py
+!scripts/build_ucla_heat_tract_xwalk.py
 data/*
 !data/exposure
 data/exposure/*

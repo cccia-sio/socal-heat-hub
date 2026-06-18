@@ -214,6 +214,14 @@
       color:var(--muted);
     }
     tr:last-child td{border-bottom:none}
+    td.grp{
+      background:var(--soft);
+      font-weight:600;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:0.04em;
+      color:var(--muted);
+    }
 
     /* glossary */
     dl.glossary{margin:14px 0}
@@ -267,6 +275,14 @@
       text-decoration:none;
     }
     .back:hover{text-decoration:underline}
+    .license-note{
+      margin-top:28px;
+      padding-top:14px;
+      border-top:1px solid var(--border);
+      font-size:12.5px;
+      color:var(--muted);
+    }
+    .license-note a{color:var(--muted)}
 
     /* ---------- print stylesheet ---------- */
     @media print{
@@ -301,6 +317,9 @@
       /* partner logos at end of guide */
       .partners{break-inside:avoid;margin-top:32px;padding-top:14px}
       .partners img{height:32px;opacity:1}
+
+      /* license note prints (footer/back-link do not) */
+      .license-note{break-inside:avoid;margin-top:20px}
     }
   </style>
 </head>
@@ -506,14 +525,28 @@
         <tr><th>Variable</th><th>Source</th></tr>
       </thead>
       <tbody>
-        <tr><td>Weather observations</td><td><a href="https://synopticdata.com/" target="_blank" rel="noopener">MesoWest / Synoptic Data</a></td></tr>
-        <tr><td>Future temperature projections</td><td><a href="https://loca.ucsd.edu/" target="_blank" rel="noopener">LOCA2 downscaled CMIP6</a></td></tr>
+        <tr><td class="grp" colspan="2">Heat exposure</td></tr>
+        <tr><td>Air temperature (daytime &amp; overnight)</td><td><a href="https://synopticdata.com/" target="_blank" rel="noopener">MesoWest / Synoptic Data</a></td></tr>
+        <tr><td>Humid heat (Wet-Bulb Globe Temperature)</td><td><a href="https://rapidrefresh.noaa.gov/hrrr/" target="_blank" rel="noopener">NOAA HRRR</a></td></tr>
         <tr><td>Land surface temperature</td><td><a href="https://www.usgs.gov/landsat-missions" target="_blank" rel="noopener">USGS Landsat</a></td></tr>
-        <tr><td>Chronic disease prevalence</td><td><a href="https://www.cdc.gov/places/index.html" target="_blank" rel="noopener">CDC PLACES</a></td></tr>
+        <tr><td>Future temperature projections</td><td><a href="https://loca.ucsd.edu/" target="_blank" rel="noopener">LOCA2 downscaled CMIP6</a></td></tr>
+
+        <tr><td class="grp" colspan="2">Population sensitivity</td></tr>
+        <tr><td>Chronic disease &amp; social needs</td><td><a href="https://www.cdc.gov/places/index.html" target="_blank" rel="noopener">CDC PLACES</a></td></tr>
         <tr><td>Social vulnerability</td><td><a href="https://www.atsdr.cdc.gov/place-health/php/svi/index.html" target="_blank" rel="noopener">CDC SVI 2022</a></td></tr>
-        <tr><td>Income, education, healthcare, housing</td><td><a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy Places Index (HPI)</a></td></tr>
-        <tr><td>Demographics and housing</td><td><a href="https://www.census.gov/programs-surveys/acs" target="_blank" rel="noopener">ACS 5-year estimates</a></td></tr>
+        <tr><td>Heat-related hospitalizations</td><td><a href="https://calheatscore.calepa.ca.gov/" target="_blank" rel="noopener">CalHeatScore (CalEPA / OEHHA)</a></td></tr>
+        <tr><td>Energy burden</td><td><a href="https://data.openei.org/submissions/6219" target="_blank" rel="noopener">DOE LEAD Tool (2022)</a></td></tr>
+        <tr><td>Demographics, housing &amp; occupation</td><td><a href="https://www.census.gov/programs-surveys/acs" target="_blank" rel="noopener">ACS 5-year estimates</a></td></tr>
+
+        <tr><td class="grp" colspan="2">Adaptive capacity</td></tr>
+        <tr><td>Income, education, healthcare, parks &amp; tree canopy</td><td><a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy Places Index (HPI)</a></td></tr>
         <tr><td>Air conditioning prevalence</td><td><a href="https://www.census.gov/newsroom/press-releases/2026/2023-lace.html" target="_blank" rel="noopener">U.S. Census LACE 2023</a>; <a href="https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629" target="_blank" rel="noopener">Romitti et&nbsp;al.</a> (modeled)</td></tr>
+        <tr><td>Impervious surface</td><td><a href="https://www.mrlc.gov/data" target="_blank" rel="noopener">NLCD (MRLC)</a></td></tr>
+        <tr><td>Green space &amp; land use</td><td><a href="https://sdgis-sandag.opendata.arcgis.com/" target="_blank" rel="noopener">SANDAG / SanGIS</a></td></tr>
+
+        <tr><td class="grp" colspan="2">Reference map layers</td></tr>
+        <tr><td>Population density</td><td><a href="https://www.epa.gov/enviroatlas" target="_blank" rel="noopener">EPA EnviroAtlas</a></td></tr>
+        <tr><td>Cool-zone cooling sites</td><td><a href="https://www.coolzones.org/" target="_blank" rel="noopener">San Diego County Cool Zones</a></td></tr>
       </tbody>
     </table>
     <p>Each variable name in the tool has a small <code>(Source)</code> link that opens the original source.</p>
@@ -531,6 +564,13 @@
         </a>
       </div>
     </div>
+
+    <p class="license-note">
+      &copy;&nbsp;2026 Southern California Extreme Heat Research Hub &amp; San Diego Regional Climate Collaborative.
+      Code licensed <a href="https://github.com/cccia-sio/socal-heat-hub/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>;
+      data &amp; content <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC&nbsp;BY&nbsp;4.0</a>,
+      with each source under its own terms.
+    </p>
 
     <footer>
       <a class="back" href="../index.html">&larr; Return to landing page</a>

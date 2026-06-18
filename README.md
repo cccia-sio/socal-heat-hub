@@ -44,3 +44,15 @@ Funding was provided through the
 [NSF CoPe program](https://www.nsf.gov/funding/opportunities/cope-coastlines-people-hubs-research-broadening-participation).
 
 Issues and feedback welcome via GitHub issues.
+
+## License
+
+- **Code** (build pipeline, scripts, front-end) — [MIT](LICENSE).
+- **Data & content** (composite scores, percentile ranks, and the layers
+  computed here) — [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
+  reuse freely, including commercially, with attribution.
+
+Incorporated third-party data keeps its own terms. In particular, **Healthy
+Places Index** data is non-commercial, so HPI-derived columns are shown on the
+map but **excluded from the "Download Data" export**. See
+[DATA_LICENSE.md](DATA_LICENSE.md) for the full breakdown.

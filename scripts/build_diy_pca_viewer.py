@@ -3003,13 +3003,28 @@ function _addrOnKey(e){
 var _dtMap=null, _dtLayers={sat:null,lu:null,lst:null};
 var _dtView='sat', _dtGeoid=null;
 
-// Curated variables to show in the modal — three per pillar, picked to
-// cover the headline aspects of each.
+// Fallback variables per pillar, shown only when nothing is selected/built yet.
 var _DT_CURATED = {
   exposure: ['mean_tmax', 'mean_tmin_overnight', 'p99_wbgt'],
   sensitivity: ['RPL_THEMES', 'EP_AGE65', 'diabetes_prev'],
   adaptive: ['ac_prob', 'pct_green', 'pct_pre1980']
 };
+// Variables to list for a pillar in the detail modal, driven by what's selected
+// (mirrors the radar). Exposure: the selected heat mode's member layers — the
+// actual ingredients of the Heat Exposure score. Sensitivity/Adaptive: the
+// enabled variables, ordered by PCA loading (contribution to the composite);
+// pre-build, enabled vars in panel order; nothing enabled -> curated fallback.
+function dtPillarKeys(pid){
+  if(pid==='exposure'){
+    var mode=heatModeDef(heatMode);
+    return (mode&&mode.layers)?mode.layers.slice():(_DT_CURATED.exposure||[]);
+  }
+  var R=results&&results[pid];
+  if(R&&R.keys&&R.keys.length)return radarImportance(R);
+  var ks=[];
+  VM.forEach(function(v){if(v.pillar===pid&&enabled[v.key])ks.push(v.key);});
+  return ks.length?ks:(_DT_CURATED[pid]||[]);
+}
 
 function openDetailDrawer(geoid){
   if(!geoid) return;
@@ -3079,10 +3094,12 @@ function openDetailDrawer(geoid){
     '<div id="dt-lst-legend" class="dt-lst-legend" style="display:none"></div>'+
   '</div>';
 
-  // ---- Curated variable rows per pillar
+  // ---- Selected-variable rows per pillar (driven by the current selection)
   ['exposure','sensitivity','adaptive'].forEach(function(pid){
     var pm=PMETA[pid];
-    var keys=_DT_CURATED[pid]||[];
+    var keys=dtPillarKeys(pid);
+    var hdr=pm.label;
+    if(pid==='exposure'){var md=heatModeDef(heatMode);if(md)hdr+=' \\u2014 '+md.label;}
     var rows='';
     keys.forEach(function(key){
       var meta=null;
@@ -3101,7 +3118,7 @@ function openDetailDrawer(geoid){
     });
     if(rows){
       html+='<div class="dt-section">'+
-        '<div class="dt-pillar-hdr" style="color:'+pm.color+'">'+pm.label+'</div>'+
+        '<div class="dt-pillar-hdr" style="color:'+pm.color+'">'+hdr+'</div>'+
         rows+'</div>';
     }
   });
@@ -3902,27 +3919,128 @@ function fcolor(pr,fi){
 // name plus a value the popup's Percentile/Value toggle switches between the
 // county percentile rank and the real-world reading; dots also carry a <title>.
 var radarValMode='pct';   // 'pct' = percentile rank, 'abs' = real-world value
+// Short spoke labels for the sensitivity/adaptive radar (full names live in
+// varLabel[]). Kept concise so dynamically-chosen spokes stay legible.
+var RADAR_SHORT={
+  bphigh_prev:'High BP', casthma_prev:'Asthma', chd_prev:'Heart Dis.',
+  cognition_prev:'Cognitive', copd_prev:'COPD', depression_prev:'Depression',
+  diabetes_prev:'Diabetes', stroke_prev:'Stroke', obesity_prev:'Obesity',
+  mhlth_prev:'Mental Dist.', leb_pctile:'Life Exp.', loneliness_prev:'Loneliness',
+  emotionspt_prev:'No Support', heat_hosp_day:'Heat Hosp.', heat_hosp_night:'Night Hosp.',
+  EP_AGE65:'Seniors', pct_senior_alone:'Sr. Alone', EP_AGE17:'Children',
+  EP_DISABL:'Disability', EP_LIMENG:'Ltd English', EP_SNGPNT:'Single Par.',
+  EP_POV150:'Poverty', EP_UNEMP:'Unemployed', EP_HBURD:'Housing Cost',
+  EP_NOHSDP:'No HS Dip.', EP_UNINSUR:'Uninsured', EP_MINRTY:'Minority',
+  EP_MUNIT:'Multi-Unit', EP_MOBILE:'Mobile Home', EP_CROWD:'Crowding',
+  EP_NOVEH:'No Vehicle', EP_GROUPQ:'Group Qtrs', EP_NOINT:'No Internet',
+  pct_outdoor_workers:'Outdoor Wk', pct_ag_workers:'Ag Workers',
+  foodinsecu_prev:'Food Insec.', foodstamp_prev:'SNAP', housinsecu_prev:'Housing Ins.',
+  lacktrpt_prev:'No Transit', shututility_prev:'Util. Shutoff', energy_burden:'Energy Burd.',
+  RPL_THEMES:'SVI', RPL_THEME1:'SVI: SES', RPL_THEME2:'SVI: HH',
+  RPL_THEME3:'SVI: Race', RPL_THEME4:'SVI: Hous.',
+  pollution_pctile:'Pollution', ozone_pctile:'Ozone', pm25_pctile:'PM2.5', dieselpm_pctile:'Diesel PM',
+  ac_prob:'AC', ac_prob_romitti:'AC (Rom.)', treecanopy_pctile:'Canopy',
+  parkaccess_pctile:'Parks', pct_pre1980:'Old Housing', pct_pre1960:'Pre-1960',
+  pct_renter:'Renters', pct_green:'Greenspace', pct_impervious:'Impervious',
+  income_pctile:'Income', abovepoverty_pctile:'Above Pov.', economic_pctile:'Economic',
+  education_pctile:'Education', houseing_pctile:'Housing Q.', transportation_pctile:'Transport',
+  social_pctile:'Social', neighborhood_pctile:'Neighb.', insured_pctile:'Insured',
+  automobile_pctile:'Auto', homeownership_pctile:'Homeown.', commute_pctile:'Commute',
+  voting_pctile:'Voting', retail_pctile:'Food Access'
+};
+var _EXP_MODE_SHORT={daytime:'Daytime', nighttime:'Nighttime', wbgt:'Humid', surface:'Surface'};
+// Radar wedges (the "thirds"). Exposure spokes are the four heat modes (the
+// selected one active, the rest greyed context). Sensitivity/Adaptive spokes are
+// chosen at render time from the enabled variables (top by PCA loading), then
+// backfilled from `defaults` (greyed) when fewer than four are enabled.
 var _RADAR_SECTORS=[
-  {pillar:'exposure',    label:'Heat Exposure', c:-90, scoreKey:'_exposure',    invScore:false, vars:[
-    {key:'mean_tmax',           s:'Daytime',   full:'Daytime heat',      inv:false},
-    {key:'mean_tmin_overnight', s:'Nighttime', full:'Nighttime heat',    inv:false},
-    {key:'mean_lst',            s:'Surface',   full:'Surface temp',      inv:false},
-    {key:'p99_wbgt',            s:'Humid',     full:'Humid heat (WBGT)', inv:false}]},
-  {pillar:'sensitivity', label:'Sensitivity',   c:30,  scoreKey:'_sensitivity', invScore:false, vars:[
-    {key:'EP_AGE65',   s:'Seniors',  full:'Seniors',            inv:false},
-    {key:'EP_AGE17',   s:'Children', full:'Children',           inv:false},
-    {key:'RPL_THEMES', s:'SVI',      full:'Social Vuln. Index', inv:false},
-    {key:'EP_POV150',  s:'Poverty',  full:'Poverty',            inv:false}]},
-  {pillar:'adaptive',    label:'Low Capacity',  c:150, scoreKey:'_adaptive',    invScore:true,  vars:[
-    {key:'ac_prob',           s:'AC',         full:'Low AC access',   inv:true},
-    {key:'treecanopy_pctile', s:'Canopy',     full:'Low tree canopy', inv:true},
-    {key:'income_pctile',     s:'Income',     full:'Low income',      inv:true},
-    {key:'pct_green',         s:'Greenspace', full:'Low green space', inv:true}]}
+  {pillar:'exposure',    label:'Heat Exposure', c:-90, scoreKey:'_exposure',    invScore:false, defaults:[]},
+  {pillar:'sensitivity', label:'Sensitivity',   c:30,  scoreKey:'_sensitivity', invScore:false,
+    defaults:['EP_AGE65','EP_AGE17','RPL_THEMES','EP_POV150']},
+  {pillar:'adaptive',    label:'Low Capacity',  c:150, scoreKey:'_adaptive',    invScore:true,
+    defaults:['ac_prob','treecanopy_pctile','income_pctile','pct_green']}
 ];
 // County percentile for one variable, flipped to a deficit when inv (capacity).
 function _radarPct(key,inv,fi){
   var arr=rawPct[key]||[]; var b=(arr[fi]!=null)?arr[fi]:null;
   return (b==null)?null:(inv?100-b:b);
+}
+// Plot a spoke as a deficit (100-pct) when the variable is protective (higher
+// value = lower risk, POLARITY===false), so "outward" always means more risk.
+function _radarInv(key){ return POLARITY[key]===false; }
+
+// Per-mode exposure composite percentiles — exposureScore() run for EVERY heat
+// mode, not just the selected one, so each mode-spoke shows its true composite
+// and the selected mode's spoke reconciles exactly with the pillar score.
+// Cached per scenario/period token (deltas only change with those).
+var _expModeCache={tok:null,val:null};
+function expModeScores(){
+  var tok=curScenario+'|'+curPeriod;
+  if(_expModeCache.tok===tok&&_expModeCache.val)return _expModeCache.val;
+  var feats=GJ.features,N=feats.length,out={},i,j;
+  HEAT_MODES.forEach(function(mode){
+    var keys=mode.layers.filter(function(k){
+      for(var t=0;t<N;t++){if(feats[t].properties[k]!=null)return true;}return false;});
+    if(!keys.length){out[mode.key]=null;return;}
+    var acc=new Array(N);for(i=0;i<N;i++)acc[i]=0;
+    for(j=0;j<keys.length;j++){
+      var d=getDeltaArr(keys[j]),x=new Array(N),mu=0;
+      for(i=0;i<N;i++){var v=feats[i].properties[keys[j]];if(v==null)v=0;if(d)v+=d[i];x[i]=v;mu+=v;}
+      mu/=N;var sd=0;for(i=0;i<N;i++)sd+=(x[i]-mu)*(x[i]-mu);
+      sd=Math.sqrt(sd/(N-1));if(sd<1e-10)sd=1;
+      for(i=0;i<N;i++)acc[i]+=(x[i]-mu)/sd;
+    }
+    for(i=0;i<N;i++)acc[i]/=keys.length;
+    out[mode.key]=pctRank(acc);
+  });
+  _expModeCache={tok:tok,val:out};
+  return out;
+}
+// Rank a pillar PCA result's variables by contribution to the composite
+// (variance-weighted squared loading over the retained PCs). Returns keys, desc.
+function radarImportance(R){
+  var keys=R.keys||[],pcs=R.pcs||[],nret=Math.max(1,R.nret||1);
+  return keys.map(function(k,j){
+    var s=0;
+    for(var t=0;t<nret&&t<pcs.length;t++){
+      var L=(pcs[t].loadings&&pcs[t].loadings[j]!=null)?pcs[t].loadings[j]:0;
+      var w=(pcs[t].pct!=null)?pcs[t].pct:0;
+      s+=L*L*w;
+    }
+    return {key:k,imp:s};
+  }).sort(function(a,b){return b.imp-a.imp;}).map(function(o){return o.key;});
+}
+// Build up to four spokes for a wedge. Exposure: the four heat modes (selected
+// one active). Sensitivity/Adaptive: top enabled variables by PCA loading
+// (active), backfilled with greyed default variables to fill four.
+function radarSpokes(sec,fi){
+  if(sec.pillar==='exposure'){
+    var ms=expModeScores();
+    return HEAT_MODES.map(function(m){
+      var arr=ms[m.key], lead=(m.layers&&m.layers.length)?m.layers[0]:null;
+      return {key:m.key, short:(_EXP_MODE_SHORT[m.key]||m.label), full:m.label,
+              pct:(arr&&arr[fi]!=null)?arr[fi]:null, active:(m.key===heatMode),
+              rawKey:lead, isMode:true};
+    });
+  }
+  var out=[],have={},R=results&&results[sec.pillar];
+  if(R&&R.keys&&R.keys.length){
+    var ranked=radarImportance(R);
+    for(var i=0;i<ranked.length&&out.length<4;i++){
+      var k=ranked[i],iv=_radarInv(k);
+      out.push({key:k, short:(RADAR_SHORT[k]||varLabel[k]||k), full:(varLabel[k]||k),
+                pct:_radarPct(k,iv,fi), active:true, rawKey:k, isMode:false});
+      have[k]=1;
+    }
+  }
+  var fillerActive=!(R&&R.keys&&R.keys.length); // pre-compute: show defaults normally
+  for(var d=0;d<sec.defaults.length&&out.length<4;d++){
+    var dk=sec.defaults[d];if(have[dk])continue;
+    out.push({key:dk, short:(RADAR_SHORT[dk]||varLabel[dk]||dk), full:(varLabel[dk]||dk),
+              pct:_radarPct(dk,_radarInv(dk),fi), active:fillerActive, rawKey:dk, isMode:false});
+    have[dk]=1;
+  }
+  return out;
 }
 function radarSVG(fi,pr){
   var cx=200, cy=158, R=84, W=400, H=320, OFF=[-42,-18,18,42];
@@ -3946,43 +4064,66 @@ function radarSVG(fi,pr){
   });
   // per-sector fans, dots, labels
   _RADAR_SECTORS.forEach(function(sec){
-    var col=PMETA[sec.pillar]?PMETA[sec.pillar].color:'#888';
-    var vp=sec.vars.map(function(v){return _radarPct(v.key,v.inv,fi);});
-    var score, sv=pr[sec.scoreKey];
-    if(sv!=null){score=sec.invScore?100-sv:sv;}
-    else{var sm=0,cn=0;for(var j=0;j<vp.length;j++)if(vp[j]!=null){sm+=vp[j];cn++;}score=cn?sm/cn:0;}
+    var col=PMETA[sec.pillar]?PMETA[sec.pillar].color:'#888', GRAY='#9aa1ab';
+    var isExp=(sec.pillar==='exposure');
+    var spokes=radarSpokes(sec,fi);
+    // Pillar score. Exposure reads the selected mode's composite so the centre
+    // dot and header reconcile exactly with the selected mode's spoke.
+    var score;
+    if(isExp){var ms=expModeScores(),sa=ms[heatMode];score=(sa&&sa[fi]!=null)?sa[fi]:0;}
+    else{var sv=pr[sec.scoreKey];
+      if(sv!=null){score=sec.invScore?100-sv:sv;}
+      else{var sm=0,cn=0;spokes.forEach(function(sp){if(sp.active&&sp.pct!=null){sm+=sp.pct;cn++;}});score=cn?sm/cn:0;}}
     var pts=[
-      {deg:sec.c+OFF[0],pct:vp[0],main:false,vi:0},
-      {deg:sec.c+OFF[1],pct:vp[1],main:false,vi:1},
-      {deg:sec.c,       pct:score,main:true},
-      {deg:sec.c+OFF[2],pct:vp[2],main:false,vi:2},
-      {deg:sec.c+OFF[3],pct:vp[3],main:false,vi:3}
+      {deg:sec.c+OFF[0],sp:spokes[0]||null},
+      {deg:sec.c+OFF[1],sp:spokes[1]||null},
+      {deg:sec.c,       main:true,pct:score},
+      {deg:sec.c+OFF[2],sp:spokes[2]||null},
+      {deg:sec.c+OFF[3],sp:spokes[3]||null}
     ];
     pts.forEach(function(pt){
-      s+='<line x1="'+cx+'" y1="'+cy+'" x2="'+PX(pt.deg,R)+'" y2="'+PY(pt.deg,R)+'" stroke="'+col+
-        '" stroke-opacity="'+(pt.main?0.35:0.16)+'" stroke-width="'+(pt.main?1.4:1)+'"/>';
+      var muted=(!pt.main&&(!pt.sp||!pt.sp.active));
+      s+='<line x1="'+cx+'" y1="'+cy+'" x2="'+PX(pt.deg,R)+'" y2="'+PY(pt.deg,R)+'" stroke="'+(muted?GRAY:col)+
+        '" stroke-opacity="'+(pt.main?0.35:(muted?0.12:0.16))+'" stroke-width="'+(pt.main?1.4:1)+'"/>';
     });
+    // Filled profile: exposure spans all four modes (heat fingerprint);
+    // sensitivity/adaptive span only the active (selected) spokes + score, so
+    // the coloured shape reflects what actually drives the pillar score.
     var poly=[cx.toFixed(1)+','+cy.toFixed(1)];
-    pts.forEach(function(pt){var pc=(pt.pct==null?0:pt.pct);poly.push(PX(pt.deg,R*pc/100)+','+PY(pt.deg,R*pc/100));});
+    pts.forEach(function(pt){
+      if(!(pt.main||(pt.sp&&(isExp||pt.sp.active))))return;
+      var pc=pt.main?(pt.pct==null?0:pt.pct):(pt.sp.pct==null?0:pt.sp.pct);
+      poly.push(PX(pt.deg,R*pc/100)+','+PY(pt.deg,R*pc/100));
+    });
     s+='<polygon points="'+poly.join(' ')+'" fill="'+col+'" fill-opacity="0.22" stroke="'+col+
       '" stroke-width="1.4" stroke-linejoin="round"/>';
     pts.forEach(function(pt){
-      var pc=(pt.pct==null?0:pt.pct);
       if(pt.main){
-        s+='<circle cx="'+PX(pt.deg,R*pc/100)+'" cy="'+PY(pt.deg,R*pc/100)+'" r="5.5" fill="'+col+
-          '" stroke="#fff" stroke-width="1.4"><title>'+sec.label+' score: '+Math.round(pc)+'</title></circle>';
+        var pcm=pt.pct==null?0:pt.pct;
+        s+='<circle cx="'+PX(pt.deg,R*pcm/100)+'" cy="'+PY(pt.deg,R*pcm/100)+'" r="5.5" fill="'+col+
+          '" stroke="#fff" stroke-width="1.4"><title>'+sec.label+' score: '+Math.round(pcm)+'</title></circle>';
         return;
       }
-      var vd=sec.vars[pt.vi], rv=pr[vd.key];
-      var rs=(!vd.inv && rv!=null && !isNaN(rv))?(': '+fmtCmpRaw(vd.key,rv)):'';
-      var title=vd.full+rs+' ('+(pt.pct==null?'n/a':Math.round(pt.pct)+' pctile')+')';
-      s+='<circle cx="'+PX(pt.deg,R*pc/100)+'" cy="'+PY(pt.deg,R*pc/100)+'" r="2.9" fill="'+col+
-        '" stroke="#fff" stroke-width="1"><title>'+title+'</title></circle>';
+      var sp=pt.sp; if(!sp)return;
+      var muted=!sp.active, dotCol=muted?GRAY:col, pc=(sp.pct==null?0:sp.pct);
+      var titleTxt;
+      if(sp.isMode){
+        titleTxt=sp.full+' composite ('+(sp.pct==null?'n/a':Math.round(sp.pct)+' pctile')+(sp.active?', selected mode':', not selected')+')';
+      }else{
+        var rv=pr[sp.rawKey];
+        var rs=(sp.rawKey!=null&&rv!=null&&!isNaN(rv))?(': '+fmtCmpRaw(sp.rawKey,rv)):'';
+        titleTxt=sp.full+rs+' ('+(sp.pct==null?'n/a':Math.round(sp.pct)+' pctile')+(muted?', not selected':'')+')';
+      }
+      var rr=sp.active?(sp.isMode?4.2:3.4):2.5;
+      s+='<circle cx="'+PX(pt.deg,R*pc/100)+'" cy="'+PY(pt.deg,R*pc/100)+'" r="'+rr+'" fill="'+dotCol+
+        '" stroke="#fff" stroke-width="'+(sp.active?1.4:1)+'"><title>'+titleTxt+'</title></circle>';
       var ca=Math.cos(pt.deg*Math.PI/180), anc=Math.abs(ca)<0.30?'middle':(ca>0?'start':'end');
       var lx=PX(pt.deg,R+12), ly=P(pt.deg,R+12)[1];
-      var valStr=(radarValMode==='abs')?fmtCmpRaw(vd.key,rv):(pt.pct==null?'-':String(Math.round(pt.pct)));
-      s+='<text x="'+lx+'" y="'+(ly-1).toFixed(1)+'" text-anchor="'+anc+'" font-size="9.5" font-weight="700" fill="'+col+'">'+vd.s+'</text>';
-      s+='<text x="'+lx+'" y="'+(ly+9).toFixed(1)+'" text-anchor="'+anc+'" font-size="9" font-weight="500" fill="#6b7280">'+valStr+'</text>';
+      var valStr;
+      if(radarValMode==='abs'){var rv2=(sp.rawKey!=null)?pr[sp.rawKey]:null;valStr=(rv2!=null&&!isNaN(rv2))?fmtCmpRaw(sp.rawKey,rv2):(sp.pct==null?'-':String(Math.round(sp.pct)));}
+      else{valStr=(sp.pct==null?'-':String(Math.round(sp.pct)));}
+      s+='<text x="'+lx+'" y="'+(ly-1).toFixed(1)+'" text-anchor="'+anc+'" font-size="9.5" font-weight="'+(sp.active?'700':'600')+'" fill="'+(muted?GRAY:col)+'">'+sp.short+'</text>';
+      s+='<text x="'+lx+'" y="'+(ly+9).toFixed(1)+'" text-anchor="'+anc+'" font-size="9" font-weight="500" fill="'+(muted?GRAY:'#6b7280')+'">'+valStr+'</text>';
     });
     var cam=Math.cos(sec.c*Math.PI/180), anc2=Math.abs(cam)<0.30?'middle':(cam>0?'start':'end'), mp=P(sec.c,R+26);
     s+='<text x="'+mp[0].toFixed(1)+'" y="'+mp[1].toFixed(1)+'" text-anchor="'+anc2+'" font-size="11.5" font-weight="700">'+

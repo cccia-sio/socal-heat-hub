@@ -3961,7 +3961,7 @@ var _RADAR_SECTORS=[
   {pillar:'exposure',    label:'Heat Exposure', c:-90, scoreKey:'_exposure',    invScore:false, defaults:[]},
   {pillar:'sensitivity', label:'Sensitivity',   c:30,  scoreKey:'_sensitivity', invScore:false,
     defaults:['EP_AGE65','EP_AGE17','RPL_THEMES','EP_POV150']},
-  {pillar:'adaptive',    label:'Low Capacity',  c:150, scoreKey:'_adaptive',    invScore:true,
+  {pillar:'adaptive',    label:'Adaptive Capacity', c:150, scoreKey:'_adaptive', invScore:true,
     defaults:['ac_prob','treecanopy_pctile','income_pctile','pct_green']}
 ];
 // County percentile for one variable, flipped to a deficit when inv (capacity).
@@ -4133,8 +4133,17 @@ function radarSVG(fi,pr){
       s+='<text x="'+lx+'" y="'+(ly+9).toFixed(1)+'" text-anchor="'+anc+'" font-size="9" font-weight="500" fill="'+(muted?GRAY:'#6b7280')+'">'+valStr+'</text>';
     });
     var cam=Math.cos(sec.c*Math.PI/180), anc2=Math.abs(cam)<0.30?'middle':(cam>0?'start':'end'), mp=P(sec.c,R+26);
-    s+='<text x="'+mp[0].toFixed(1)+'" y="'+mp[1].toFixed(1)+'" text-anchor="'+anc2+'" font-size="11.5" font-weight="700">'+
+    // Adaptive's label is the longest; nudge it right + constrain width so
+    // "Adaptive Capacity NN" clears the left edge without overlapping the disk.
+    var isAdapt=(sec.pillar==='adaptive'), hx=mp[0]+(isAdapt?18:0);
+    var tl=isAdapt?' textLength="116" lengthAdjust="spacingAndGlyphs"':'';
+    s+='<text x="'+hx.toFixed(1)+'" y="'+mp[1].toFixed(1)+'" text-anchor="'+anc2+'"'+tl+' font-size="11.5" font-weight="700">'+
       '<tspan fill="'+col+'">'+sec.label+' </tspan><tspan fill="#374151">'+Math.round(score)+'</tspan></text>';
+    if(isAdapt){
+      // Small grey note: this wedge plots the capacity gap, so it reads opposite
+      // to the "Adaptive Capacity" map layer (there, higher = more capacity).
+      s+='<text x="'+hx.toFixed(1)+'" y="'+(mp[1]+10).toFixed(1)+'" text-anchor="'+anc2+'" font-size="8" fill="#9aa1ab">(higher score = higher risk)</text>';
+    }
   });
   return s+'</svg>';
 }
@@ -4207,9 +4216,6 @@ function drawTracts(){
           '<button id="hv-tg-abs" onclick="setRadarMode(\\'abs\\')" style="'+_hvtgStyle(radarValMode==='abs','r')+'">Value</button>'+
         '</div>';
         h+='<div id="hv-radar-holder" data-fi="'+fi+'" style="text-align:center">'+radarSVG(fi,p)+'</div>';
-        h+='<div style="font-size:9.5px;color:#6b7280;line-height:1.35;text-align:center;margin:3px 10px 0">'+
-          'Every spoke grows outward as risk rises. The <b style="color:'+(PMETA.adaptive?PMETA.adaptive.color:'#006d2c')+'">Low Capacity</b> '+
-          'wedge is a <b>capacity gap</b> \\u2014 a long spoke means low income, canopy, or AC.</div>';
       }
       h+='<div class="popup-btn-row">'+
         '<button class="popup-more-btn" onclick="map.closePopup();openDetailDrawer(\\''+p.GEOID+'\\')">Show more info \\u25b8</button>'+
@@ -4558,19 +4564,22 @@ function _patternBlurb(r,k){
 
 function showLayerBtns(){
   var el=document.getElementById("layer-buttons"),html="";
-  [{id:"composite",label:"Composite Risk",dot:"#bd0026"},
-   {id:"driver",label:"Dominant Driver",dot:"#2c3e50"},
+  [{id:"composite",label:"Composite Risk",dot:"#bd0026",
+    info:"The overall score: the average of the three pillars (Heat Exposure, Population Sensitivity, and low Adaptive Capacity), each percentile-ranked across San Diego County tracts. Higher = greater heat risk."},
+   {id:"driver",label:"Dominant Driver",dot:"#2c3e50",
+    info:"Colors each tract by its largest risk driver: Heat Exposure (red), Population Sensitivity (purple), or low Adaptive Capacity (green). Shows which pillar dominates, not the overall risk level."},
    {id:"drivermix",label:"Driver Mix",dot:"conic-gradient(#c0392b 0deg 120deg,#6a51a3 120deg 240deg,#16a052 240deg 360deg)"}].forEach(function(b){
     html+='<button class="lbtn'+(curLayer===b.id?" active":"")+'" onclick="setLyr(\\''+b.id+'\\')">'+
-      '<span class="ldot" style="background:'+b.dot+'"></span>'+b.label+'</button>';});
+      '<span class="ldot" style="background:'+b.dot+'"></span>'+
+      '<span class="lbtn-txt">'+b.label+'</span>'+(b.info?ic(b.info):'')+'</button>';});
   // Downscaled toggle (composite/driver/mix only) -- part of the map-layer group,
   // directly under the three main layer buttons. Runs the per-pixel analysis at
   // ~100 m (downscaled LST exposure + live tract sensitivity/adaptive, on the
   // populated footprint), like the report hero maps; the info icon explains it.
   if(DS_ENC && DS_LAYERS[curLayer]){
-    var dsInfo=ic('How the downscaling works: the Heat Exposure pillar is rendered at ~100 m from a machine-learned downscaled land-surface-temperature field (the heat-risk-sd model), ranked to a county percentile. Population Sensitivity and Adaptive Capacity have no sub-tract data, so each tract keeps its current score. The composite (or driver) is then recomputed per pixel and masked to where people actually live (EPA dasymetric population, 30 m). Only the exposure pillar genuinely varies within a tract.');
+    var dsInfo=ic('Renders the map at ~100 m, masked to where people live (EPA dasymetric population). Only Heat Exposure varies within a tract, from a downscaled land-surface-temperature model; Population Sensitivity and Adaptive Capacity keep their tract-level scores.');
     html+='<div class="popwt"><label><input type="checkbox" '+(dsRenderOn?"checked":"")+
-      ' onchange="setDsRender(this.checked)"><span>Show populated areas</span></label>'+dsInfo+'</div>';
+      ' onchange="setDsRender(this.checked)"><span>Populated areas</span></label>'+dsInfo+'</div>';
   }
   // Primary Spatial Patterns dropdown: the PCA pattern layers per pillar, PLUS the
   // Heat Exposure mode score nested inside it.

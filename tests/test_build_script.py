@@ -55,13 +55,14 @@ def test_every_template_token_has_a_replace_call(build_script_text):
 
 
 def test_welcome_modal_pieces_in_template(build_script_text):
-    """The welcome popup needs three coordinated pieces (modal markup,
-    storage-key gating, and the close handlers). If any silently disappears,
-    the popup either never shows or never dismisses.
+    """The welcome popup needs its coordinated pieces: modal markup, the
+    dismiss button, and the closeWelcome handler. If any silently disappears,
+    the popup either never shows or never dismisses. The popup is intentionally
+    per-session (no localStorage gating) — it shows on every page load.
     """
     template_start = build_script_text.find("HTML_TEMPLATE")
     template = build_script_text[template_start:]
 
     assert 'id="welcome-modal"' in template, "welcome-modal markup missing from template."
-    assert "WELCOME_KEY" in template, "WELCOME_KEY gating variable missing from template."
+    assert "closeWelcome" in template, "closeWelcome dismiss handler missing from template."
     assert 'id="wlc-got-it"' in template, "Got-it dismiss button missing from template."

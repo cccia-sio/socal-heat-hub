@@ -92,13 +92,17 @@ def test_viewer_html_is_nontrivial(viewer_html_path):
     )
 
 
-def test_welcome_modal_storage_key_versioned(viewer_html_text):
-    """Bumping WELCOME_KEY is how returning users see updated popup copy.
+def test_welcome_modal_shows_every_load(viewer_html_text):
+    """The welcome popup is intentionally per-session: it opens on every page
+    load with no localStorage gating, so the framing message lands each visit.
 
-    If this assertion fails the popup gating logic was rewritten — that's fine,
-    just remove or update the test. But unintentional edits should be caught.
+    (Replaces an older test that required a versioned WELCOME_KEY; that gating
+    was removed when the popup switched to always-on-load.)
     """
-    assert re.search(r"WELCOME_KEY\s*=\s*'hrv-welcome-seen-v\d+'", viewer_html_text), (
-        "Expected a versioned WELCOME_KEY (e.g. 'hrv-welcome-seen-v3'). "
-        "Bump the suffix whenever the popup copy changes so returning users see it."
+    assert 'id="welcome-modal"' in viewer_html_text, (
+        "welcome-modal markup missing from generated HTML."
+    )
+    assert "hrv-welcome-seen" not in viewer_html_text, (
+        "Stale welcome-modal storage key found — the popup is now per-session "
+        "(shows every load); don't reintroduce localStorage gating."
     )

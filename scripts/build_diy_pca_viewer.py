@@ -2179,7 +2179,7 @@ function getAdj(varKey,i){
 }
 
 // Format a raw variable value with appropriate units for display in the
-// compare-tracts modal. Knows about temperature (°C), 0–1 fractions
+// compare-tracts modal. Knows about temperature (°C + °F), 0–1 fractions
 // (probabilities, AC-rank), pre-computed percentile vars (HPI _pctile, SVI
 // RPL_*) and CDC PLACES / SVI EP_* / pct_* / humidity values that are stored
 // as 0–100 percentages.
@@ -2187,10 +2187,14 @@ var _CMP_TEMP_KEYS={mean_tmax:1,p85_tmax:1,p99_tmax:1,max_tmax:1,
   mean_lst:1,p85_wbgt:1,p99_wbgt:1,
   mean_tmin_overnight:1,p90_tmin_overnight:1,p95_dewpoint:1};
 var _CMP_FRAC_KEYS={no_relief_fraction:1,ac_prob:1,ac_prob_romitti:1};
+// Absolute Celsius -> Fahrenheit. Temperatures are shown in both units so
+// non-scientists can read them. NOTE: this is for absolute values; temperature
+// *differences* (deltas) convert with the scale only (x9/5, no +32 offset).
+function cToF(c){return c*9/5+32;}
 function fmtCmpRaw(key,val){
   if(val==null||isNaN(val))return '\\u2014';
   var v=+val;
-  if(_CMP_TEMP_KEYS[key])return v.toFixed(1)+'\\u00b0C';
+  if(_CMP_TEMP_KEYS[key])return v.toFixed(1)+'\\u00b0C / '+cToF(v).toFixed(1)+'\\u00b0F';
   if(_CMP_FRAC_KEYS[key])return (v*100).toFixed(1)+'%';
   if(key.indexOf('RPL_')===0)return v.toFixed(2);
   if(/_pctile$/.test(key))return v.toFixed(1);
@@ -4020,7 +4024,7 @@ function radarSpokes(sec,fi){
       var arr=ms[m.key], lead=(m.layers&&m.layers.length)?m.layers[0]:null;
       return {key:m.key, short:(_EXP_MODE_SHORT[m.key]||m.label), full:m.label,
               pct:(arr&&arr[fi]!=null)?arr[fi]:null, active:(m.key===heatMode),
-              rawKey:lead, isMode:true};
+              rawKey:lead, isMode:true, inv:false};
     });
   }
   var out=[],have={},R=results&&results[sec.pillar];
@@ -4029,15 +4033,16 @@ function radarSpokes(sec,fi){
     for(var i=0;i<ranked.length&&out.length<4;i++){
       var k=ranked[i],iv=_radarInv(k);
       out.push({key:k, short:(RADAR_SHORT[k]||varLabel[k]||k), full:(varLabel[k]||k),
-                pct:_radarPct(k,iv,fi), active:true, rawKey:k, isMode:false});
+                pct:_radarPct(k,iv,fi), active:true, rawKey:k, isMode:false, inv:iv});
       have[k]=1;
     }
   }
   var fillerActive=!(R&&R.keys&&R.keys.length); // pre-compute: show defaults normally
   for(var d=0;d<sec.defaults.length&&out.length<4;d++){
     var dk=sec.defaults[d];if(have[dk])continue;
+    var div=_radarInv(dk);
     out.push({key:dk, short:(RADAR_SHORT[dk]||varLabel[dk]||dk), full:(varLabel[dk]||dk),
-              pct:_radarPct(dk,_radarInv(dk),fi), active:fillerActive, rawKey:dk, isMode:false});
+              pct:_radarPct(dk,div,fi), active:fillerActive, rawKey:dk, isMode:false, inv:div});
     have[dk]=1;
   }
   return out;
@@ -4112,7 +4117,9 @@ function radarSVG(fi,pr){
       }else{
         var rv=pr[sp.rawKey];
         var rs=(sp.rawKey!=null&&rv!=null&&!isNaN(rv))?(': '+fmtCmpRaw(sp.rawKey,rv)):'';
-        titleTxt=sp.full+rs+' ('+(sp.pct==null?'n/a':Math.round(sp.pct)+' pctile')+(muted?', not selected':'')+')';
+        var pctTxt=(sp.pct==null?'n/a':Math.round(sp.pct)+' pctile');
+        titleTxt=sp.full+rs+' ('+pctTxt+(muted?', not selected':'')+')'+
+          (sp.inv?' \\u2014 capacity gap, higher = lower capacity':'');
       }
       var rr=sp.active?(sp.isMode?4.2:3.4):2.5;
       s+='<circle cx="'+PX(pt.deg,R*pc/100)+'" cy="'+PY(pt.deg,R*pc/100)+'" r="'+rr+'" fill="'+dotCol+
@@ -4180,10 +4187,11 @@ function drawTracts(){
         var dArrTip=getDeltaArr(rawVar);
         if(dArrTip){
           var delta=dArrTip[fi];
+          var deltaF=delta*9/5;   // temperature DIFFERENCE: scale only, no +32 offset
           h+='\\u0394 '+(varLabel[rawVar]||rawVar)+': <b style="color:#c0392b">'+
-            (delta>=0?'+':'')+delta.toFixed(2)+'\\u00b0C</b><br>';
-          h+='<span style="color:#888;font-size:11px">Present: '+(rv!=null?rv:'—')+
-            ' \\u2192 Projected: '+getAdj(rawVar,fi).toFixed(1)+'</span><br>';
+            (delta>=0?'+':'')+delta.toFixed(2)+'\\u00b0C ('+(deltaF>=0?'+':'')+deltaF.toFixed(1)+'\\u00b0F)</b><br>';
+          h+='<span style="color:#888;font-size:11px">Present: '+(rv!=null?fmtCmpRaw(rawVar,rv):'—')+
+            ' \\u2192 Projected: '+fmtCmpRaw(rawVar,getAdj(rawVar,fi))+'</span><br>';
         }else{
           h+=(varLabel[rawVar]||rawVar)+': '+(rv!=null?rv:'—')+'<br>';
         }
@@ -4199,6 +4207,9 @@ function drawTracts(){
           '<button id="hv-tg-abs" onclick="setRadarMode(\\'abs\\')" style="'+_hvtgStyle(radarValMode==='abs','r')+'">Value</button>'+
         '</div>';
         h+='<div id="hv-radar-holder" data-fi="'+fi+'" style="text-align:center">'+radarSVG(fi,p)+'</div>';
+        h+='<div style="font-size:9.5px;color:#6b7280;line-height:1.35;text-align:center;margin:3px 10px 0">'+
+          'Every spoke grows outward as risk rises. The <b style="color:'+(PMETA.adaptive?PMETA.adaptive.color:'#006d2c')+'">Low Capacity</b> '+
+          'wedge is a <b>capacity gap</b> \\u2014 a long spoke means low income, canopy, or AC.</div>';
       }
       h+='<div class="popup-btn-row">'+
         '<button class="popup-more-btn" onclick="map.closePopup();openDetailDrawer(\\''+p.GEOID+'\\')">Show more info \\u25b8</button>'+
@@ -4295,7 +4306,8 @@ function showLegend(){
       el.innerHTML='<div style="font-weight:600;margin-bottom:2px">\\u0394 '+varLabel[rawVar]+ic('Projected change in this variable between the future scenario and the present-day baseline (LOCA2 ensemble mean). Warmer colors indicate larger projected increases.')+'</div>'+
         '<div style="font-size:10px;color:#666;margin-bottom:4px">'+sl[curScenario]+' '+curPeriod+' change from present &nbsp;<a href="https://climatedata.ca/resource/understanding-shared-socio-economic-pathways-ssps/" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline">What are SSPs?</a></div>'+
         '<div class="grad" style="background:linear-gradient(to right,'+dstops+')"></div>'+
-        '<div class="labels"><span>+'+dr.min.toFixed(1)+'\\u00b0C</span><span>+'+dr.max.toFixed(1)+'\\u00b0C</span></div>';
+        '<div class="labels"><span>+'+dr.min.toFixed(1)+'\\u00b0C<br>+'+(dr.min*9/5).toFixed(1)+'\\u00b0F</span>'+
+        '<span style="text-align:right">+'+dr.max.toFixed(1)+'\\u00b0C<br>+'+(dr.max*9/5).toFixed(1)+'\\u00b0F</span></div>';
       el.style.display="block";return;
     }
     var cs=pal('PCC')[varPillar[rawVar]]||pal('CR');
@@ -5401,10 +5413,11 @@ function renderScnCompareSide(side){
         var dTmax=_scnDelta(scn,period,'tasmax',idx)-_scnDelta(scnA,periodA,'tasmax',idx);
         var dTmin=_scnDelta(scn,period,'tasmin',idx)-_scnDelta(scnA,periodA,'tasmin',idx);
         var sMax=(dTmax>=0?'+':''), sMin=(dTmin>=0?'+':'');
+        var dTmaxF=dTmax*9/5, dTminF=dTmin*9/5;   // temperature DIFFERENCE: scale only
         climateBlock='<div style="border-top:1px solid #ddd;margin-top:4px;padding-top:4px;color:#666;font-size:11px">'+
           'Underlying climate signal (this tract, B − A):'+
-          '<br>Δ mean Tmax: <b>'+sMax+dTmax.toFixed(2)+'\\u00b0C</b>'+
-          '<br>Δ mean Tmin: <b>'+sMin+dTmin.toFixed(2)+'\\u00b0C</b>'+
+          '<br>Δ mean Tmax: <b>'+sMax+dTmax.toFixed(2)+'\\u00b0C ('+sMax+dTmaxF.toFixed(1)+'\\u00b0F)</b>'+
+          '<br>Δ mean Tmin: <b>'+sMin+dTmin.toFixed(2)+'\\u00b0C ('+sMin+dTminF.toFixed(1)+'\\u00b0F)</b>'+
           '</div>';
       }
       lyr.bindTooltip('Tract '+f.properties.GEOID.slice(-6)+
@@ -5711,7 +5724,7 @@ function _captureStudyAreaMap(opts){
       // Mirror the live in-page legend (showLegend) for the active view state.
       var sl={'ssp245':'SSP2-4.5','ssp370':'SSP3-7.0','ssp585':'SSP5-8.5'};
       var title='', subtitle='', stops=null;
-      var lowLabel='Low', highLabel='High';
+      var lowLabel='Low', highLabel='High', lowLabel2='', highLabel2='';
       var driverRows=null, triMix=false;
 
       if(rawVar){
@@ -5722,6 +5735,8 @@ function _captureStudyAreaMap(opts){
           stops=pal('CD');
           lowLabel='+'+dr.min.toFixed(1)+'°C';
           highLabel='+'+dr.max.toFixed(1)+'°C';
+          lowLabel2='+'+(dr.min*9/5).toFixed(1)+'°F';   // delta: scale only, no +32 offset
+          highLabel2='+'+(dr.max*9/5).toFixed(1)+'°F';
         }else{
           title=varLabel[rawVar]||rawVar;
           subtitle=_scenarioLabel();
@@ -5806,7 +5821,7 @@ function _captureStudyAreaMap(opts){
       if(showSspLink){plan.push({op:'ssplink',y:y}); y+=subSize+10;}
       if(stops){
         plan.push({op:'grad',y:y}); y+=gradH+4;
-        plan.push({op:'gradLabels',y:y}); y+=bodySize+4;
+        plan.push({op:'gradLabels',y:y}); y+=bodySize+4; if(lowLabel2)y+=bodySize+1;
       }
       if(driverRows){
         driverRows.forEach(function(r){plan.push({op:'drow',y:y,label:r.label,rgb:r.rgb});y+=rowH;});
@@ -5881,6 +5896,12 @@ function _captureStudyAreaMap(opts){
           ctx.fillStyle='#475569'; ctx.font=fonts.body;
           ctx.textAlign='left';  ctx.fillText(lowLabel, px*SCALE, py*SCALE);
           ctx.textAlign='right'; ctx.fillText(highLabel, (px+gradW)*SCALE, py*SCALE);
+          if(lowLabel2){
+            var py2=(py+bodySize+1)*SCALE;
+            ctx.fillStyle='#64748b';
+            ctx.textAlign='left';  ctx.fillText(lowLabel2, px*SCALE, py2);
+            ctx.textAlign='right'; ctx.fillText(highLabel2, (px+gradW)*SCALE, py2);
+          }
           ctx.textAlign='left';
         }else if(L.op==='drow'){
           ctx.fillStyle='rgb('+L.rgb.join(',')+')';

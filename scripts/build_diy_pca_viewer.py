@@ -920,13 +920,17 @@ details.subsec[open] summary::before{transform:rotate(90deg)}
 .biv-title{font-weight:600;color:#333;margin-bottom:3px}
 .biv-sw{display:block;width:74px;height:74px;border:1px solid #bbb}
 .biv-axes{display:flex;justify-content:space-between;margin-top:2px;font-size:9px;color:#666}
-/* Pattern-button info icon sits flush with the right edge of the sidebar; the
-   sidebar's overflow-y:auto clips horizontal overflow, so anchor the popup's
-   right edge to the icon and let it grow leftward into the sidebar. */
-.lbtn .info-pop{left:auto;right:0}
-.lbtn .info-pop::after{left:auto;right:5px}
-.popwt .info-pop{left:auto;right:0}
-.popwt .info-pop::after{left:auto;right:5px}
+/* Sidebar info bubbles (layer buttons, PCA-pattern buttons, the Populated-areas
+   checkbox) sit at the right edge of #sidebar, which clips horizontal overflow
+   (overflow-y:auto forces overflow-x:auto). To render the popup to the RIGHT of
+   its icon -- out over the map -- promote it to fixed positioning; the coords are
+   set from the icon's rect by positionSidebarPop() in JS on hover/focus, and the
+   arrow moves to the popup's left edge. On mobile the sidebar is a transformed
+   overlay drawer (see the max-width media query), which would trap a fixed
+   descendant, so there it reverts to an in-drawer popup that grows leftward. */
+#sidebar .info-pop{position:fixed;left:0;top:0;right:auto;transform:translateY(-50%)}
+#sidebar .info-pop::after{top:50%;left:-10px;bottom:auto;right:auto;
+  transform:translateY(-50%);border:5px solid transparent;border-right-color:#1f2937}
 details.pc-group{margin-top:4px;border-top:1px dashed #e5e5e5;padding-top:4px}
 details.pc-group>summary{list-style:none;cursor:pointer;
   padding:6px 10px;border-radius:8px;font-size:11px;font-weight:600;
@@ -1581,6 +1585,11 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   body.sidebar-open #menu-toggle span:nth-child(2){opacity:0}
   body.sidebar-open #menu-toggle span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
   #map-wrap{width:100%}
+  /* Sidebar is an overlay drawer here; keep info bubbles in-drawer (revert the
+     desktop fixed-right positioning, which the transformed drawer would trap). */
+  #sidebar .info-pop{position:absolute;left:auto;right:0;top:calc(100% + 8px);transform:none}
+  #sidebar .info-pop::after{top:auto;bottom:100%;left:auto;right:5px;transform:none;
+    border:5px solid transparent;border-bottom-color:#1f2937}
   /* Branding: keep the two top-right logos but shrink them; drop the
      bottom-right SIO mark so it doesn't fight the scale bar and the
      bottom-left control stack on a narrow screen. */
@@ -4139,12 +4148,11 @@ function radarSVG(fi,pr){
     var tl=isAdapt?' textLength="116" lengthAdjust="spacingAndGlyphs"':'';
     s+='<text x="'+hx.toFixed(1)+'" y="'+mp[1].toFixed(1)+'" text-anchor="'+anc2+'"'+tl+' font-size="11.5" font-weight="700">'+
       '<tspan fill="'+col+'">'+sec.label+' </tspan><tspan fill="#374151">'+Math.round(score)+'</tspan></text>';
-    if(isAdapt){
-      // Small grey note: this wedge plots the capacity gap, so it reads opposite
-      // to the "Adaptive Capacity" map layer (there, higher = more capacity).
-      s+='<text x="'+hx.toFixed(1)+'" y="'+(mp[1]+10).toFixed(1)+'" text-anchor="'+anc2+'" font-size="8" fill="#9aa1ab">(higher score = higher risk)</text>';
-    }
   });
+  // Whole-compass reminder that every wedge is risk-oriented (higher = worse).
+  // Easy to miss for Adaptive Capacity, whose map layer runs the opposite way.
+  // Sits in the clear bottom margin so it never crowds the wedges or spokes.
+  s+='<text x="'+cx+'" y="'+(cy+130)+'" text-anchor="middle" font-size="10.5" fill="#9aa1ab">(higher score = higher risk)</text>';
   return s+'</svg>';
 }
 // Segmented-button styles for the in-popup Percentile/Value toggle.
@@ -4241,6 +4249,26 @@ function drawTracts(){
 // at module scope — when nested inside showLegend, calls from showLayerBtns
 // throw ReferenceError and silently nuke the PC dropdown render.
 function ic(t){return ' <span class="info-ic" tabindex="0">i<span class="info-pop">'+t+'</span></span>';}
+// Position sidebar info-bubble popups to the RIGHT of their icon, out over the
+// map. They're promoted to position:fixed in CSS (to escape #sidebar's overflow
+// clip); here we set the fixed coords from the icon's rect on hover/focus.
+// Delegated on document so dynamically-rendered buttons are covered. On mobile
+// the sidebar is an overlay drawer, so the CSS media query keeps an in-drawer
+// popup and we clear any stale inline coords instead of repositioning.
+(function(){
+  var _popMQ=window.matchMedia('(max-width:768px),(max-height:500px) and (orientation:landscape)');
+  function positionSidebarPop(e){
+    var t=e.target, ico=(t&&t.closest)?t.closest('#sidebar .info-ic'):null;
+    if(!ico)return;
+    var pop=ico.querySelector('.info-pop'); if(!pop)return;
+    if(_popMQ.matches){pop.style.left='';pop.style.top='';return;}
+    var r=ico.getBoundingClientRect();
+    pop.style.left=(r.right+9)+'px';
+    pop.style.top=(r.top+r.height/2)+'px';
+  }
+  document.addEventListener('mouseover',positionSidebarPop);
+  document.addEventListener('focusin',positionSidebarPop);
+})();
 
 // Trivariate (ternary) color for the Driver Mix layer. White at the centroid
 // (the three drivers contribute equally, so no single one dominates) and each

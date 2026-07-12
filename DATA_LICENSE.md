@@ -29,13 +29,34 @@ but several have their own conditions:
 |---|---|---|
 | [Healthy Places Index (HPI)](https://www.healthyplacesindex.org/terms-and-conditions) | **Non-commercial** + attribution; mark if modified | **Excluded from the "Download Data" export.** Shown on the map under HPI's terms with attribution; obtain the data from HPI directly. |
 | [SANDAG / SanGIS](https://www.sangis.org/) | Raw parcel/land-base layers need a SanGIS sublicense | Only a derived per-tract green-space percentage is used; raw parcels are not redistributed. |
-| [MesoWest / Synoptic](https://synopticdata.com/) | Open for non-commercial / research use | Only derived per-tract temperature statistics are redistributed. |
+| [MesoWest / Synoptic](https://synopticdata.com/) | Open for non-commercial / research use | Only derived per-tract temperature statistics are redistributed — see the note below on why these, unlike HPI, stay in the export. |
 | [CalHeatScore (CalEPA / OEHHA)](https://calheatscore.calepa.ca.gov/) | State aggregated product | Only tract-level relative rate ratios are used. |
+| [UCLA Heat Maps](https://uclaheatmaps.org) | Public research product, aggregated from California HCAI emergency-department records | Display-only map layer; **not included in the export.** |
 
 Because HPI is non-commercial and CC BY permits commercial use, HPI-derived
 columns are **omitted from the bulk data download** to keep the downloadable
 dataset CC BY-clean. They remain visible on the map, used under HPI's own terms
 with attribution. If you redistribute the raw inputs (not the normal "view/use
 the map" path), check each source's terms.
+
+### Why HPI is excluded but MesoWest/Synoptic is not
+
+Both sources are non-commercial, so the differing treatment is deliberate. The
+HPI columns on the map are HPI's *published product* — their percentile values,
+passed through unchanged; redistributing them is redistributing HPI. The
+MesoWest columns (`mean_tmax`, `p85_tmax`, `p99_tmax`, `max_tmax`,
+`mean_tmin_overnight`, `p90_tmin_overnight`, `no_relief_fraction`) are new
+statistics this project computes from raw station observations and interpolates
+to tracts; the observations themselves are not redistributed and cannot be
+recovered from the aggregates. The same reasoning covers the derived SanGIS
+green-space percentage and the CalHeatScore tract-level rate ratios.
+
+### Attribution travels with the download
+
+Every row of the CSV and every feature of the GeoJSON produced by "Download
+Data" carries three constant columns — `citation`, `license` (CC BY 4.0), and
+`sources_url` — so a file that leaves this site still states its terms and links
+back to the per-variable source table. These are stamped from `EXPORT_META` in
+`scripts/build_diy_pca_viewer.py`.
 
 See the full source list in the [User Guide](userguide/index.html).

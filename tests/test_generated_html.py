@@ -35,6 +35,8 @@ INLINED_JSON_VARS = [
     "GJ",
     "VM",
     "VSRC",
+    "NO_EXPORT",
+    "EXPORT_META",
     "DELTAS",
     "DELTA_MAP",
     "JURIS",

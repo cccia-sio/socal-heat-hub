@@ -307,6 +307,22 @@ VAR_SOURCES = {
 # terms with attribution. HPI is non-commercial, which conflicts with CC BY.
 RESTRICTED_EXPORT_SOURCES = {_SRC_HPI}
 
+# Attribution stamped onto every row of the "Download Data" export — as CSV
+# columns and as GeoJSON feature properties — so a file that travels away from
+# this site still carries its license and a link to the per-variable source
+# table. Keep ASCII-only: the CSV ships without a BOM, and non-ASCII would
+# mojibake when opened in Excel.
+EXPORT_META = {
+    "citation": (
+        "San Diego Heat Risk Explorer - Southern California Extreme Heat "
+        "Research Hub & San Diego Regional Climate Collaborative. Healthy "
+        "Places Index variables are shown on the map but omitted from this "
+        "export under HPI's non-commercial terms."
+    ),
+    "license": "CC BY 4.0",
+    "sources_url": "https://cccia-sio.github.io/socal-heat-hub/userguide/#data",
+}
+
 # ── Column groupings for loading ─────────────────────────────────────────
 # Columns from tract_heat_risk_all.csv
 _EXP_CSV_COLS = [
@@ -639,6 +655,7 @@ def main():
                if v in RESTRICTED_EXPORT_SOURCES and k in tracts.columns),
         ensure_ascii=True,
     )
+    export_meta_str = json.dumps(EXPORT_META, ensure_ascii=True)
     # Heat modes: drop any layer missing from the data, then any empty mode.
     heat_modes_str = json.dumps(
         [{"key": k, "label": lbl, "layers": [c for c in cols if c in tracts.columns],
@@ -770,6 +787,7 @@ def main():
     html = html.replace("__VARMETA_PLACEHOLDER__", var_meta_str)
     html = html.replace("__VARSOURCES_PLACEHOLDER__", var_sources_str)
     html = html.replace("__NOEXPORT_PLACEHOLDER__", no_export_str)
+    html = html.replace("__EXPORTMETA_PLACEHOLDER__", export_meta_str)
     html = html.replace("__HEATMODES_PLACEHOLDER__", heat_modes_str)
     html = html.replace("__DELTAS_PLACEHOLDER__", deltas_str)
     html = html.replace("__DELTAMAP_PLACEHOLDER__", delta_map_str)
@@ -1823,7 +1841,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <div class="exp-section">
         <div class="exp-section-label">Columns</div>
         <label class="exp-radio" style="cursor:pointer"><input type="checkbox" id="exp-incl-pctile" checked>Include within-county percentile ranks<span class="exp-radio-desc">adds <code>&lt;var&gt;_sd_pctile</code></span></label>
-        <div class="exp-note">Raw source values are included, except <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy&nbsp;Places&nbsp;Index</a> variables (tree canopy, park access, income, education, life expectancy, pollution, &amp;c.), which are shown on the map but omitted from download under HPI's non-commercial terms &mdash; get those from HPI directly. Percentile ranks (0&ndash;100) are computed within San Diego County and match the map and PCA.</div>
+        <div class="exp-note">Raw source values are included, except <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy&nbsp;Places&nbsp;Index</a> variables (tree canopy, park access, income, education, life expectancy, pollution, &amp;c.), which are shown on the map but omitted from download under HPI's non-commercial terms &mdash; get those from HPI directly. Percentile ranks (0&ndash;100) are computed within San Diego County and match the map and PCA. Every row carries <code>citation</code>, <code>license</code> (CC&nbsp;BY&nbsp;4.0) and <code>sources_url</code> columns; the per-variable source list is in the <a href="../userguide/index.html#data" target="_blank" rel="noopener">User&nbsp;Guide</a>.</div>
       </div>
       <div class="exp-section">
         <div class="exp-section-label">Scope</div>
@@ -2021,6 +2039,7 @@ var GJ  = __GEOJSON_PLACEHOLDER__;
 var VM  = __VARMETA_PLACEHOLDER__;
 var VSRC = __VARSOURCES_PLACEHOLDER__;
 var NO_EXPORT = __NOEXPORT_PLACEHOLDER__;     // var keys omitted from Download Data (restricted source terms; still shown on map)
+var EXPORT_META = __EXPORTMETA_PLACEHOLDER__; // {citation,license,sources_url} stamped on every exported row
 var DELTAS = __DELTAS_PLACEHOLDER__;         // {period:{ssp:{tasmax:[...],tasmin:[...]}}} or null
 var DELTA_MAP = __DELTAMAP_PLACEHOLDER__;    // {varKey:"tasmax"|"tasmin"}
 var JURIS = __JURIS_PLACEHOLDER__;           // city jurisdiction GeoJSON or null
@@ -6508,10 +6527,14 @@ function _exportColumnSpec(){
     if(results.sensitivity)cols.push({key:'sensitivity_score',label:'sensitivity_score'});
     if(results.adaptive)cols.push({key:'adaptive_score',label:'adaptive_score'});
   }
+  // Attribution, repeated on every row, so the file carries its license and a
+  // link to the per-variable source table once it leaves this site.
+  Object.keys(EXPORT_META).forEach(function(k){cols.push({key:k,label:k,meta:true});});
   return cols;
 }
 
 function _rowValueFor(col,i,pr){
+  if(col.meta)return EXPORT_META[col.key];
   if(col.key==='GEOID')return pr.GEOID;
   if(col.key==='jurisdiction'){_ensureTractJuris();return _tractJurisName[i];}
   if(col.key==='scenario')return curScenario;

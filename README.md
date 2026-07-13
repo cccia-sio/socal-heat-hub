@@ -8,7 +8,13 @@ Pick the variables that matter to you — temperatures, chronic disease rates,
 tree canopy, AC access, poverty — and the tool combines them into a
 neighborhood-level risk map. Toggle climate scenarios to see how risk shifts
 under mid-century and end-of-century warming. The tool runs entirely in the
-browser — no server, no tracking, no account needed.
+browser — no server, no account, and no analytics or tracking of any kind.
+
+Two things do leave your browser, both to third parties, neither logged by us:
+map tiles are fetched from CARTO and Esri as you pan, and **anything you type
+into the address search is sent to OpenStreetMap's Nominatim** geocoder to be
+turned into a location. If you'd rather not send an address to a third party,
+click the map instead of searching for it.
 
 See the [User Guide](https://cccia-sio.github.io/socal-heat-hub/userguide/)
 for variables, methodology, and map interpretation.
@@ -45,12 +51,23 @@ Funding was provided through the
 
 Issues and feedback welcome via GitHub issues.
 
+## Citation
+
+If you use this tool, its methodology, or its derived data, please cite it —
+see [CITATION.cff](CITATION.cff).
+
 ## License
 
-- **Code** (build pipeline, scripts, front-end) — [MIT](LICENSE).
+- **Code** (build pipeline, scripts, front-end source) — [MIT](LICENSE).
 - **Data & content** (composite scores, percentile ranks, and the layers
   computed here) — [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
   reuse freely, including commercially, with attribution.
+
+The MIT grant covers the **code**, not the tract data baked into the generated
+`main/heat_risk_map.html`. That file embeds third-party data (HPI, UCLA Heat
+Maps) that this project cannot sublicense commercially — so copying the
+generated HTML is not an MIT-covered act. See the scope note in
+[LICENSE](LICENSE).
 
 Incorporated third-party data keeps its own terms. In particular, **Healthy
 Places Index** data is non-commercial, so HPI-derived columns are shown on the

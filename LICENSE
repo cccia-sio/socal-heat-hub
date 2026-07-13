@@ -21,9 +21,46 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
----
+================================================================================
+SCOPE OF THE MIT GRANT — READ THIS BEFORE REDISTRIBUTING
+================================================================================
 
-The MIT License above covers the SOFTWARE in this repository (the build
-pipeline, scripts, and front-end code). The DATA and written content are
-licensed separately under CC BY 4.0, and incorporated third-party data retains
-its own terms. See DATA_LICENSE.md.
+"The Software" above means the CODE in this repository:
+
+  * the build pipeline under `scripts/`
+  * the front-end source — the HTML/CSS/JavaScript authored here, including the
+    `HTML_TEMPLATE` string in `scripts/build_diy_pca_viewer.py`
+  * the test suite
+
+"The Software" does NOT mean the DATA. Three things are carved out of the MIT
+grant, because this project has no right to license them the way MIT does.
+
+1. THE TRACT DATA PAYLOAD EMBEDDED IN THE GENERATED VIEWER.
+
+   `main/heat_risk_map.html` is a build artifact: front-end code with a complete
+   tract-level dataset baked into it. The code in that file is MIT. The embedded
+   data is NOT — it is governed by DATA_LICENSE.md, and it includes third-party
+   material this project cannot sublicense (see 2 and 3). Copying the generated
+   HTML is not covered by this MIT grant.
+
+2. HEALTHY PLACES INDEX (HPI) DATA — NON-COMMERCIAL.
+
+   HPI's terms forbid commercial use. HPI-derived percentile columns are
+   embedded in the generated viewer so the map can display them, under HPI's own
+   terms with attribution. They are excluded from the "Download Data" export for
+   exactly this reason. MIT permits selling copies; HPI does not permit
+   commercial use. MIT therefore cannot and does not extend to HPI data.
+   Obtain HPI data from HPI: https://www.healthyplacesindex.org/
+
+3. UCLA HEAT MAPS / CalHeatScore DERIVED VALUES.
+
+   Aggregated from California HCAI emergency-department records and used as a
+   display-only layer. Excluded from the export. Not sublicensed here.
+
+If you want the CODE, take `scripts/` and the front-end source under MIT — that
+is a real, unrestricted grant and it is the part we are inviting you to reuse.
+If you want the DATA, read DATA_LICENSE.md: this project's own contributions
+(composite scores, percentile ranks, and the layers computed here) are CC BY 4.0,
+and each third-party input keeps its original terms.
+
+If you use this work, please cite it — see CITATION.cff.

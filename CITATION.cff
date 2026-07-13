@@ -1,0 +1,52 @@
+cff-version: 1.2.0
+title: San Diego Heat Risk Explorer
+message: >-
+  If you use this tool, its methodology, or its derived data, please cite it.
+type: software
+authors:
+  # TODO: add co-authors (PI, SDRCC collaborators) and ORCIDs before minting the DOI.
+  - given-names: Connor
+    family-names: Mack
+    email: cjmack@ucsd.edu
+    affiliation: Scripps Institution of Oceanography, UC San Diego
+    # orcid: 'https://orcid.org/0000-0000-0000-0000'
+repository-code: 'https://github.com/cccia-sio/socal-heat-hub'
+url: 'https://cccia-sio.github.io/socal-heat-hub/'
+abstract: >-
+  An interactive, browser-based composite heat-risk viewer for every census
+  tract in San Diego County. Users select the variables that matter to them
+  across three pillars — heat exposure, population sensitivity, and adaptive
+  capacity — and the tool combines them via PCA into a neighborhood-level risk
+  map, with LOCA2-downscaled climate scenarios for mid-century and
+  end-of-century warming.
+keywords:
+  - extreme heat
+  - heat vulnerability
+  - climate adaptation
+  - environmental justice
+  - San Diego
+  - census tract
+  - principal component analysis
+license: MIT
+license-url: 'https://github.com/cccia-sio/socal-heat-hub/blob/main/LICENSE'
+# The MIT license covers the CODE only. The data and derived content are CC BY
+# 4.0, and embedded third-party data (HPI, UCLA Heat Maps) keeps its own terms.
+# See DATA_LICENSE.md and the scope note in LICENSE.
+
+# TODO: mint a DOI (Zenodo -> "New version" on each release) and add it here.
+# A DOI is what makes reuse citable and makes being scooped provable — it
+# timestamps the work and gives reusers something concrete to point at.
+# identifiers:
+#   - type: doi
+#     value: 10.5281/zenodo.XXXXXXX
+#     description: Archived release
+
+# TODO: once the methods paper is out, add it as the preferred citation so
+# `cite this repository` resolves to the paper rather than the software.
+# preferred-citation:
+#   type: article
+#   title: ''
+#   authors: []
+#   journal: ''
+#   year: 2026
+#   doi: ''

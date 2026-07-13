@@ -335,14 +335,44 @@ python3 -m pytest
 - `test_build_script.py` — constants/invariants in `build_diy_pca_viewer.py`.
 - `test_generated_html.py` — the committed viewer has the expected structure
   (no leftover `__*_PLACEHOLDER__` tokens, required elements present).
+- `test_export_licensing.py` — restricted sources (HPI) never reach the data
+  download, and every export carries its citation/license.
 - `test_landsat_assets.py` — the LST overlay PNGs + bounds JSON exist and parse.
 - `test_pages_workflow.py` — `pages.yml` keeps its include-before-exclude rsync
   ordering (the deploy gotcha above).
 - `test_static_links.py` — internal links across the pages resolve.
 - `test_tracked_files.py` — the `.gitignore` allow-list still tracks exactly the
   intended scripts/data products.
+- `test_tract_pdf.py` — the single-tract PDF export: XML-safe rose-plot labels,
+  one page, row-cap overflow reported, imagery attributed, and the SANDAG
+  land-use inset dropped (caption and credit with it) when its parcels don't
+  render.
+- `test_risk_orientation.py` — the rose plot, the detail modal and the tract PDF
+  all print RISK percentiles, so protective variables (tree canopy, income, AC)
+  are flipped to `100 - pct` everywhere. Each surface owns a copy of this logic
+  and they have drifted apart twice.
+- `test_composite_staleness.py` — only `compute()` may write the composite.
+  Changing a heat mode or a variable marks it stale and highlights Build instead
+  of silently rebuilding.
 
 These are the guardrails that catch the kinds of drift this document is prone to.
+
+### Writing new ones
+
+The viewer is one big inlined script, so most guards work by slicing a function
+out of the built HTML and asserting on its source. `conftest.py` provides
+`js_fn("name")` for that, and `js_code("name")` for the same thing with comments
+stripped.
+
+**Use `js_code` for any assertion about what the code does or doesn't contain.**
+Fixed code tends to *describe* the bug it fixed, so `assert "_rgbTriplet" not in
+src` cheerfully trips over the comment `// _rgbTriplet only reads rgb()`, and
+`assert "getImageData" in src` passes even after the real check is deleted. That
+mistake was made three times while writing these tests.
+
+And these guards only earn their keep if they fail on the real bug. When adding
+one, reintroduce the bug in `main/heat_risk_map.html`, confirm the test goes red,
+then restore the file.
 
 ## Deployment
 

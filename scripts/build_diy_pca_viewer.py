@@ -3405,7 +3405,7 @@ document.addEventListener('keydown', function(e){
 var jurisLayers={};
 var jurisLabels={};   // name -> permanent center label tooltip, shown with the layer
 var JURIS_COLOR="#000000";
-function jurisCheckboxId(name){return "cb-juris-"+name.replace(/\s+/g,"_");}
+function jurisCheckboxId(name){return "cb-juris-"+name.replace(/\\s+/g,"_");}
 if(JURIS){
   function makeJurisStyle(){
     return function(){return{fillColor:"transparent",color:JURIS_COLOR,weight:1.5,fillOpacity:0,dashArray:""}};
@@ -3540,7 +3540,7 @@ var TRIBAL_COLORS={reservation:"#8b5a2b",trust:"#b78050"};
 function tribalGroupKey(name){
   return name.replace(/ Reservation$/,"").replace(/ Off-Reservation Trust Land$/,"");
 }
-function tribalCheckboxId(groupKey){return "cb-tribal-"+groupKey.replace(/\s+/g,"_");}
+function tribalCheckboxId(groupKey){return "cb-tribal-"+groupKey.replace(/\\s+/g,"_");}
 if(typeof TRIBAL!=='undefined'&&TRIBAL&&TRIBAL.features&&TRIBAL.features.length){
   function makeTribalStyle(type){
     var c=TRIBAL_COLORS[type]||TRIBAL_COLORS.reservation;

@@ -908,6 +908,11 @@ details.subsec[open] summary::before{transform:rotate(90deg)}
   font-family:inherit}
 #compute-btn:hover{background:#1d4ed8}
 #compute-btn:active{background:#1e40af}
+/* Stale: the panel has changed since the last build. Amber reads as "action
+   needed" rather than "error", and the ring catches the eye without motion. */
+#compute-btn.needs-build{background:#d97706;box-shadow:0 0 0 3px rgba(217,119,6,0.28)}
+#compute-btn.needs-build:hover{background:#b45309}
+#compute-btn.needs-build:active{background:#92400e}
 
 #results{font-size:12px;color:#555;margin-bottom:12px}
 .res-row{margin-bottom:3px}
@@ -2070,6 +2075,10 @@ var PMETA = {
   sensitivity: {label:"Population Sensitivity", color:"#6a51a3"},
   adaptive:    {label:"Adaptive Capacity", color:"#006d2c"}
 };
+// Accent for the Composite summary card. It isn't a pillar, so it has no PMETA
+// hue — this is the brand blue used by the PDF title rule and the popup buttons,
+// which keeps it from reading as a fourth pillar next to the three PMETA cards.
+var _DT_CARD_ACCENT = "#2563eb";
 var SREF = {exposure:"mean_tmax", sensitivity:"bphigh_prev", adaptive:"income_pctile"};
 
 /* ================================================================
@@ -2080,6 +2089,12 @@ var heatMode = (HEAT_MODES[0]?HEAT_MODES[0].key:"daytime"); // selected exposure
 var curLayer = "composite";
 var rawVar   = null; // key of raw variable being previewed (before PCA)
 var results  = null;
+// The composite is a COMMITTED artifact: only compute() ever writes _comp and the
+// pillar scores. Changing an input (heat mode, enabled variables) marks it stale
+// instead of silently recomputing — the old behaviour redrew the composite the
+// instant you picked a new heat mode, so it looked like the map was
+// live-calculating and there was no way to tell a rebuild had happened.
+var compositeStale = false;
 var curScenario = "present"; // "present" | "ssp245" | "ssp370" | "ssp585"
 var curPeriod   = "";        // "" (present) | "2050" | "2080"
 var cbMode = (function(){try{return localStorage.getItem('hrv-cb-mode')==='1';}catch(e){return false;}})();
@@ -3097,11 +3112,13 @@ function openDetailDrawer(geoid){
     // radar. _adaptive is stored capacity-side (higher = MORE capacity), so it
     // is flipped to a capacity deficit here exactly as the radar's adaptive
     // wedge and the composite (100-s in compute()) already do.
+    // Accent bars carry the PILLAR colour, so each card matches its pillar
+    // header below and its rose-plot wedge. (Keep in step with the tract PDF.)
     var cards=[
-      {lbl:'Composite', val:pr._comp},
-      {lbl:'Heat Exp.', val:pr._exposure},
-      {lbl:'Sensitivity', val:pr._sensitivity},
-      {lbl:'Adaptive Cap.', val:(pr._adaptive==null?null:100-pr._adaptive)}
+      {lbl:'Composite', val:pr._comp, col:_DT_CARD_ACCENT},
+      {lbl:'Heat Exp.', val:pr._exposure, col:PMETA.exposure.color},
+      {lbl:'Sensitivity', val:pr._sensitivity, col:PMETA.sensitivity.color},
+      {lbl:'Adaptive Cap.', val:(pr._adaptive==null?null:100-pr._adaptive), col:PMETA.adaptive.color}
     ];
     html+='<div class="dt-section-hdr">Risk Summary</div>';
     html+='<div class="dt-summary">';
@@ -3109,7 +3126,7 @@ function openDetailDrawer(geoid){
       if(c.val==null){
         html+='<div class="dt-card"><div class="dt-card-lbl">'+c.lbl+'</div><div class="dt-card-val dt-na">\\u2014</div></div>';
       }else{
-        var col=_dtRiskColor(c.val);
+        var col=c.col;
         html+='<div class="dt-card" style="border-left:3px solid '+col+'">'+
           '<div class="dt-card-lbl">'+c.lbl+'</div>'+
           '<div class="dt-card-val">'+c.val.toFixed(0)+'</div>'+
@@ -3844,6 +3861,10 @@ function compute(){
     var pv={sensitivity:[],adaptive:[]};
     VM.forEach(function(v){if(v.pillar!=="exposure"&&enabled[v.key])pv[v.pillar].push(v.key);});
     rawVar=null; // switch from raw preview to results mode
+    // Building commits the heat-mode preview, so surface the thing they asked
+    // for: the composite. Any other built layer (driver, a PC) is left alone —
+    // it gets rebuilt in place rather than yanking the user back to composite.
+    if(curLayer==="heatmode")curLayer="composite";
     // Exposure = selected heat mode (no PCA); Sensitivity/Adaptive = PCA.
     var res={exposure:exposureScore()};
     ["sensitivity","adaptive"].forEach(function(pid){res[pid]=pillarPCA(pid,pv[pid]);});
@@ -3871,6 +3892,8 @@ function compute(){
       pr._drvE=eS;pr._drvS=sS;pr._drvA=aD;
     }
     results=res;
+    compositeStale=false;   // the panel and the map now agree again
+    syncBuildBtn();
     drawTracts();
     showResults();
     showLayerBtns();
@@ -3939,6 +3962,13 @@ function fcolor(pr,fi){
     var cs=pcc[varPillar[rawVar]]||cr;
     return toHex(interpC(cs,(pct-2)/96));
   }
+  // Live preview of the selected heat mode. Reads expModeScores(), NOT pr._exposure
+  // — that still belongs to the last build and may be a different mode entirely.
+  if(curLayer==="heatmode"){
+    var msf=expModeScores(), harr=msf?msf[heatMode]:null;
+    var hv=harr?harr[fi]:null;
+    if(hv==null)return"#ccc";
+    return toHex(interpC(pcc.exposure||cr,(hv-2)/96));}
   if(curLayer==="composite"){if(pr._comp==null)return"#ccc";return toHex(interpC(cr,(pr._comp-2)/96));}
   if(curLayer==="exposure"){var ev=pr._exposure;if(ev==null)return"#ccc";
     return toHex(interpC(pcc.exposure||cr,(ev-2)/96));}
@@ -4370,8 +4400,34 @@ function _triCanvas(w,h){
   return cv;
 }
 
-function showLegend(){
+function showLegend(){ _showLegendBody(); _appendStaleNote(); }
+
+// Amber footnote whenever the map is showing a composite-derived layer that
+// predates the user's latest panel changes. The preview views aren't stale —
+// they're live — so they're exempt.
+function _appendStaleNote(){
+  if(!(compositeStale&&results))return;
+  if(rawVar||curLayer==="heatmode")return;
   var el=document.getElementById("legend");
+  if(!el||el.style.display==="none")return;
+  el.insertAdjacentHTML('beforeend',
+    '<div style="font-size:10px;color:#b45309;margin-top:5px;line-height:1.35">'+
+    'Showing the last build \\u2014 your changes aren\\u2019t applied yet.</div>');
+}
+
+function _showLegendBody(){
+  var el=document.getElementById("legend");
+  // Selected heat mode, previewed live — not yet folded into a build.
+  if(curLayer==="heatmode"&&!rawVar){
+    var md=heatModeDef(heatMode);
+    var hstops=(pal('PCC').exposure||pal('CR')).map(function(c){return"rgb("+c.join(",")+")"}).join(",");
+    el.innerHTML='<div style="font-weight:600;margin-bottom:2px">Heat Exposure \\u2014 '+_addrEsc((md&&md.label)||'')+
+      ic('The selected heat mode, scored as the mean of its z-scored layers and percentile-ranked across San Diego County tracts. Higher = hotter relative to other tracts. This is a preview of the mode on its own; it is not a composite.')+'</div>'+
+      '<div style="font-size:10px;color:#b45309;margin-bottom:4px">Preview \\u2014 click Build to fold this into the composite.</div>'+
+      '<div class="grad" style="background:linear-gradient(to right,'+hstops+')"></div>'+
+      '<div class="labels"><span>Low</span><span>High</span></div>';
+    el.style.display="block";return;
+  }
   // Raw variable preview legend
   if(rawVar){
     // Future scenario + projectable var: delta legend
@@ -4496,33 +4552,62 @@ function buildUI(){
   ["sensitivity","adaptive"].forEach(syncPillarCb);
 }
 
-// Select a heat mode (exposure is single-select). Recompute if a composite is
-// already built; otherwise live-preview the mode's lead layer on the map.
+// Flag the built composite as out of date with the panel. No-op before the first
+// build, when the button is already the obvious call to action.
+function markCompositeStale(){
+  if(!results||compositeStale)return;
+  compositeStale=true;
+  syncBuildBtn();
+  showLegend();   // surfaces the "showing the last build" note
+}
+// Reflect stale state on the Build button: amber + a rewritten label, so the
+// pending action is legible even if the user never looks at the legend.
+function syncBuildBtn(){
+  var b=document.getElementById('compute-btn');
+  if(!b)return;
+  var stale=(compositeStale&&!!results);
+  b.classList.toggle('needs-build',stale);
+  b.textContent=stale?'Rebuild Composite Risk Map':'Build Composite Risk Map';
+}
+
+// Select a heat mode (exposure is single-select). Always previews the mode on the
+// map. The composite is deliberately NOT recomputed here — it goes stale until
+// the user clicks Build.
 function selectHeatMode(key){
   if(!heatModeDef(key))return;
   heatMode=key;
   var rows=document.querySelectorAll('.mode-row');
   for(var i=0;i<rows.length;i++)rows[i].classList.remove('on');
   var row=document.getElementById('mr_'+key);if(row)row.classList.add('on');
-  if(results)compute();
-  else previewHeatMode();
+  previewHeatMode();
+  markCompositeStale();
 }
 
-// Pre-build preview: show the selected mode's lead layer using the existing
-// raw-variable percentile machinery (a quick look at the heat geography).
+// Show the selected heat mode on the map: its own composite percentile — the
+// very score that becomes Heat Exposure on Build — read live from
+// expModeScores(). Nothing is written to the features, so the committed
+// composite underneath survives untouched. Falls back to the mode's lead layer
+// if the mode has no usable data.
 function previewHeatMode(){
   var mode=heatModeDef(heatMode);if(!mode)return;
-  var lead=null;
-  for(var i=0;i<mode.layers.length;i++){if(rawPct[mode.layers[i]]){lead=mode.layers[i];break;}}
-  if(!lead)return;
-  rawVar=lead;curLayer="composite";
+  var ms=expModeScores();
+  if(ms&&ms[heatMode]){
+    rawVar=null;curLayer="heatmode";
+  }else{
+    var lead=null;
+    for(var i=0;i<mode.layers.length;i++){if(rawPct[mode.layers[i]]){lead=mode.layers[i];break;}}
+    if(!lead)return;
+    rawVar=lead;curLayer="composite";
+  }
   updateDeltaRange();
   document.getElementById("prompt").style.display="none";
   drawTracts();
+  if(results)showLayerBtns();   // clear the active-layer highlight: this is a preview, not a built layer
 }
 
 function tog(key){
   enabled[key]=!enabled[key];
+  markCompositeStale();   // the built composite no longer reflects the panel
   var row=document.getElementById("vr_"+key);
   if(row){if(enabled[key])row.classList.add("on");else row.classList.remove("on");}
   if(enabled[key]){
@@ -4562,6 +4647,7 @@ function syncPillarCb(pid){
 // shot, then update the displayed raw layer the same way tog() does on a
 // single-variable change.
 function togPillar(pid,on){
+  markCompositeStale();   // the built composite no longer reflects the panel
   VM.forEach(function(v){
     if(v.pillar!==pid)return;
     enabled[v.key]=on;
@@ -6403,14 +6489,84 @@ function _radarCanvas(fi,pr,scale){
   return _svgToCanvas(svg,W,H,S);
 }
 
-// Satellite locator for one tract. Same approach as _captureStudyAreaMap:
-// Leaflet is used purely as a projector and the tiles are drawn by hand,
-// because html2canvas cannot composite Leaflet's tile and vector panes in
-// alignment. Resolves to null (rather than rejecting) when imagery is blocked,
-// so a firewalled network loses the panel but still gets the PDF.
-function _captureTractInset(feat){
+// Composite the SANDAG land-use parcels onto the inset canvas. protomaps-leaflet
+// draws each tile into its own <canvas> inside a Leaflet GridLayer, so we let it
+// render off-screen and then blit those tiles across. Position comes from the
+// DOM rects rather than re-deriving Leaflet's tile math — the layer may use a
+// different tile size / levelDiff than the raster grid, and the rects are
+// already exactly where Leaflet put them.
+// Resolves false when protomaps is unavailable or the PMTiles fetch yields
+// nothing (e.g. file:// preview, where Range requests fail), so the caller can
+// drop the panel instead of emitting a blank one.
+function _pdfPaintLanduse(pm,ctx,S){
   return new Promise(function(resolve){
-    var W=640,H=520,S=2,TILE=256;
+    if(!window.protomapsL){resolve(false);return;}
+    if(!pm.getPane('landusePane')){
+      pm.createPane('landusePane');
+      pm.getPane('landusePane').style.zIndex=450;
+    }
+    var layer=_buildLanduseLayer();
+    if(!layer){resolve(false);return;}
+    var settled=false;
+    function finish(){
+      if(settled)return;
+      settled=true;
+      var painted=false;
+      try{
+        // Blit onto a scratch canvas first, not straight onto the basemap: a
+        // failed PMTiles fetch still leaves protomaps with blank-but-valid tile
+        // canvases, so "we drew some tiles" is NOT evidence that any parcels
+        // rendered. Only the pixels can tell us, and once they're composited
+        // over CARTO we can no longer distinguish them from the basemap.
+        var sc=document.createElement('canvas');
+        sc.width=ctx.canvas.width;sc.height=ctx.canvas.height;
+        var sctx=sc.getContext('2d');
+        var mr=pm.getContainer().getBoundingClientRect();
+        var tiles=layer._tiles||{};
+        Object.keys(tiles).forEach(function(k){
+          var el=tiles[k]&&tiles[k].el;
+          if(!el||!el.width||!el.height)return;
+          var r=el.getBoundingClientRect();
+          if(!r.width||!r.height)return;
+          try{sctx.drawImage(el,(r.left-mr.left)*S,(r.top-mr.top)*S,r.width*S,r.height*S);}catch(e){}
+        });
+        // Parcels (incl. water) blanket the SANDAG extent, so a real render
+        // covers most of the frame. Sample the alpha channel; a blank layer
+        // scores ~0. The scratch canvas only ever holds protomaps' own vector
+        // output, so it is never tainted and getImageData is safe.
+        var d=sctx.getImageData(0,0,sc.width,sc.height).data;
+        var seen=0,hit=0;
+        for(var i=3;i<d.length;i+=4*17){seen++;if(d[i]>8)hit++;}
+        painted=(seen>0&&hit>seen*0.02);
+        if(painted)ctx.drawImage(sc,0,0);
+      }catch(e){painted=false;}
+      try{pm.removeLayer(layer);}catch(e){}
+      resolve(painted);
+    }
+    // GridLayer fires 'load' once every visible tile is done; give the last
+    // canvas paint a frame to land before we read the tiles back.
+    layer.on('load',function(){setTimeout(finish,150);});
+    try{layer.addTo(pm);}catch(e){resolve(false);return;}
+    setTimeout(finish,8000);   // hard cap — a stalled PMTiles fetch must not hang the export
+  });
+}
+
+// Locator inset for one tract, in either of two views:
+//   'sat' — Esri World Imagery
+//   'lu'  — CARTO light basemap + SANDAG land-use parcels (protomaps/PMTiles)
+// Same approach as _captureStudyAreaMap: Leaflet is used purely as a projector
+// and the raster tiles are drawn by hand, because html2canvas cannot composite
+// Leaflet's tile and vector panes in alignment. Resolves to null (rather than
+// rejecting) when the basemap is blocked, so a firewalled network loses the
+// panel but still gets the PDF.
+function _captureTractInset(feat,mode){
+  mode=mode||'sat';
+  return new Promise(function(resolve){
+    // Wide format: the two insets stack in the PDF's right column, so each is
+    // short and wide. Aspect matches that slot (232pt / 107.5pt) so the image
+    // fills it without letterboxing. A wide frame isn't wasted space — it shows
+    // more of the surrounding neighbourhood, which is what a locator is for.
+    var W=680,H=315,S=2,TILE=256;
     var div=document.createElement('div');
     div.style.cssText='position:absolute;top:-99999px;left:-99999px;width:'+W+'px;height:'+H+'px;';
     document.body.appendChild(div);
@@ -6424,7 +6580,7 @@ function _captureTractInset(feat){
     var b;
     try{b=L.geoJSON(feat).getBounds();}catch(e){done(null);return;}
     if(!b||!b.isValid()){done(null);return;}
-    pm.fitBounds(b,{padding:[34,34],maxZoom:17,animate:false});
+    pm.fitBounds(b,{padding:[30,12],maxZoom:17,animate:false});
     var z=pm.getZoom(), pb=pm.getPixelBounds();
 
     var canvas=document.createElement('canvas');
@@ -6439,6 +6595,13 @@ function _captureTractInset(feat){
         im.src=src;
       });
     }
+    function tileUrl(z,x,y){
+      // Esri World Imagery is ordered {z}/{y}/{x}, not the usual {z}/{x}/{y}.
+      if(mode==='lu')
+        return 'https://a.basemaps.cartocdn.com/light_all/'+z+'/'+x+'/'+y+'@2x.png';
+      return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/'+
+             'MapServer/tile/'+z+'/'+y+'/'+x;
+    }
     var minTX=Math.floor(pb.min.x/TILE),maxTX=Math.floor(pb.max.x/TILE);
     var minTY=Math.floor(pb.min.y/TILE),maxTY=Math.floor(pb.max.y/TILE);
     var nW=Math.pow(2,z), tasks=[], got={n:0};
@@ -6446,9 +6609,7 @@ function _captureTractInset(feat){
       for(var ty=minTY;ty<=maxTY;ty++){
         if(ty<0||ty>=nW)continue;
         var wx=((tx%nW)+nW)%nW;
-        // Esri World Imagery is ordered {z}/{y}/{x}, not the usual {z}/{x}/{y}.
-        var url='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/'+
-                'MapServer/tile/'+z+'/'+ty+'/'+wx;
+        var url=tileUrl(z,wx,ty);
         var dx=(tx*TILE-pb.min.x)*S, dy=(ty*TILE-pb.min.y)*S;
         (function(x,y,u){
           tasks.push(loadImage(u).then(function(im){
@@ -6458,7 +6619,13 @@ function _captureTractInset(feat){
       }
     }
     Promise.all(tasks).then(function(){
-      if(!got.n){done(null);return;}   // imagery blocked — drop the panel
+      if(!got.n){done(null);return;}   // basemap blocked — drop the panel
+      // Parcels go on top of the CARTO base. If they don't render there is no
+      // land-use panel to show, so drop it rather than pass off a plain basemap.
+      return (mode==='lu')?_pdfPaintLanduse(pm,ctx,S):true;
+    }).then(function(ok){
+      if(ok===undefined)return;        // already resolved null above
+      if(!ok){done(null);return;}
       var g=feat.geometry;
       if(!g){done(canvas);return;}
       function addRings(rings){
@@ -6474,13 +6641,37 @@ function _captureTractInset(feat){
       if(g.type==='Polygon')addRings(g.coordinates);
       else if(g.type==='MultiPolygon')g.coordinates.forEach(addRings);
       else{done(canvas);return;}
-      ctx.globalAlpha=0.12;ctx.fillStyle='#fde047';ctx.fill('evenodd');
+      // No wash over the land-use view: a yellow tint would shift every parcel
+      // colour away from its legend swatch.
+      if(mode!=='lu'){ctx.globalAlpha=0.12;ctx.fillStyle='#fde047';ctx.fill('evenodd');}
       ctx.globalAlpha=1;ctx.lineJoin='round';
       ctx.strokeStyle='#0f172a';ctx.lineWidth=6;ctx.stroke();   // halo for contrast
       ctx.strokeStyle='#fde047';ctx.lineWidth=2.6;ctx.stroke();
       done(canvas);
     }).catch(function(){done(null);});
   });
+}
+
+// Compact land-use key for the PDF, laid out as a single row where it fits and
+// wrapped when it doesn't. Returns the y below the key.
+function _pdfLuLegend(pdf,x,y,maxW){
+  var cats=LU_CATS.concat([LU_WATER_CAT]);
+  var SW=5, PAD=3, GAP=9, LH=9;
+  pdf.setFont('helvetica','normal');pdf.setFontSize(6);
+  var cx=x, cy=y;
+  cats.forEach(function(c){
+    var tw=pdf.getTextWidth(c.name), iw=SW+PAD+tw;
+    if(cx>x&&cx+iw>x+maxW){cx=x;cy+=LH;}
+    var rgb=_hexToRgb(c.color);   // LU_CATS are hex; _rgbTriplet only reads rgb()
+    pdf.setFillColor(rgb[0],rgb[1],rgb[2]);
+    pdf.rect(cx,cy-SW+1,SW,SW,'F');
+    pdf.setDrawColor(203,213,225);pdf.setLineWidth(0.3);
+    pdf.rect(cx,cy-SW+1,SW,SW);
+    pdf.setTextColor(100,116,139);
+    pdf.text(c.name,cx+SW+PAD,cy);
+    cx+=iw+GAP;
+  });
+  return cy+3;
 }
 
 // Variable rows for one pillar, in the same order the rose plot ranks them
@@ -6508,7 +6699,7 @@ function _tractPdfPillar(pid,idx,pr){
           omitted:Math.max(0,rows.length-_TRACT_PDF_MAX_ROWS)};
 }
 
-function _tractPdfBuild(idx,feat,radarC,mapC){
+function _tractPdfBuild(idx,feat,radarC,mapC,luC){
   var pr=feat.properties, geoid=pr.GEOID;
   var jsPDF=window.jspdf.jsPDF;
   var pdf=new jsPDF({orientation:'portrait',unit:'pt',format:'letter',compress:true});
@@ -6537,14 +6728,18 @@ function _tractPdfBuild(idx,feat,radarC,mapC){
   var y=82, chh=44, cgap=8, cw=(CW-cgap*3)/4;
   // Adaptive is flipped to a capacity deficit so every card is risk-oriented,
   // matching the rose plot printed directly below it (and the detail modal).
-  [['Composite',pr._comp],['Heat Exposure',pr._exposure],
-   ['Sensitivity',pr._sensitivity],
-   ['Adaptive Cap.',(pr._adaptive==null?null:100-pr._adaptive)]
+  // Accent bars carry the PILLAR colour (PMETA) — the same hue as that pillar's
+  // section header below and its rose-plot wedge. Colouring them by risk instead
+  // put a red bar on "Adaptive Cap." while its own header was green.
+  [['Composite',pr._comp,_DT_CARD_ACCENT],
+   ['Heat Exposure',pr._exposure,PMETA.exposure.color],
+   ['Sensitivity',pr._sensitivity,PMETA.sensitivity.color],
+   ['Adaptive Cap.',(pr._adaptive==null?null:100-pr._adaptive),PMETA.adaptive.color]
   ].forEach(function(c,i){
     var x=M+i*(cw+cgap), v=c[1];
     pdf.setFillColor(248,250,252);pdf.rect(x,y,cw,chh,'F');
     if(v!=null){
-      var col=_rgbTriplet(_dtRiskColor(v));
+      var col=_hexToRgb(c[2]);
       pdf.setFillColor(col[0],col[1],col[2]);pdf.rect(x,y,3,chh,'F');
     }
     pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(100,116,139);
@@ -6576,26 +6771,44 @@ function _tractPdfBuild(idx,feat,radarC,mapC){
 
   // ── Rose plot + satellite locator, side by side ──────────────
   // The rose plot drives the row height: it's the figure people read first, so
-  // it gets the width it needs and the locator is centred against it.
+  // it gets the width it needs. The right column stacks the satellite locator
+  // over the SANDAG land-use view, sharing that height between them. Either
+  // capture can come back null (imagery blocked, PMTiles unreachable), so the
+  // survivors just take the whole column.
   var panTop=y+8;
   var roseW=288, rx=M+300, rw=CW-300;
   var panH=radarC?roseW*(radarC.height/radarC.width):230;
+  var insets=[];
+  if(mapC)insets.push({c:mapC,label:'Tract location \\u2014 satellite'});
+  if(luC) insets.push({c:luC, label:'Land use (SANDAG)'});
   pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(71,85,105);
   pdf.text('Heat-vulnerability profile',M,panTop);
-  if(mapC)pdf.text('Tract location',rx,panTop);
+  if(insets.length)pdf.text(insets[0].label,rx,panTop);
   var imgTop=panTop+7;
   if(radarC){
     pdf.addImage(radarC.toDataURL('image/png'),'PNG',M,imgTop,roseW,panH,undefined,'FAST');
   }
-  if(mapC){
-    var mAsp=mapC.width/mapC.height;
-    var mwid=rw, mh=mwid/mAsp;
-    if(mh>panH){mh=panH;mwid=mh*mAsp;}
-    var mx=rx+(rw-mwid)/2, my=imgTop+(panH-mh)/2;   // centre against the rose plot
-    pdf.addImage(mapC.toDataURL('image/png'),'PNG',mx,my,mwid,mh,undefined,'FAST');
-    pdf.setDrawColor(203,213,225);pdf.setLineWidth(0.6);pdf.rect(mx,my,mwid,mh);
-  }
-  y=imgTop+panH+16;
+  // The first caption already sits on the panel header row; later ones are
+  // drawn inline above their own image, so each slot loses CAPH+IGAP.
+  var CAPH=9, IGAP=6;
+  var slotH=insets.length?(panH-(insets.length-1)*(CAPH+IGAP))/insets.length:0;
+  var iy=imgTop;
+  insets.forEach(function(p,i){
+    if(i>0){
+      pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(71,85,105);
+      pdf.text(p.label,rx,iy+CAPH-2);
+      iy+=CAPH;
+    }
+    var a=p.c.width/p.c.height;
+    var w=rw, h=w/a;
+    if(h>slotH){h=slotH;w=h*a;}
+    var dx=rx+(rw-w)/2, dy=iy+(slotH-h)/2;
+    pdf.addImage(p.c.toDataURL('image/png'),'PNG',dx,dy,w,h,undefined,'FAST');
+    pdf.setDrawColor(203,213,225);pdf.setLineWidth(0.6);pdf.rect(dx,dy,w,h);
+    iy+=slotH+IGAP;
+  });
+  y=imgTop+panH+12;
+  if(luC)y=_pdfLuLegend(pdf,M,y,CW)+4;
 
   // ── Variables behind each pillar ─────────────────────────────
   var pillars=['exposure','sensitivity','adaptive'].map(function(pid){
@@ -6683,6 +6896,7 @@ function _tractPdfBuild(idx,feat,radarC,mapC){
   var srcTxt='Sources incl. MesoWest/Synoptic, NOAA HRRR, USGS Landsat, CDC PLACES & SVI, '+
              'Healthy Places Index, U.S. Census.'+
              (mapC?' Imagery \\u00a9 Esri, Maxar, Earthstar Geographics.':'')+
+             (luC?' Land use \\u00a9 SANDAG; basemap \\u00a9 CARTO, \\u00a9 OpenStreetMap contributors.':'')+
              ' Full list: '+EXPORT_META.sources_url;
   var fy=footTop+30;
   pdf.splitTextToSize(srcTxt,CW).forEach(function(line){
@@ -6707,7 +6921,7 @@ function downloadTractPdf(geoid){
   // are still worth exporting, and the PDF says the scores are missing.
   if(!results){try{compute();}catch(e){}}
 
-  var radarC=null;
+  var radarC=null, satC=null;
   _pdfShow('Loading PDF library\\u2026');
   _ensurePdfLibs().then(function(){
     _pdfShow('Drawing the heat-vulnerability profile\\u2026');
@@ -6715,10 +6929,14 @@ function downloadTractPdf(geoid){
   }).then(function(c){
     radarC=c;
     _pdfShow('Fetching satellite imagery\\u2026');
-    return _captureTractInset(feat);
-  }).then(function(mapC){
+    return _captureTractInset(feat,'sat');
+  }).then(function(c){
+    satC=c;
+    _pdfShow('Rendering SANDAG land use\\u2026');
+    return _captureTractInset(feat,'lu');
+  }).then(function(luC){
     _pdfShow('Building PDF\\u2026');
-    _tractPdfBuild(idx,feat,radarC,mapC);
+    _tractPdfBuild(idx,feat,radarC,satC,luC);
     _pdfHide();
   }).catch(function(err){
     console.error('Tract PDF export failed:',err);

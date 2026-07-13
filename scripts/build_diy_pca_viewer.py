@@ -822,9 +822,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>San Diego Heat Risk Explorer</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
-<script src="https://unpkg.com/protomaps-leaflet@4.1.1/dist/protomaps-leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"
+      integrity="sha384-o/2yZuJZWGJ4s/adjxVW71R+EO/LyCwdQfP5UWSgX/w87iiTXuvDZaejd3TsN7mf"
+      crossorigin="anonymous"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"
+        integrity="sha384-okbbMvvx/qfQkmiQKfd5VifbKZ/W8p1qIsWvE1ROPUfHWsDcC8/BnHohF7vPg2T6"
+        crossorigin="anonymous"></script>
+<script src="https://unpkg.com/protomaps-leaflet@4.1.1/dist/protomaps-leaflet.js"
+        integrity="sha384-sWbmruuInggy2e4rWvqqqdbRbmdj81cna00wBtIthh+lEV6YQPjrrmDJfnjJsryv"
+        crossorigin="anonymous"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{display:flex;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -2793,7 +2799,9 @@ function _addrApplyHit(hit, fallbackLabel){
   var feat = _addrFindTract(lon, lat);
   var dn = hit.display_name || fallbackLabel || '';
   var dnShort = dn.length>80 ? dn.slice(0,77)+'\\u2026' : dn;
-  var html = '<span class="addr-found">'+dnShort+'</span>';
+  // Nominatim is backed by OpenStreetMap, which anyone can edit: display_name is
+  // untrusted and this string reaches innerHTML via _addrSetStatus.
+  var html = '<span class="addr-found">'+_addrEsc(dnShort)+'</span>';
   if(feat){
     var gid = feat.properties.GEOID;
     html += '<span class="addr-tract">Census tract '+gid.slice(-6)+'</span>';
@@ -4539,7 +4547,7 @@ function buildUI(){
       seen[sub].forEach(function(v){
         var chk=enabled[v.key]?" checked":"";
         var cls=enabled[v.key]?"var-row on":"var-row";
-        var src=VSRC[v.key]?'<a class="src-link" href="'+VSRC[v.key]+'" target="_blank">(Source)</a>':"";
+        var src=VSRC[v.key]?'<a class="src-link" href="'+VSRC[v.key]+'" target="_blank" rel="noopener">(Source)</a>':"";
         html+='<div class="'+cls+'" id="vr_'+v.key+'"><label style="color:'+pm.color+'">'+
           '<input type="checkbox" onchange="tog(\\''+v.key+'\\')" '+chk+'>'+
           '<span style="color:#444">'+v.label+'</span></label>'+src+'</div>';
@@ -5669,10 +5677,12 @@ function _pdfShow(msg){
 }
 function _pdfHide(){document.getElementById('pdf-overlay').classList.remove('show');}
 
-function _loadScript(src){
+function _loadScript(src,integrity){
   return new Promise(function(resolve,reject){
     var s=document.createElement('script');
     s.src=src;s.crossOrigin='anonymous';
+    // crossOrigin alone verifies nothing; the hash is what pins the bytes.
+    if(integrity)s.integrity=integrity;
     s.onload=resolve;s.onerror=function(){reject(new Error('Failed to load '+src));};
     document.head.appendChild(s);
   });
@@ -5680,7 +5690,8 @@ function _loadScript(src){
 
 function _ensurePdfLibs(){
   var needs=[];
-  if(!window.jspdf)needs.push(_loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'));
+  if(!window.jspdf)needs.push(_loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk'));
   return Promise.all(needs);
 }
 

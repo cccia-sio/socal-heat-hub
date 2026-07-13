@@ -1389,6 +1389,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 .dt-card-pct{font-size:9.5px;color:#9ca3af;line-height:1.1}
 .dt-driver{margin-top:10px;font-size:11.5px;color:#374151;line-height:1.45}
 .dt-driver b{color:#111}
+.dt-note{margin-top:8px;font-size:10px;color:#9ca3af;line-height:1.4}
 /* Layer toggle buttons above the single tract map */
 .dt-view-switch{display:inline-flex;background:#f3f4f6;border:1px solid #e5e7eb;
   border-radius:8px;padding:3px;gap:2px;margin-bottom:6px}
@@ -1430,8 +1431,16 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   padding:5px 10px;border:none;border-radius:4px;cursor:pointer;
   font-family:inherit}
 .popup-more-btn:hover{background:#1e40af}
+/* Secondary action: the one-page tract handout. Outlined rather than filled so
+   it reads as subordinate to the two blue primary actions above it. */
+.popup-pdf-btn{display:inline-block;background:#fff;color:#334155;font-size:11px;
+  font-weight:600;padding:5px 10px;border:1px solid #cbd5e1;border-radius:4px;
+  cursor:pointer;font-family:inherit}
+.popup-pdf-btn:hover{background:#f1f5f9;border-color:#94a3b8}
+.popup-pdf-btn:disabled{opacity:0.55;cursor:default}
 .popup-btn-row{display:flex;flex-direction:column;gap:6px;align-items:stretch;margin-top:8px}
-.popup-btn-row .popup-more-btn,.popup-btn-row .popup-compare-btn{margin:0;width:100%;
+.popup-btn-row .popup-more-btn,.popup-btn-row .popup-compare-btn,
+.popup-btn-row .popup-pdf-btn{margin:0;width:100%;
   box-sizing:border-box;text-align:center;border-radius:6px}
 
 /* --- bottom-left control stack -------------------------------------------
@@ -3084,11 +3093,15 @@ function openDetailDrawer(geoid){
   // ---- Summary section (popup-style: composite + pillar score cards + driver)
   html+='<div class="dt-section">';
   if(pr._comp!=null){
+    // Every card is risk-oriented (higher = higher risk), matching the popup
+    // radar. _adaptive is stored capacity-side (higher = MORE capacity), so it
+    // is flipped to a capacity deficit here exactly as the radar's adaptive
+    // wedge and the composite (100-s in compute()) already do.
     var cards=[
       {lbl:'Composite', val:pr._comp},
       {lbl:'Heat Exp.', val:pr._exposure},
       {lbl:'Sensitivity', val:pr._sensitivity},
-      {lbl:'Adaptive Cap.', val:pr._adaptive}
+      {lbl:'Adaptive Cap.', val:(pr._adaptive==null?null:100-pr._adaptive)}
     ];
     html+='<div class="dt-section-hdr">Risk Summary</div>';
     html+='<div class="dt-summary">';
@@ -3104,6 +3117,7 @@ function openDetailDrawer(geoid){
       }
     });
     html+='</div>';
+    html+='<div class="dt-note">County percentile \\u2014 higher score = higher risk (Adaptive Capacity is scored as a capacity gap, so higher = less capacity).</div>';
     if(pr._drv){
       html+='<div class="dt-driver">Dominant driver: <b>'+_addrEsc(pr._drv)+'</b></div>';
     }
@@ -3176,6 +3190,11 @@ function closeDetailDrawer(){
   _dtView='sat';_dtGeoid=null;
 }
 
+// One variable row. The bar length, its color and the printed percentile are
+// all the RISK percentile, so this reconciles exactly with the popup radar,
+// which plots protective variables (POLARITY===false) as deficits. The value
+// on the right stays the real-world reading, so a high-canopy tract reads
+// "85.6 / 0th percentile risk".
 function _dtRow(label, dispVal, pct, higherIsWorse){
   if(pct==null){
     return '<div class="dt-var-row">'+
@@ -3185,13 +3204,13 @@ function _dtRow(label, dispVal, pct, higherIsWorse){
   var p=Math.max(0,Math.min(100,pct));
   var riskPct = higherIsWorse ? p : (100 - p);
   var color = _dtRiskColor(riskPct);
-  var width = Math.max(2, p);
-  var dirNote = higherIsWorse ? 'higher = more risk' : 'higher = more protection';
+  var width = Math.max(2, riskPct).toFixed(1);   // toFixed: 100-p can land on 10.299999999999997
+  var dirNote = higherIsWorse ? 'higher = more risk' : 'higher value = less risk';
   return '<div class="dt-var-row">'+
     '<div class="dt-var-top"><span class="dt-var-label">'+_addrEsc(label)+'</span>'+
     '<span class="dt-var-val">'+_addrEsc(dispVal)+'</span></div>'+
     '<div class="dt-var-bar-wrap"><div class="dt-var-bar" style="width:'+width+'%;background:'+color+'"></div></div>'+
-    '<div class="dt-var-pct">'+Math.round(p)+'th percentile \\u00b7 '+dirNote+'</div>'+
+    '<div class="dt-var-pct">'+_ord(riskPct)+' percentile risk \\u00b7 '+dirNote+'</div>'+
   '</div>';
 }
 function _dtRowNA(label){
@@ -4143,22 +4162,25 @@ function radarSVG(fi,pr){
       if(sp.isMode){
         titleTxt=sp.full+' composite ('+(sp.pct==null?'n/a':Math.round(sp.pct)+' pctile')+(sp.active?', selected mode':', not selected')+')';
       }else{
+        // getAdj, not pr[] — under a future scenario the raw property is still
+        // present-day, so an unadjusted label would contradict the detail
+        // modal's rows (which already apply the delta).
         var rv=pr[sp.rawKey];
-        var rs=(sp.rawKey!=null&&rv!=null&&!isNaN(rv))?(': '+fmtCmpRaw(sp.rawKey,rv)):'';
+        var rs=(sp.rawKey!=null&&rv!=null&&!isNaN(rv))?(': '+fmtCmpRaw(sp.rawKey,getAdj(sp.rawKey,fi))):'';
         var pctTxt=(sp.pct==null?'n/a':Math.round(sp.pct)+' pctile');
         titleTxt=sp.full+rs+' ('+pctTxt+(muted?', not selected':'')+')'+
           (sp.inv?' \\u2014 capacity gap, higher = lower capacity':'');
       }
       var rr=sp.active?(sp.isMode?4.2:3.4):2.5;
       s+='<circle cx="'+PX(pt.deg,R*pc/100)+'" cy="'+PY(pt.deg,R*pc/100)+'" r="'+rr+'" fill="'+dotCol+
-        '" stroke="#fff" stroke-width="'+(sp.active?1.4:1)+'"><title>'+titleTxt+'</title></circle>';
+        '" stroke="#fff" stroke-width="'+(sp.active?1.4:1)+'"><title>'+_addrEsc(titleTxt)+'</title></circle>';
       var ca=Math.cos(pt.deg*Math.PI/180), anc=Math.abs(ca)<0.30?'middle':(ca>0?'start':'end');
       var lx=PX(pt.deg,R+12), ly=P(pt.deg,R+12)[1];
       var valStr;
-      if(radarValMode==='abs'){var rv2=(sp.rawKey!=null)?pr[sp.rawKey]:null;valStr=(rv2!=null&&!isNaN(rv2))?fmtCmpRaw(sp.rawKey,rv2):(sp.pct==null?'-':String(Math.round(sp.pct)));}
+      if(radarValMode==='abs'){var rv2=(sp.rawKey!=null)?pr[sp.rawKey]:null;valStr=(rv2!=null&&!isNaN(rv2))?fmtCmpRaw(sp.rawKey,getAdj(sp.rawKey,fi)):(sp.pct==null?'-':String(Math.round(sp.pct)));}
       else{valStr=(sp.pct==null?'-':String(Math.round(sp.pct)));}
-      s+='<text x="'+lx+'" y="'+(ly-1).toFixed(1)+'" text-anchor="'+anc+'" font-size="9.5" font-weight="'+(sp.active?'700':'600')+'" fill="'+(muted?GRAY:col)+'">'+sp.short+'</text>';
-      s+='<text x="'+lx+'" y="'+(ly+9).toFixed(1)+'" text-anchor="'+anc+'" font-size="9" font-weight="500" fill="'+(muted?GRAY:'#6b7280')+'">'+valStr+'</text>';
+      s+='<text x="'+lx+'" y="'+(ly-1).toFixed(1)+'" text-anchor="'+anc+'" font-size="9.5" font-weight="'+(sp.active?'700':'600')+'" fill="'+(muted?GRAY:col)+'">'+_addrEsc(sp.short)+'</text>';
+      s+='<text x="'+lx+'" y="'+(ly+9).toFixed(1)+'" text-anchor="'+anc+'" font-size="9" font-weight="500" fill="'+(muted?GRAY:'#6b7280')+'">'+_addrEsc(valStr)+'</text>';
     });
     var cam=Math.cos(sec.c*Math.PI/180), anc2=Math.abs(cam)<0.30?'middle':(cam>0?'start':'end'), mp=P(sec.c,R+26);
     // Adaptive's label is the longest; nudge it right + constrain width so
@@ -4247,6 +4269,7 @@ function drawTracts(){
       h+='<div class="popup-btn-row">'+
         '<button class="popup-more-btn" onclick="map.closePopup();openDetailDrawer(\\''+p.GEOID+'\\')">Show more info \\u25b8</button>'+
         '<button class="popup-compare-btn" onclick="startCompare(\\''+p.GEOID+'\\')">Compare with another tract</button>'+
+        '<button class="popup-pdf-btn" onclick="downloadTractPdf(\\''+p.GEOID+'\\')">Export tract PDF</button>'+
       '</div>';
       h+='</div>';
       lyr.bindPopup(h,{maxWidth:360,minWidth:344});
@@ -6313,6 +6336,399 @@ function _heroPdfTwoPanel(cL,cR,opts){
   var ts=dt.toISOString().replace(/[:.]/g,'-').slice(0,19);
   var slug=opts.jurisName?('_'+opts.jurisName.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')):'';
   pdf.save('san_diego_heat_risk'+slug+'_'+ts+'.pdf');
+}
+
+/* ================================================================
+   SINGLE-TRACT PDF
+   ================================================================
+   One-page portrait handout for one tract, reached from the "Export tract PDF"
+   button in the tract popup: risk summary, the popup's rose plot, a satellite
+   locator, and the top variables behind each pillar.
+
+   Like the map and the other PDF exports (and unlike the bulk CSV/GeoJSON
+   download), this is a RENDERED VIEW, not a dataset — so Healthy Places Index
+   variables may appear here, used under HPI's own terms and credited in the
+   footer. See DATA_LICENSE.md. */
+
+var _TRACT_PDF_MAX_ROWS=8;   // per pillar; any overflow is stated, never silent
+
+// 'rgb(r,g,b)' -> [r,g,b], so the PDF reuses _dtRiskColor's ramp rather than
+// duplicating the stops.
+function _rgbTriplet(s){
+  var m=/rgb\\((\\d+),\\s*(\\d+),\\s*(\\d+)\\)/.exec(String(s));
+  return m?[+m[1],+m[2],+m[3]]:[148,163,184];
+}
+// PMETA's pillar colors are hex; jsPDF wants channels.
+function _hexToRgb(h){
+  var m=/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(h||'').trim());
+  return m?[parseInt(m[1],16),parseInt(m[2],16),parseInt(m[3],16)]:[71,85,105];
+}
+function _ord(n){
+  n=Math.round(n);
+  var suf=['th','st','nd','rd'], v=n%100;
+  return n+(suf[(v-20)%10]||suf[v]||suf[0]);
+}
+function _pdfTrunc(pdf,txt,maxW){
+  txt=String(txt==null?'':txt);
+  if(pdf.getTextWidth(txt)<=maxW)return txt;
+  while(txt.length>1&&pdf.getTextWidth(txt+'\\u2026')>maxW)txt=txt.slice(0,-1);
+  return txt+'\\u2026';
+}
+
+// Rasterize an SVG string to a canvas. Note the rose plot is re-parsed as
+// STRICT XML once it becomes an <img> — HTML's lenient parser is not in play —
+// so every label radarSVG() injects must be run through _addrEsc first. A bare
+// "&" (e.g. the "Age 17 & Under" label) would otherwise fail the load silently.
+function _svgToCanvas(svg,w,h,scale){
+  return new Promise(function(resolve,reject){
+    var img=new Image();
+    img.onload=function(){
+      var c=document.createElement('canvas');
+      c.width=Math.round(w*scale);c.height=Math.round(h*scale);
+      var cx=c.getContext('2d');
+      cx.fillStyle='#ffffff';cx.fillRect(0,0,c.width,c.height);
+      cx.drawImage(img,0,0,c.width,c.height);
+      resolve(c);
+    };
+    img.onerror=function(){reject(new Error('the rose plot could not be rendered'));};
+    img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+  });
+}
+// Pin the SVG's intrinsic size to the target pixel size so browsers rasterize
+// at full resolution instead of rendering at 336px and upscaling.
+function _radarCanvas(fi,pr,scale){
+  var S=scale||3, W=400, H=320;   // W/H = radarSVG's viewBox
+  var svg=radarSVG(fi,pr).replace('width="336" height="269"',
+    'width="'+(W*S)+'" height="'+(H*S)+'"');
+  return _svgToCanvas(svg,W,H,S);
+}
+
+// Satellite locator for one tract. Same approach as _captureStudyAreaMap:
+// Leaflet is used purely as a projector and the tiles are drawn by hand,
+// because html2canvas cannot composite Leaflet's tile and vector panes in
+// alignment. Resolves to null (rather than rejecting) when imagery is blocked,
+// so a firewalled network loses the panel but still gets the PDF.
+function _captureTractInset(feat){
+  return new Promise(function(resolve){
+    var W=640,H=520,S=2,TILE=256;
+    var div=document.createElement('div');
+    div.style.cssText='position:absolute;top:-99999px;left:-99999px;width:'+W+'px;height:'+H+'px;';
+    document.body.appendChild(div);
+    var pm=L.map(div,{zoomControl:false,attributionControl:false,
+      fadeAnimation:false,zoomAnimation:false});
+    function done(v){
+      try{pm.remove();}catch(e){}
+      try{div.parentNode.removeChild(div);}catch(e){}
+      resolve(v);
+    }
+    var b;
+    try{b=L.geoJSON(feat).getBounds();}catch(e){done(null);return;}
+    if(!b||!b.isValid()){done(null);return;}
+    pm.fitBounds(b,{padding:[34,34],maxZoom:17,animate:false});
+    var z=pm.getZoom(), pb=pm.getPixelBounds();
+
+    var canvas=document.createElement('canvas');
+    canvas.width=W*S;canvas.height=H*S;
+    var ctx=canvas.getContext('2d');
+    ctx.fillStyle='#e8eaed';ctx.fillRect(0,0,canvas.width,canvas.height);
+    function project(lat,lng){var p=pm.latLngToContainerPoint([lat,lng]);return[p.x*S,p.y*S];}
+    function loadImage(src){
+      return new Promise(function(res){
+        var im=new Image();im.crossOrigin='anonymous';
+        im.onload=function(){res(im);};im.onerror=function(){res(null);};
+        im.src=src;
+      });
+    }
+    var minTX=Math.floor(pb.min.x/TILE),maxTX=Math.floor(pb.max.x/TILE);
+    var minTY=Math.floor(pb.min.y/TILE),maxTY=Math.floor(pb.max.y/TILE);
+    var nW=Math.pow(2,z), tasks=[], got={n:0};
+    for(var tx=minTX;tx<=maxTX;tx++){
+      for(var ty=minTY;ty<=maxTY;ty++){
+        if(ty<0||ty>=nW)continue;
+        var wx=((tx%nW)+nW)%nW;
+        // Esri World Imagery is ordered {z}/{y}/{x}, not the usual {z}/{x}/{y}.
+        var url='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/'+
+                'MapServer/tile/'+z+'/'+ty+'/'+wx;
+        var dx=(tx*TILE-pb.min.x)*S, dy=(ty*TILE-pb.min.y)*S;
+        (function(x,y,u){
+          tasks.push(loadImage(u).then(function(im){
+            if(im){got.n++;ctx.drawImage(im,x,y,TILE*S,TILE*S);}
+          }));
+        })(dx,dy,url);
+      }
+    }
+    Promise.all(tasks).then(function(){
+      if(!got.n){done(null);return;}   // imagery blocked — drop the panel
+      var g=feat.geometry;
+      if(!g){done(canvas);return;}
+      function addRings(rings){
+        rings.forEach(function(r){
+          for(var i=0;i<r.length;i++){
+            var p=project(r[i][1],r[i][0]);   // GeoJSON is [lng,lat]
+            if(i===0)ctx.moveTo(p[0],p[1]);else ctx.lineTo(p[0],p[1]);
+          }
+          ctx.closePath();
+        });
+      }
+      ctx.beginPath();
+      if(g.type==='Polygon')addRings(g.coordinates);
+      else if(g.type==='MultiPolygon')g.coordinates.forEach(addRings);
+      else{done(canvas);return;}
+      ctx.globalAlpha=0.12;ctx.fillStyle='#fde047';ctx.fill('evenodd');
+      ctx.globalAlpha=1;ctx.lineJoin='round';
+      ctx.strokeStyle='#0f172a';ctx.lineWidth=6;ctx.stroke();   // halo for contrast
+      ctx.strokeStyle='#fde047';ctx.lineWidth=2.6;ctx.stroke();
+      done(canvas);
+    }).catch(function(){done(null);});
+  });
+}
+
+// Variable rows for one pillar, in the same order the rose plot ranks them
+// (PCA contribution), capped at _TRACT_PDF_MAX_ROWS.
+function _tractPdfPillar(pid,idx,pr){
+  var keys=dtPillarKeys(pid)||[], rows=[];
+  keys.forEach(function(key){
+    var meta=null;
+    for(var j=0;j<VM.length;j++){if(VM[j].key===key){meta=VM[j];break;}}
+    if(!meta)return;
+    var rawV=pr[key];
+    if(rawV==null||(typeof rawV==='number'&&isNaN(rawV))){
+      rows.push({label:meta.label,val:'no data',pct:null,worse:true});return;
+    }
+    var dArr=getDeltaArr(key);
+    var disp=dArr?getAdj(key,idx):+rawV;
+    rows.push({
+      label:meta.label,
+      val:fmtCmpRaw(key,disp),
+      pct:(rawPct[key]&&rawPct[key][idx]!=null)?rawPct[key][idx]:null,
+      worse:(POLARITY&&POLARITY[key]!==false)
+    });
+  });
+  return {rows:rows.slice(0,_TRACT_PDF_MAX_ROWS),
+          omitted:Math.max(0,rows.length-_TRACT_PDF_MAX_ROWS)};
+}
+
+function _tractPdfBuild(idx,feat,radarC,mapC){
+  var pr=feat.properties, geoid=pr.GEOID;
+  var jsPDF=window.jspdf.jsPDF;
+  var pdf=new jsPDF({orientation:'portrait',unit:'pt',format:'letter',compress:true});
+  var pw=pdf.internal.pageSize.getWidth();    // 612
+  var ph=pdf.internal.pageSize.getHeight();   // 792
+  var M=40, CW=pw-2*M;
+
+  _ensureTractJuris();
+  var jn=_tractJurisName[idx];
+  var place=jn?('City of '+jn):'Unincorporated San Diego County';
+
+  // ── Title band ───────────────────────────────────────────────
+  pdf.setFillColor(247,249,252);pdf.rect(0,0,pw,64,'F');
+  pdf.setFillColor(37,99,235);pdf.rect(0,64,pw,2.4,'F');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(17);pdf.setTextColor(15,23,42);
+  pdf.text('Census Tract '+geoid.slice(-6),M,30);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.setTextColor(71,85,105);
+  pdf.text(place+'  \\u00b7  GEOID '+geoid,M,46);
+  pdf.setFontSize(9);pdf.setTextColor(120,130,148);
+  pdf.text(_scenarioLabel(),M,58);
+  pdf.setFont('helvetica','bold');pdf.setFontSize(9.5);pdf.setTextColor(37,99,235);
+  var wm='San Diego Heat Risk Explorer';
+  pdf.text(wm,pw-M-pdf.getTextWidth(wm),30);
+
+  // ── Risk summary cards ───────────────────────────────────────
+  var y=82, chh=44, cgap=8, cw=(CW-cgap*3)/4;
+  // Adaptive is flipped to a capacity deficit so every card is risk-oriented,
+  // matching the rose plot printed directly below it (and the detail modal).
+  [['Composite',pr._comp],['Heat Exposure',pr._exposure],
+   ['Sensitivity',pr._sensitivity],
+   ['Adaptive Cap.',(pr._adaptive==null?null:100-pr._adaptive)]
+  ].forEach(function(c,i){
+    var x=M+i*(cw+cgap), v=c[1];
+    pdf.setFillColor(248,250,252);pdf.rect(x,y,cw,chh,'F');
+    if(v!=null){
+      var col=_rgbTriplet(_dtRiskColor(v));
+      pdf.setFillColor(col[0],col[1],col[2]);pdf.rect(x,y,3,chh,'F');
+    }
+    pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(100,116,139);
+    pdf.text(c[0].toUpperCase(),x+9,y+15);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(16);pdf.setTextColor(15,23,42);
+    var vs=(v!=null)?String(Math.round(v)):'\\u2014';
+    // Measure at the size it's actually drawn in — getTextWidth reads the
+    // CURRENT font, so measuring after the switch below would under-report and
+    // print "/100" on top of the number.
+    var vsW=pdf.getTextWidth(vs);
+    pdf.text(vs,x+9,y+35);
+    if(v!=null){
+      pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(148,163,184);
+      pdf.text('/100',x+9+vsW+3,y+35);
+    }
+  });
+  y+=chh+13;
+  if(pr._drv){
+    pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(71,85,105);
+    pdf.text('Dominant driver:',M,y);
+    var lw=pdf.getTextWidth('Dominant driver:')+4;
+    pdf.setFont('helvetica','bold');pdf.setTextColor(15,23,42);
+    pdf.text(String(pr._drv),M+lw,y);
+  }else if(pr._comp==null){
+    pdf.setFont('helvetica','italic');pdf.setFontSize(8.5);pdf.setTextColor(148,163,184);
+    pdf.text('No composite built \\u2014 scores omitted. The readings below are unaffected.',M,y);
+  }
+  y+=10;
+
+  // ── Rose plot + satellite locator, side by side ──────────────
+  // The rose plot drives the row height: it's the figure people read first, so
+  // it gets the width it needs and the locator is centred against it.
+  var panTop=y+8;
+  var roseW=288, rx=M+300, rw=CW-300;
+  var panH=radarC?roseW*(radarC.height/radarC.width):230;
+  pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(71,85,105);
+  pdf.text('Heat-vulnerability profile',M,panTop);
+  if(mapC)pdf.text('Tract location',rx,panTop);
+  var imgTop=panTop+7;
+  if(radarC){
+    pdf.addImage(radarC.toDataURL('image/png'),'PNG',M,imgTop,roseW,panH,undefined,'FAST');
+  }
+  if(mapC){
+    var mAsp=mapC.width/mapC.height;
+    var mwid=rw, mh=mwid/mAsp;
+    if(mh>panH){mh=panH;mwid=mh*mAsp;}
+    var mx=rx+(rw-mwid)/2, my=imgTop+(panH-mh)/2;   // centre against the rose plot
+    pdf.addImage(mapC.toDataURL('image/png'),'PNG',mx,my,mwid,mh,undefined,'FAST');
+    pdf.setDrawColor(203,213,225);pdf.setLineWidth(0.6);pdf.rect(mx,my,mwid,mh);
+  }
+  y=imgTop+panH+16;
+
+  // ── Variables behind each pillar ─────────────────────────────
+  var pillars=['exposure','sensitivity','adaptive'].map(function(pid){
+    var d=_tractPdfPillar(pid,idx,pr);
+    var hdr=PMETA[pid].label;
+    if(pid==='exposure'){var md=heatModeDef(heatMode);if(md)hdr+=' \\u2014 '+md.label;}
+    return {pid:pid,hdr:hdr,rows:d.rows,omitted:d.omitted};
+  }).filter(function(p){return p.rows.length;});
+
+  // Fit the rows into whatever vertical room is left, rather than assuming.
+  var footTop=ph-62;
+  var hdrH=15, secGap=7, noteH=10;
+  var nRows=0, fixed=0;
+  pillars.forEach(function(p){
+    nRows+=p.rows.length;
+    fixed+=hdrH+secGap+(p.omitted?noteH:0);
+  });
+  // Let the rows breathe into whatever room is left rather than stranding a
+  // band of white above the footer — a tract with 3 enabled variables per
+  // pillar leaves far more space than one with 8. Clamped both ways: 16pt so
+  // sparse tracts don't look double-spaced, 9.5pt so full ones still fit.
+  var avail=footTop-y-4;
+  var rowH=nRows?(avail-fixed)/nRows:13;
+  if(rowH>16)rowH=16;
+  if(rowH<9.5)rowH=9.5;
+
+  var valR=M+300, barX=M+316, barW=118, pctR=M+CW;
+  pillars.forEach(function(p){
+    var pm=PMETA[p.pid];
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9);
+    var hc=_hexToRgb(pm.color);
+    pdf.setTextColor(hc[0],hc[1],hc[2]);
+    pdf.text(p.hdr.toUpperCase(),M,y+8);
+    pdf.setDrawColor(226,232,240);pdf.setLineWidth(0.5);
+    pdf.line(M,y+11.5,M+CW,y+11.5);
+    y+=hdrH;
+    p.rows.forEach(function(r){
+      var ty=y+rowH-3.5;
+      pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(51,65,85);
+      pdf.text(_pdfTrunc(pdf,r.label,196),M,ty);
+      pdf.setFont('helvetica','bold');pdf.setTextColor(15,23,42);
+      pdf.text(String(r.val),valR-pdf.getTextWidth(String(r.val)),ty);
+      if(r.pct!=null){
+        var p0=Math.max(0,Math.min(100,r.pct));
+        // Bar length AND the printed rank are the RISK percentile, so a
+        // protective variable reconciles with the rose plot above (which plots
+        // capacity as a deficit). The colour was already risk-oriented.
+        var risk=r.worse?p0:(100-p0);
+        var rc=_rgbTriplet(_dtRiskColor(risk));
+        var by=y+rowH/2-2.5;
+        pdf.setFillColor(232,236,241);pdf.rect(barX,by,barW,5,'F');
+        pdf.setFillColor(rc[0],rc[1],rc[2]);
+        pdf.rect(barX,by,Math.max(1.5,barW*risk/100),5,'F');
+        pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(100,116,139);
+        var pt=_ord(risk)+' pct risk';
+        pdf.text(pt,pctR-pdf.getTextWidth(pt),ty);
+      }else{
+        pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(148,163,184);
+        pdf.text('\\u2014',pctR-pdf.getTextWidth('\\u2014'),ty);
+      }
+      y+=rowH;
+    });
+    if(p.omitted){
+      pdf.setFont('helvetica','italic');pdf.setFontSize(7.5);pdf.setTextColor(148,163,184);
+      pdf.text('+ '+p.omitted+' more selected variable'+(p.omitted===1?'':'s')+
+               ' not shown (top '+_TRACT_PDF_MAX_ROWS+' by contribution)',M,y+6);
+      y+=noteH;
+    }
+    y+=secGap;
+  });
+
+  // ── Footer ───────────────────────────────────────────────────
+  pdf.setDrawColor(226,232,240);pdf.setLineWidth(0.5);pdf.line(M,footTop,pw-M,footTop);
+  var dt=new Date();
+  var dStr=dt.toLocaleString(undefined,{year:'numeric',month:'short',day:'2-digit',
+    hour:'2-digit',minute:'2-digit'});
+  pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(100,116,139);
+  pdf.text('Generated '+dStr+'  \\u00b7  '+EXPORT_META.license+
+           '  \\u00b7  Percentiles are ranked within San Diego County.',M,footTop+12);
+  pdf.text('San Diego Heat Risk Explorer \\u2014 Southern California Extreme Heat Research Hub '+
+           '& San Diego Regional Climate Collaborative.',M,footTop+21);
+  // Wrap rather than assume: the source list plus the URL overruns the right
+  // margin at this size if written as one line.
+  pdf.setTextColor(130,140,155);
+  var srcTxt='Sources incl. MesoWest/Synoptic, NOAA HRRR, USGS Landsat, CDC PLACES & SVI, '+
+             'Healthy Places Index, U.S. Census.'+
+             (mapC?' Imagery \\u00a9 Esri, Maxar, Earthstar Geographics.':'')+
+             ' Full list: '+EXPORT_META.sources_url;
+  var fy=footTop+30;
+  pdf.splitTextToSize(srcTxt,CW).forEach(function(line){
+    pdf.text(line,M,fy);fy+=8;
+  });
+
+  pdf.save('san_diego_heat_risk_tract_'+geoid+'.pdf');
+}
+
+function downloadTractPdf(geoid){
+  if(!geoid)return;
+  var idx=(window._gIdx&&window._gIdx[geoid]!=null)?window._gIdx[geoid]:null;
+  if(idx==null){
+    for(var i=0;i<GJ.features.length;i++){
+      if(GJ.features[i].properties.GEOID===geoid){idx=i;break;}
+    }
+  }
+  if(idx==null||!GJ.features[idx])return;
+  var feat=GJ.features[idx];
+  // Pillar scores come from the composite. Build it if the user hasn't — but
+  // don't bail if they've enabled nothing: the rose plot and the raw readings
+  // are still worth exporting, and the PDF says the scores are missing.
+  if(!results){try{compute();}catch(e){}}
+
+  var radarC=null;
+  _pdfShow('Loading PDF library\\u2026');
+  _ensurePdfLibs().then(function(){
+    _pdfShow('Drawing the heat-vulnerability profile\\u2026');
+    return _radarCanvas(idx,feat.properties,3);
+  }).then(function(c){
+    radarC=c;
+    _pdfShow('Fetching satellite imagery\\u2026');
+    return _captureTractInset(feat);
+  }).then(function(mapC){
+    _pdfShow('Building PDF\\u2026');
+    _tractPdfBuild(idx,feat,radarC,mapC);
+    _pdfHide();
+  }).catch(function(err){
+    console.error('Tract PDF export failed:',err);
+    _pdfHide();
+    var bar=document.getElementById('error-bar');
+    bar.textContent='Tract PDF export failed: '+err.message+
+      '. You can also use the browser\\u2019s Print \\u2192 Save as PDF.';
+    bar.style.display='block';
+    setTimeout(function(){bar.style.display='none';},9000);
+  });
 }
 
 /* ================================================================

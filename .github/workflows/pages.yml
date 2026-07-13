@@ -25,27 +25,37 @@ jobs:
 
       - uses: actions/configure-pages@v6
 
-      - name: Stage site (exclude build tooling)
+      # ALLOW-LIST, not a deny-list. Nothing reaches the public site unless it is
+      # named below. The previous rsync excluded a handful of paths and shipped
+      # everything else, which silently published ARCHITECTURE.md, CLAUDE.md,
+      # tests/, docs/, and internal review PDFs. Adding a file to the repo must
+      # never publish it by default. `cp` fails loudly on a missing source, so a
+      # renamed asset breaks the build instead of quietly vanishing from the site.
+      - name: Stage site (explicit allow-list)
         run: |
-          mkdir -p _site
-          rsync -av \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='scripts' \
-            --include='data/' \
-            --include='data/exposure/' \
-            --include='data/exposure/processed/' \
-            --include='data/exposure/processed/landsat/' \
-            --include='data/exposure/processed/landsat/**' \
-            --include='data/context/' \
-            --include='data/context/sandag_landuse.pmtiles' \
-            --include='data/context/overlays/' \
-            --include='data/context/overlays/**' \
-            --exclude='data/**' \
-            --exclude='_site' \
-            --exclude='.gitignore' \
-            --exclude='README.md' \
-            ./ _site/
+          set -euo pipefail
+          mkdir -p _site/main _site/userguide _site/assets
+          mkdir -p _site/data/context/overlays _site/data/exposure/processed/landsat
+
+          # Pages shell
+          cp .nojekyll index.html _site/
+          cp LICENSE DATA_LICENSE.md _site/
+
+          # Viewer + user guide (the three linked pages)
+          cp main/heat_risk_map.html _site/main/
+          cp userguide/index.html _site/userguide/
+          cp userguide/figure_hero_composite.png userguide/figure_compare_scenarios.png _site/userguide/
+
+          # Logos referenced by the linked pages (sio_logoCroped.png is unused)
+          cp assets/ccsd_logo.png assets/sio_logo.png assets/usd-logo-horizontal.png _site/assets/
+
+          # Raster/vector overlays the viewer fetches at runtime
+          cp data/context/sandag_landuse.pmtiles _site/data/context/
+          cp -R data/context/overlays/. _site/data/context/overlays/
+          cp -R data/exposure/processed/landsat/. _site/data/exposure/processed/landsat/
+
+          echo "--- staged for deploy ---"
+          find _site -type f | sort
 
       - uses: actions/upload-pages-artifact@v5
         with:

@@ -14,9 +14,21 @@ python3 scripts/build_diy_pca_viewer.py
 
 Tracked scripts: `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`, `build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`. Tracked data: `data/exposure/processed/landsat/`, `data/context/sandag_landuse.pmtiles`, and `data/context/overlays/` (Data-Layer raster PNGs + `*_bounds.json`). Source CSV/GeoJSON/raster inputs live under `data/` locally but aren't committed — files dropped elsewhere under `data/` won't deploy.
 
-## Deployment gotcha: rsync rule order
+## The repo is private. The Pages site is not. Tracked ≠ published.
 
-`.github/workflows/pages.yml` excludes `data/**` *except* the landsat subtree, `sandag_landuse.pmtiles`, and `data/context/overlays/`. rsync is "first match wins," so those includes must come before the catch-all `data/**` exclude. Don't reorder.
+Those are separate settings and it's easy to assume the private repo protects the files. It doesn't — Pages serves the *deployed artifact*, so anything the workflow stages is world-readable at `cccia-sio.github.io/socal-heat-hub/`.
+
+The staging step in `.github/workflows/pages.yml` is an **allow-list**: it names every file that ships (27 of them). If a path isn't in that list, it isn't public. **Adding a file to this repo must never publish it.** This step used to be a deny-list, which silently published `ARCHITECTURE.md`, `CLAUDE.md`, `tests/`, `docs/`, and a partner's private review PDF.
+
+Adding a new runtime asset (an overlay the viewer fetches) takes two edits: the staging step in `pages.yml`, and `MUST_DEPLOY` in `tests/test_pages_workflow.py`. Never replace the staging step with a blanket copy of the repo root.
+
+## Front-end security invariants
+
+Guarded by `tests/test_frontend_security.py`; all fixes go in `HTML_TEMPLATE`, never in the generated HTML:
+
+- Geocoder output is untrusted. Nominatim is backed by OpenStreetMap, which anyone can edit — escape `display_name` with `_addrEsc()` before it reaches `innerHTML`.
+- CDN scripts carry an SRI hash. Compute with `curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A`, and check the origin sends CORS or `crossorigin="anonymous"` will break the load.
+- No analytics. The README and user guide promise no tracking; keep that true.
 
 ## Other rebuilds
 

@@ -39,6 +39,16 @@ venv/
 .idea/
 *.swp
 
+# Claude Code local settings (also covered by the user's global gitignore, but a
+# collaborator cloning without that config would otherwise commit it)
+.claude/
+
+# Internal review artifacts and scratch mockups — local only.
+# The SDRCC comments PDF is a partner's private editorial feedback; it was
+# tracked and (before the deploy allow-list) served publicly.
+assets/*Comments*.pdf
+_mockup_*.png
+
 # Local slide decks (not deployed)
 decks/
 

@@ -12,12 +12,13 @@ The public artifact is a static GitHub Pages site at
 - `/main/heat_risk_map.html` — the interactive heat-risk viewer (single self-contained HTML).
 - `/userguide/` — plain-language user guide (`userguide/index.html`).
 
-One more page deploys but is **not linked from the landing nav**:
-
-- `/main/hospitalizations.html` — standalone "Heat-attributable hospitalizations
-  by ZIP" viewer. (Distinct from the tract-level "Heat hospitalizations" Data
-  Layer inside the main viewer.) It ships only because it's tracked under
-  `main/`; if it isn't meant to be public, untrack it.
+Those three pages are the entire public site. `main/hospitalizations.html` — a
+standalone "Heat-attributable hospitalizations by ZIP" viewer, distinct from the
+tract-level "Heat hospitalizations" Data Layer inside the main viewer — is
+tracked but **no longer deployed**. It used to ship (unlinked but publicly
+reachable) purely because it lived under `main/`; the deploy allow-list now
+excludes it. To publish it, add it to the staging step in `pages.yml` and link
+it from the landing nav.
 
 The viewers run entirely in the browser. There is no backend, no API, and no
 runtime data fetching beyond the Leaflet basemap tiles and the deployed
@@ -46,9 +47,10 @@ non-allow-listed `scripts/`, `literature/` (the research corpus — see below),
 `__pycache__/`, `.venv/`, LaTeX aux files, `.DS_Store`, editor dirs, and
 `decks/`.
 
-The GitHub Pages workflow re-applies the same allow-list at deploy time through
-its rsync include/exclude rules (belt-and-suspenders — see
-`.github/workflows/pages.yml` and the **Deployment** section below).
+Tracked ≠ published. The Pages workflow applies its own, *narrower* allow-list at
+deploy time: many tracked files (`tests/`, `docs/`, `ARCHITECTURE.md`,
+`CLAUDE.md`, `README.md`) are deliberately never deployed. See
+`.github/workflows/pages.yml` and the **Deployment** section below.
 
 ## Top-level layout
 
@@ -188,12 +190,12 @@ data/exposure/processed/landsat/
 inlines the bounds + legend into the viewer. The PNGs are fetched at runtime
 by the browser (relative paths to `data/exposure/processed/landsat/`).
 
-The relative path means **the LST PNGs are deployed alongside the HTML**, even
-though the rest of `data/` is excluded: `pages.yml` explicitly includes
-`data/exposure/processed/landsat/**` ahead of the catch-all `data/**` exclude,
-so the overlays ship to production. (rsync is "first match wins" — the includes
-must precede the exclude; don't reorder them. The same applies to the Data-Layer
-overlays and the PMTiles file below.)
+The relative path means **the LST PNGs must be deployed alongside the HTML**,
+even though most of `data/` is not: the staging step in `pages.yml` copies
+`data/exposure/processed/landsat/` explicitly. The same applies to the
+Data-Layer overlays and the PMTiles file below. If you add a new runtime overlay
+under `data/`, it will **not** ship until you add it to that staging step and to
+`MUST_DEPLOY` in `tests/test_pages_workflow.py`.
 
 ## The Data-Layer overlays pipeline
 
@@ -338,8 +340,13 @@ python3 -m pytest
 - `test_export_licensing.py` — restricted sources (HPI) never reach the data
   download, and every export carries its citation/license.
 - `test_landsat_assets.py` — the LST overlay PNGs + bounds JSON exist and parse.
-- `test_pages_workflow.py` — `pages.yml` keeps its include-before-exclude rsync
-  ordering (the deploy gotcha above).
+- `test_pages_workflow.py` — the deploy stays an allow-list: internal files
+  (`ARCHITECTURE.md`, `CLAUDE.md`, `tests/`, `docs/`, the SDRCC review PDF) are
+  never staged, the assets the viewer fetches at runtime always are, and nobody
+  reintroduces a blanket copy of the repo root.
+- `test_frontend_security.py` — the geocoder's `display_name` stays escaped
+  before it reaches `innerHTML`, CDN scripts keep their SRI hashes,
+  `target="_blank"` keeps `rel="noopener"`, and no analytics creep in.
 - `test_static_links.py` — internal links across the pages resolve.
 - `test_tracked_files.py` — the `.gitignore` allow-list still tracks exactly the
   intended scripts/data products.
@@ -381,18 +388,44 @@ then restore the file.
 
 1. `actions/checkout@v6`
 2. `actions/configure-pages@v6`
-3. `rsync` the repo into `_site/`, excluding `.git`, `.github`, `scripts`,
-   `_site`, `.gitignore`, `README.md`, and `data/**` — but with `--include`
-   rules placed *before* the `data/**` exclude that re-admit three subtrees:
-   `data/exposure/processed/landsat/**`, `data/context/sandag_landuse.pmtiles`,
-   and `data/context/overlays/**`. rsync is **first-match-wins**, so these
-   includes must stay ahead of the `data/**` exclude — do not reorder.
+3. **Stage site** — `cp` an explicit list of files into `_site/`.
 4. `actions/upload-pages-artifact@v5` and `actions/deploy-pages@v5`.
 
-Result: GitHub Pages serves `index.html`, `main/`, `userguide/`, `assets/`,
-`docs/`, the three allow-listed `data/` subtrees, and `.nojekyll` from the root
-of the deployed site. (`scripts/` and all other `data/` are not deployed;
-`literature/` is gitignored and never reaches the workflow.)
+### The deploy is an allow-list. Adding a file must never publish it.
+
+Step 3 names every file that ships. If a path is not in that list, it does not
+reach the public site. This matters more than it looks, so it's worth being
+blunt about why:
+
+**The repo is private. The Pages site is not.** Those are separate settings, and
+people conflate them. Pages serves the *deployed artifact*, so anything the
+workflow copies into `_site/` is world-readable at
+`cccia-sio.github.io/socal-heat-hub/` — private repo or not.
+
+This step used to be an rsync **deny-list**: it excluded `.git`, `.github`,
+`scripts`, `README.md`, and most of `data/`, then shipped *everything else*. The
+result was that `ARCHITECTURE.md` (this file), `CLAUDE.md`, `pytest.ini`, the
+whole `tests/` suite, `docs/` (including the PCA methodology deck and internal
+diagnostics), a stray root-level mockup PNG, an unlinked hospitalizations page,
+and a 3.6 MB PDF of a partner's private review comments were all live on the
+open internet. Nobody put them there on purpose — they were published *by
+default*, simply for existing in the repo.
+
+An allow-list inverts that default. The staging step also runs `set -euo
+pipefail` and `cp` (not rsync), so a renamed or missing asset **fails the
+deploy** instead of silently disappearing from the site.
+
+`tests/test_pages_workflow.py` enforces both directions: internal paths must not
+appear in the staging step, and the assets the viewer fetches at runtime must.
+
+**What ships (27 files):** `.nojekyll`, `index.html`, `LICENSE`,
+`DATA_LICENSE.md`, `main/heat_risk_map.html`, `userguide/` (page + 2 figures),
+three logos from `assets/`, and the three allow-listed `data/` subtrees.
+
+**What does not:** `scripts/`, `.github/`, `tests/`, `docs/`, `README.md`,
+`ARCHITECTURE.md`, `CLAUDE.md`, `CITATION.cff`, `pytest.ini`,
+`main/hospitalizations.html`, and everything else under `data/`.
+(`literature/` and `decks/` are gitignored and never reach the workflow at all.)
 
 ## Literature corpus (gitignored)
 

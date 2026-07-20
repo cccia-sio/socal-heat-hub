@@ -12,7 +12,7 @@ python3 scripts/build_diy_pca_viewer.py
 
 ## `scripts/` and `data/` are gitignored except allow-list entries
 
-Tracked scripts: `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`, `build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`. Tracked data: `data/exposure/processed/landsat/`, `data/context/sandag_landuse.pmtiles`, and `data/context/overlays/` (Data-Layer raster PNGs + `*_bounds.json`). Source CSV/GeoJSON/raster inputs live under `data/` locally but aren't committed — files dropped elsewhere under `data/` won't deploy.
+Tracked scripts: `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`, `build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`, `build_hero_figure.py`. Tracked data: `data/exposure/processed/landsat/`, `data/context/sandag_landuse.pmtiles`, and `data/context/overlays/` (Data-Layer raster PNGs + `*_bounds.json`). Source CSV/GeoJSON/raster inputs live under `data/` locally but aren't committed — files dropped elsewhere under `data/` won't deploy.
 
 ## The repo is private. The Pages site is not. Tracked ≠ published.
 
@@ -35,4 +35,5 @@ Guarded by `tests/test_frontend_security.py`; all fixes go in `HTML_TEMPLATE`, n
 - LST overlay: `python3 scripts/build_lst_overlay.py` (when raw Landsat inputs change)
 - Data Layer overlays: `python3 scripts/build_data_overlays.py` (population pulled from EPA EnviroAtlas; impervious/canopy from the sibling `heat-risk-sd` NLCD rasters via `$HEAT_RISK_SD_DIR` or a fallback path)
 - UCLA excess-ER + CalHeatScore thresholds (tract crosswalk): `python3 scripts/build_ucla_heat_tract_xwalk.py` (fetches the SD slice live from the UCLA Heat Maps ArcGIS service, crosswalks ZIP→tract by centroid → `data/context/ucla_heat_tract.csv`, baked into the viewer's Exploratory Data Layers at build time)
+- User guide hero figure: `python3 scripts/build_hero_figure.py` → `userguide/figure_hero_composite.png`. Reproduces the viewer's **default view** (Daytime heat mode + the six `DEFAULT_ON` variables) by porting `exposureScore()`, `pillarPCA()` and `compute()` out of `HTML_TEMPLATE`. If you change that math, change it here too — the script's header documents where the two intentionally differ.
 - User guide PDF: `bash scripts/build_userguide_pdf.sh` (when `userguide/index.html` changes)

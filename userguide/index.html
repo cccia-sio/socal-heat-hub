@@ -371,14 +371,19 @@
     <div class="pillar-section exp">
       <h3>Heat Exposure</h3>
 
-      <h4>Heat</h4>
-      <p>Mean Daily Maximum Temperature; 85th and 99th Percentile Daily Maximum Temperature (the hottest 15% and 1% of days); Annual Maximum Temperature; <a href="https://www.usgs.gov/landsat-missions" target="_blank" rel="noopener">Landsat</a>-derived Mean Land Surface Temperature; and 85th and 99th Percentile Wet-Bulb Globe Temperature (WBGT), which combines temperature, humidity, sun, and wind into a single heat-safety index.</p>
+      <p>Heat Exposure is <strong>single-select</strong>: you choose one of the four heat hazards below and the tool scores that hazard on its own, as the average of its underlying layers. The four are not combined, because they are physically distinct and affect different places &mdash; daytime and nighttime heat are close to spatially uncorrelated across San Diego County, so blending them would cancel out the pattern in both.</p>
 
-      <h4>Nighttime Heat</h4>
-      <p>Mean Overnight Minimum Temperature; 90th Percentile Overnight Minimum Temperature (warm nights); and No-Relief Night Fraction (the percent of nights without cooling relief). Warm nights are associated with elevated heat-illness risk, especially in older adults.</p>
+      <h4>Daytime heat</h4>
+      <p>Mean Daily Maximum Temperature; 85th and 99th Percentile Daily Maximum Temperature (the hottest 15% and 1% of days); and Annual Maximum Temperature. Peaks inland.</p>
 
-      <h4>Humidity</h4>
-      <p>Mean Relative Humidity; Mean Humidity During Hot Hours (hours when air temperature exceeds the tract's 95th-percentile hourly temperature); and 95th Percentile Dewpoint Temperature. High humidity reduces evaporative cooling and raises apparent temperature.</p>
+      <h4>Nighttime heat</h4>
+      <p>Mean Overnight Minimum Temperature; 90th Percentile Overnight Minimum Temperature (warm nights); and No-Relief Night Fraction (the percent of nights without cooling relief). Peaks in dense urban and coastal census tracts. Warm nights are associated with elevated heat-illness risk, especially in older adults.</p>
+
+      <h4>Humid heat (WBGT)</h4>
+      <p>85th and 99th Percentile Wet-Bulb Globe Temperature, which combines temperature, humidity, sun, and wind into a single heat-safety index. Humidity enters the tool here rather than as a standalone variable, because it modifies how dangerous a given air temperature is rather than acting as a hazard on its own.</p>
+
+      <h4>Surface temperature</h4>
+      <p><a href="https://www.usgs.gov/landsat-missions" target="_blank" rel="noopener">Landsat</a>-derived Mean Land Surface Temperature &mdash; the radiant urban-heat-island signal, measured at the ground rather than in the air.</p>
     </div>
 
     <div class="pillar-section sen">
@@ -387,7 +392,7 @@
       <h4>Health</h4>
       <p>High Blood Pressure, Current Asthma, Coronary Heart Disease, COPD, Diabetes, Stroke, Depression, Cognitive Difficulty, and tract-level Life Expectancy percentile. Chronic-disease prevalence is from <a href="https://www.cdc.gov/places/index.html" target="_blank" rel="noopener">CDC PLACES</a>; Life Expectancy is from the <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy Places Index</a>.</p>
 
-      <h4>Demographics</h4>
+      <h4>Sociodemographics</h4>
       <p>Age 17 &amp; Under, Age 65+, Disability, Limited English, Single-Parent HH, Below 150% Poverty, Unemployed, Housing Cost Burden, No HS Diploma, Uninsured, Minority, Multi-Unit Structures, Mobile Homes, Crowding, No Vehicle, Group Quarters, and No Internet.</p>
 
       <h4>Social Vulnerability Index (SVI)</h4>
@@ -402,8 +407,8 @@
     <div class="pillar-section ada">
       <h3>Adaptive Capacity</h3>
 
-      <h4>Air Conditioning</h4>
-      <p>AC Prevalence (the percent of homes with any AC) from two independent sources: the U.S. Census Bureau's <a href="https://www.census.gov/newsroom/press-releases/2026/2023-lace.html" target="_blank" rel="noopener">Local Air Conditioning Estimates (LACE) 2023</a>, the first official tract-level AC estimates from the Census Bureau, and <a href="https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629" target="_blank" rel="noopener">Romitti et&nbsp;al. (2022)</a>, a published modeled estimate retained for comparison.</p>
+      <h4>Air Conditioning (AC)</h4>
+      <p>AC Prevalence (the percent of homes with any AC) from two independent sources, listed in the sidebar as <strong>AC Prevalence (LACE)</strong> and <strong>AC Prevalence (Romitti)</strong>: the U.S. Census Bureau's <a href="https://www.census.gov/newsroom/press-releases/2026/2023-lace.html" target="_blank" rel="noopener">Local Air Conditioning Estimates (LACE) 2023</a>, the first official tract-level AC estimates from the Census Bureau, and <a href="https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629" target="_blank" rel="noopener">Romitti et&nbsp;al. (2022)</a>, a published modeled estimate retained for comparison.</p>
 
       <h4>Built Environment</h4>
       <p>Tree Canopy, Park Access, Green Space (%), Renter-Occupied (%), and housing age (Pre-1980 and Pre-1960 Housing share). Sources: <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy Places Index</a>, <a href="https://censusreporter.org/tables/B25034/" target="_blank" rel="noopener">ACS B25034</a>, and <a href="https://sdgis-sandag.opendata.arcgis.com/" target="_blank" rel="noopener">SanGIS</a>.</p>
@@ -415,8 +420,8 @@
     </div>
 
     <h3>How the components combine</h3>
-    <p>Each pillar score ranks a census tract relative to others in San Diego County. The ranking reflects a weighted combination of the variables within that pillar. The Heat Risk Index is the mean of the three pillar scores (Heat Exposure, Population Sensitivity, and Adaptive Capacity), producing a single value between 0&ndash;100 per census tract.</p>
-    <p><strong>Correlated variables are not double-counted.</strong> Lower-income tracts tend to have older housing, less tree cover, and higher chronic-illness rates. A direct sum would weight that shared pattern multiple times. The tool uses <a href="https://people.duke.edu/~hpgavin/SystemID/References/Richardson-PCA-2009.pdf" target="_blank" rel="noopener">Principal Component Analysis</a>, a statistical method that identifies the dominant underlying patterns in a set of correlated variables, so each shared pattern is counted once rather than multiple times.</p>
+    <p>Each pillar score ranks a census tract relative to others in San Diego County. <strong>Heat Exposure</strong> is the average of the layers making up the heat mode you selected. <strong>Population Sensitivity</strong> and <strong>Adaptive Capacity</strong> are weighted combinations of the variables you turned on. All three are then percentile-ranked, and the Heat Risk Index is their mean, producing a single value between 0&ndash;100 per census tract.</p>
+    <p><strong>Correlated variables are not double-counted.</strong> Lower-income tracts tend to have older housing, less tree cover, and higher chronic-illness rates. A direct sum would weight that shared pattern multiple times. Within Population Sensitivity and Adaptive Capacity, the tool uses <a href="https://people.duke.edu/~hpgavin/SystemID/References/Richardson-PCA-2009.pdf" target="_blank" rel="noopener">Principal Component Analysis</a>, a statistical method that identifies the dominant underlying patterns in a set of correlated variables, so each shared pattern is counted once rather than multiple times. Heat Exposure does not use PCA &mdash; a heat mode is a small set of readings of the same physical hazard, so its layers are simply averaged.</p>
     <p><strong>Adaptive-capacity variables enter the score with the opposite sign.</strong> A census tract with strong protective resources receives a lower Heat Risk Index even when its exposure is high.</p>
 
 
@@ -425,6 +430,8 @@
 
     <h3>Color</h3>
     <p>A darker color indicates a higher risk based on the composite Heat Risk Index. The composite map uses red (highest = darkest red). Single-pillar views use the pillar's color: red for Heat Exposure, purple for Population Sensitivity, green for Adaptive Capacity.</p>
+    <p>The <strong>Dominant Driver</strong> map reuses those three hues to mark which pillar drives each census tract's risk, and shade carries a second signal: <strong>lighter = lower composite risk</strong>. Note that green marks census tracts where <em>low</em> adaptive capacity is the leading driver &mdash; it flags a shortfall in cooling resources, not an abundance of them.</p>
+    <p>Turning on <strong>Accessibility &rarr; colorblind-friendly palettes</strong> replaces this scheme throughout. The composite ramp becomes viridis (purple through green to yellow), and the three drivers become orange (Heat Exposure), yellow (Population Sensitivity), and blue (low Adaptive Capacity).</p>
 
     <h3>Index interpretation</h3>
     <p>The Heat Risk Index is a <em>relative percentile</em>, not absolute risk. A Heat Risk Index of 75 means the census tract is at higher risk than 75% of San Diego County census tracts. It does not mean 75% of residents will be harmed.</p>
@@ -437,6 +444,7 @@
     <ul>
       <li><strong>Composite Risk (left panel):</strong> the 0&ndash;100 Heat Risk Index combining all three pillars (default view).</li>
       <li><strong>Dominant Driver (right panel):</strong> census tracts are colored by which pillar contributes most to the Heat Risk Index. This distinguishes hotspots driven by Heat Exposure from those driven by Population Sensitivity or low Adaptive Capacity. Click on a census tract to see the scores for each of the three pillars.</li>
+      <li><strong>Driver Mix:</strong> a blend of all three drivers rather than only the winner. A census tract leans toward the hue of whichever driver it ranks highest on and reads white when the three are balanced; lighter still means lower composite risk. Use this where you want to spot census tracts with two comparable drivers, which the Dominant Driver map collapses to one.</li>
       <li><strong>Primary Spatial Patterns:</strong> this drop-down menu lists the independent patterns identified by Principal Component Analysis across all selected variables. Each entry is labeled <strong>Pattern N (var X%)</strong>, where N is the pattern's rank by importance and X% is the share of variance in the data that this pattern explains. Hover over the blue information icons to see which variables contribute most to each pattern.</li>
     </ul>
 
@@ -446,7 +454,8 @@
     <h3>Sidebar panel</h3>
     <p>The left sidebar lets you customize the map. Sections, from top to bottom:</p>
     <ul>
-      <li><strong>Heat Exposure / Population Sensitivity / Adaptive Capacity:</strong> the three pillar groups described above. Use a pillar's header checkbox to toggle the whole pillar; expand each collapsible category (Heat, Nighttime Heat, Health, Demographics, etc.) to toggle individual variables.</li>
+      <li><strong>Heat Exposure:</strong> a single-select list of the four heat hazards. Picking one replaces the exposure score rather than adding to it, so there is no header checkbox here.</li>
+      <li><strong>Population Sensitivity / Adaptive Capacity:</strong> checkbox groups. Use a pillar's header checkbox to toggle the whole pillar; expand each collapsible category (Health, Sociodemographics, Air Conditioning (AC), Built Environment, etc.) to toggle individual variables.</li>
       <li><strong>Build Composite Risk Map:</strong> combines the variables you selected into a Heat Risk Index for every census tract.</li>
       <li><strong>Map Layer:</strong> switch between the Composite Risk, Dominant Driver, a single pillar score, a single raw variable, or one of the Primary Spatial Patterns.</li>
       <li><strong>Jurisdictions:</strong> overlay city or tribal-land boundaries on the map.</li>
@@ -482,36 +491,44 @@
     <!-- =================== 4. Examples =================== -->
     <h2 class="section" id="examples">Examples</h2>
 
-    <p>Each example narrows one pillar to a single question, then leaves the other two pillars alone (all variables remain on by default) so the Heat Risk Index still reflects who is hot, who is vulnerable, and who can cope.</p>
+    <p>Each example narrows one pillar to a single question and leaves the other two at their defaults, so the Heat Risk Index still reflects who is hot, who is vulnerable, and who can cope.</p>
+
+    <div class="aside">
+      <p><strong>Start from the defaults, not from everything.</strong> The tool opens with a deliberately small selection: <em>Overall SVI</em>, <em>Age 65+</em>, and <em>Heat-Day Hospitalization Rate Ratio</em> for Population Sensitivity; <em>AC Prevalence (LACE)</em>, <em>Tree Canopy</em>, and <em>Income</em> for Adaptive Capacity; and the <em>Daytime heat</em> mode for Heat Exposure. Turning on all ~60 variables is not recommended &mdash; it pushes each pillar's PCA toward a generic &ldquo;everything correlates&rdquo; pattern and washes out the spatial contrast that makes the map useful. Unless an example says otherwise, leave the untouched pillars as they are.</p>
+    </div>
+
+    <p>The viewer also walks through Example 1 for you: take the welcome tour, and its final step offers a <strong>See worked example</strong> button that performs each step automatically.</p>
 
     <div class="workflow">
       <h3>Example 1: Where are children most at risk due to heat stress?</h3>
       <ol>
-        <li>Click the <strong>Population Sensitivity</strong> header checkbox to clear that pillar, then re-check only <strong>Age 17 &amp; Under</strong> (under <em>Demographics</em>).</li>
-        <li>Select all variables for <strong>Heat Exposure</strong> and <strong>Adaptive Capacity</strong>.</li>
+        <li>Click the <strong>Population Sensitivity</strong> header checkbox to clear that pillar, then expand <em>Sociodemographics</em> and check only <strong>Age 17 &amp; Under</strong>.</li>
+        <li>Leave <strong>Heat Exposure</strong> on <strong>Daytime heat</strong> and leave <strong>Adaptive Capacity</strong> at its defaults.</li>
         <li>Click <strong>Build Composite Risk Map</strong>.</li>
-        <li>The Population Sensitivity score is now driven entirely by the population 17 and under. Census tracts that are high risk (darker) <strong>and</strong> driven primarily by Population Sensitivity are places where children are most at risk due to heat stress.</li>
+        <li>The Population Sensitivity score is now driven entirely by the population 17 and under. Census tracts that are high risk (darker) <strong>and</strong> whose Dominant Driver is Population Sensitivity are places where children are most at risk due to heat stress.</li>
       </ol>
     </div>
 
     <div class="workflow">
       <h3>Example 2: Where would people benefit most from subsidies to purchase AC units?</h3>
       <ol>
-        <li>Click the <strong>Adaptive Capacity</strong> header checkbox to clear that pillar, then re-check only <strong>AC Prevalence</strong> (under <em>Air Conditioning</em>).</li>
-        <li>Select all variables for <strong>Heat Exposure</strong> and <strong>Population Sensitivity</strong>.</li>
+        <li>Click the <strong>Adaptive Capacity</strong> header checkbox to clear that pillar, then expand <em>Air Conditioning (AC)</em> and check only <strong>AC Prevalence (LACE)</strong>.</li>
+        <li>Leave <strong>Heat Exposure</strong> and <strong>Population Sensitivity</strong> at their defaults.</li>
         <li>Click <strong>Build Composite Risk Map</strong>.</li>
-        <li>The Adaptive Capacity score is now a pure ranking of how AC-poor each census tract is. The darkest red census tracts are priority areas for an AC-subsidy program: hot, sensitive, and currently lacking AC.</li>
+        <li>The Adaptive Capacity score is now a pure ranking of how AC-poor each census tract is. The darkest census tracts are priority areas for an AC-subsidy program: hot, sensitive, and currently lacking AC.</li>
       </ol>
+      <p>Two AC estimates are available. <strong>AC Prevalence (LACE)</strong> is the Census Bureau's official tract-level estimate; <strong>AC Prevalence (Romitti)</strong> is a published modeled estimate. Re-running the example with the other source is a quick way to check whether a tract's ranking depends on which estimate you trust.</p>
     </div>
 
     <div class="workflow">
       <h3>Example 3: Where is nighttime heat most dangerous?</h3>
       <ol>
-        <li>Click the <strong>Heat Exposure</strong> header checkbox to clear that pillar, then re-check the Nighttime Heat variables: <strong>Mean Overnight Minimum Temperature</strong>, <strong>90th Percentile Overnight Minimum Temperature</strong>, and <strong>No-Relief Night Fraction</strong>.</li>
-        <li>Leave <strong>Population Sensitivity</strong> and <strong>Adaptive Capacity</strong> alone.</li>
+        <li>Under <strong>Heat Exposure</strong>, select the <strong>Nighttime heat</strong> mode. This one click replaces the whole exposure score &mdash; the mode averages Mean Overnight Minimum Temperature, 90th Percentile Overnight Minimum Temperature, and No-Relief Night Fraction.</li>
+        <li>Leave <strong>Population Sensitivity</strong> and <strong>Adaptive Capacity</strong> at their defaults.</li>
         <li>Click <strong>Build Composite Risk Map</strong>.</li>
-        <li>The Heat Exposure score is now a pure ranking of how warm a census tract's nights are. The darkest red census tracts have severe overnight heat alongside vulnerable populations and limited capacity to cool down.</li>
+        <li>The Heat Exposure score is now a pure ranking of how warm a census tract's nights are. The darkest census tracts have severe overnight heat alongside vulnerable populations and limited capacity to cool down.</li>
       </ol>
+      <p>Expect this map to look quite different from the default. Nighttime heat peaks in dense urban and coastal tracts, whereas daytime heat peaks inland &mdash; the two are close to spatially uncorrelated across the county. Switching back to <strong>Daytime heat</strong> and rebuilding is the fastest way to see which communities are exposed to one but not the other.</p>
     </div>
 
 

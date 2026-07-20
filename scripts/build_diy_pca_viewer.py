@@ -3813,6 +3813,21 @@ function pillarPCA(pid,keys){
   // sign ref
   var ref=SREF[pid],ri=keys.indexOf(ref);if(ri<0)ri=0;
   var rc=[];for(i=0;i<N;i++)rc.push(X[i][ri]);
+  // Orient EVERY component to the pillar's risk reference before it is used.
+  // Eigenvector signs are arbitrary, so an unanchored PC used to enter the
+  // weighted composite below with inverted polarity and cancel risk instead of
+  // adding it — which also made the pillar score depend on which eigen solver
+  // ran (numpy and this Jacobi routine disagreed at r=0.33 on the default
+  // sensitivity selection, moving 32% of tracts to a different dominant
+  // driver). Loadings flip with their scores so the "Driven by" tooltip and the
+  // Primary Spatial Patterns layers stay in sync.
+  for(k=0;k<P;k++){
+    var pcCol=[];for(i=0;i<N;i++)pcCol.push(sc[i][k]);
+    if(corrXY(rc,pcCol)<0){
+      for(i=0;i<N;i++)sc[i][k]=-sc[i][k];
+      for(j=0;j<P;j++)eig.V[j][ord[k]]=-eig.V[j][ord[k]];
+    }
+  }
   // weighted composite
   var wts=vr.slice(0,nret),ws=0;for(i=0;i<wts.length;i++)ws+=wts[i];
   var w=new Array(N);for(i=0;i<N;i++){w[i]=0;for(k=0;k<nret;k++)w[i]+=sc[i][k]*wts[k]/ws;}
@@ -4384,7 +4399,12 @@ function _triCanvas(w,h){
   var c=cv.getContext('2d');
   var fs=Math.max(9,Math.round(h*0.115));
   var padT=fs+3,padB=fs+3,padX=Math.round(w*0.07);
-  var Ex=w/2,Ey=padT,Sx=padX,Sy=h-padB,Ax=w-padX,Ay=h-padB;       // E top, S bl, A br
+  // E top, A bl, S br — matches the popup radar's wedge order (_RADAR_SECTORS
+  // puts sensitivity at c:30 = bottom-right, adaptive at c:150 = bottom-left),
+  // so the two graphics don't mirror each other. The barycentric solve below is
+  // generic over the vertices, and _triMix takes weights by argument position,
+  // so moving corners here restyles the legend without recoloring any tract.
+  var Ex=w/2,Ey=padT,Ax=padX,Ay=h-padB,Sx=w-padX,Sy=h-padB;
   var det=(Sy-Ay)*(Ex-Ax)+(Ax-Sx)*(Ey-Ay);
   var img=c.createImageData(w,h),dt=img.data;
   for(var py=0;py<h;py++){for(var px=0;px<w;px++){
@@ -4403,8 +4423,8 @@ function _triCanvas(w,h){
   function lab(txt,x,y,align,base,rgb){c.textAlign=align;c.textBaseline=base;
     c.strokeText(txt,x,y);c.fillStyle='rgb('+rgb.join(',')+')';c.fillText(txt,x,y);}
   lab('Heat',Ex,1,'center','top',dg.exposure);
-  lab('Sens.',1,h-1,'left','bottom',dg.sensitivity);
-  lab('Adapt.',w-1,h-1,'right','bottom',dg.adaptive);
+  lab('Adapt.',1,h-1,'left','bottom',dg.adaptive);
+  lab('Sens.',w-1,h-1,'right','bottom',dg.sensitivity);
   return cv;
 }
 

@@ -148,7 +148,7 @@ What it does (top-down through the script):
    - climate deltas: `__DELTAS_PLACEHOLDER__`, `__DELTAMAP_PLACEHOLDER__`
    - boundary / point overlays: `__JURIS_PLACEHOLDER__`,
      `__UNINCORP_PLACEHOLDER__`, `__TRIBAL_PLACEHOLDER__`,
-     `__COOLZONES_PLACEHOLDER__` (county cool-zone sites)
+     `__COOLZONES_PLACEHOLDER__` (County + City of San Diego cool-zone sites)
    - raster-overlay bounds (shape matches the LST sidecar): `__LST_PLACEHOLDER__`,
      `__POP_PLACEHOLDER__`, `__IMPERVIOUS_PLACEHOLDER__`, `__CANOPY_PLACEHOLDER__`
    - preset layer bundles: `__HEATMODES_PLACEHOLDER__` (from the `HEAT_MODES` list)
@@ -282,7 +282,7 @@ data/
 │   └── tract_exploration.csv                ← pct_green
 │
 └── cool_zones/
-    └── coolzone_sites.csv                   ← county cool-zone sites (COOLZONES overlay)
+    └── coolzone_sites.csv                   ← County + City of San Diego cool-zone sites (COOLZONES overlay); `source` column marks provenance
 ```
 
 The mapping from CSV columns → variables shown in the viewer is in

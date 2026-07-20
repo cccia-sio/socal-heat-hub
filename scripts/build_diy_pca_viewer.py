@@ -1707,8 +1707,8 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <div id="tribal-items" style="margin-top:2px"></div>
     </details>
     <details class="subsec" id="coolzones-subsec" style="margin-top:6px"><summary>Cool Zones</summary>
-      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-coolzones" onchange="toggleCoolZones(this.checked)">Show county cool-zone sites</label></div>
-      <div style="font-size:10px;color:#666;margin:2px 0 0 6px">County-listed cooling sites (libraries, civic centers, malls). Click a marker for address &amp; phone.</div>
+      <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-coolzones" onchange="toggleCoolZones(this.checked)">Show cool-zone sites</label></div>
+      <div style="font-size:10px;color:#666;margin:2px 0 0 6px">Public cooling sites from the County Cool Zones program and the City of San Diego (libraries, rec centers, civic buildings). Click a marker for address &amp; phone.</div>
     </details>
   </div>
   <details id="scenario-bar">

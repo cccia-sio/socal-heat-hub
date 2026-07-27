@@ -13,6 +13,7 @@ Output:
 
 import json
 import logging
+import urllib.parse
 from pathlib import Path
 
 import geopandas as gpd
@@ -391,6 +392,13 @@ RESTRICTED_REASONS = {
         "CalHeatScore@oehha.ca.gov."
     ),
 }
+
+# Where user feedback goes. A mailto rather than a form or issue tracker: the
+# repo is private (so its Issues page 404s for the public), and any hosted form
+# would be a third-party data flow that the no-tracking promise would then have
+# to carve out. Subject is prefilled so replies are filterable.
+FEEDBACK_EMAIL = "cjmack@ucsd.edu"
+FEEDBACK_SUBJECT = "San Diego Heat Risk Explorer - feedback"
 
 # Attribution stamped onto every row of the "Download Data" export — as CSV
 # columns and as GeoJSON feature properties — so a file that travels away from
@@ -885,6 +893,10 @@ def main():
     html = HTML_TEMPLATE
     html = html.replace("__GEOJSON_PLACEHOLDER__", geojson_str)
     html = html.replace("__VARMETA_PLACEHOLDER__", var_meta_str)
+    feedback_mailto = (
+        f"mailto:{FEEDBACK_EMAIL}?subject={urllib.parse.quote(FEEDBACK_SUBJECT)}"
+    )
+    html = html.replace("__FEEDBACK_MAILTO_PLACEHOLDER__", feedback_mailto)
     html = html.replace("__VARSOURCES_PLACEHOLDER__", var_sources_str)
     html = html.replace("__SOURCENAMES_PLACEHOLDER__", source_names_str)
     html = html.replace("__VARUNITS_PLACEHOLDER__", var_units_str)
@@ -1847,6 +1859,13 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     <button id="dl-pdf-btn" onclick="downloadMapPdf()" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s">Download Map as PDF</button>
     <button id="dl-data-btn" onclick="openExportModal()" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s">Download Data</button>
   </div>
+  <!-- Plain mailto, not a form: no third-party service, so the no-tracking
+       promise in the README and user guide stays literally true. -->
+  <div id="feedback-section" style="border-top:1px solid #e0e0e0;padding-top:10px;margin-top:14px">
+    <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;color:#666">Feedback</h3>
+    <a id="feedback-btn" href="__FEEDBACK_MAILTO_PLACEHOLDER__" style="display:block;box-sizing:border-box;width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;text-align:center;text-decoration:none;transition:all 0.15s">Send Feedback or Request</a>
+    <div style="font-size:10px;color:#666;margin-top:5px;line-height:1.4">Questions, corrections, a variable you wish were here, or a tract that looks wrong &mdash; all welcome. Opens your email client.</div>
+  </div>
 </div>
 
 <div id="map-wrap">
@@ -2103,10 +2122,11 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
         <li><b>Jurisdictions</b> &mdash; show city, unincorporated-county, or tribal-land boundaries on the map.</li>
         <li><b>Climate Scenario</b> &mdash; see how risk shifts under future warming, for the year 2050 or 2080.</li>
         <li><b>Export</b> &mdash; save the current map as a PDF or download the data.</li>
+        <li><b>Feedback</b> &mdash; <a href="__FEEDBACK_MAILTO_PLACEHOLDER__" style="color:#2563eb">email us</a> about anything that looks wrong or missing. Also at the bottom of the sidebar.</li>
       </ul>
       <p style="margin-top:14px;font-size:11.5px;color:#6b7280;line-height:1.5">
         &copy;&nbsp;2026 Southern California Extreme Heat Research Hub &amp; San Diego Regional Climate Collaborative.
-        Code <a href="https://github.com/cccia-sio/socal-heat-hub/blob/main/LICENSE" target="_blank" rel="noopener" style="color:#6b7280;text-decoration:underline">MIT</a>;
+        Code <a href="../LICENSE" target="_blank" rel="noopener" style="color:#6b7280;text-decoration:underline">MIT</a>;
         data &amp; content <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener" style="color:#6b7280;text-decoration:underline">CC&nbsp;BY&nbsp;4.0</a>,
         each source under its own terms.
       </p>

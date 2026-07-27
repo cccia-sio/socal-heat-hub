@@ -18,6 +18,7 @@ ALLOWED_SCRIPT_FILES = {
     "build_data_overlays.py",
     "build_userguide_pdf.sh",
     "build_ucla_heat_tract_xwalk.py",
+    "build_hero_figure.py",
 }
 
 # Tracked data files. The landsat and context/overlays directories are wholly

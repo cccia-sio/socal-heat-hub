@@ -3,10 +3,12 @@
 Two invariants, both of which are easy to break by accident when adding a
 variable:
 
-1. Variables from a source whose terms bar unrestricted redistribution (today:
-   Healthy Places Index, which is non-commercial) must never reach the export —
-   not as raw values, not as `_sd_pctile` ranks, not as `_adj` climate-adjusted
-   variants. They stay on the map, used under the source's own terms.
+1. Variables from a source whose terms bar unrestricted redistribution — today
+   Healthy Places Index (non-commercial) and the CalHeatScore heat-
+   hospitalisation estimates (no published licence) — must never reach the
+   export: not as raw values, not as `_sd_pctile` ranks, not as `_adj`
+   climate-adjusted variants. They stay on the map, used under the source's
+   own terms.
 2. Every exported file must carry its own attribution, so a CSV that travels
    away from the site still states its license and links to the source table.
 
@@ -27,7 +29,8 @@ def _literals_from_build_script(build_script_text: str) -> dict:
     """
     tree = ast.parse(build_script_text)
     src_consts: dict = {}
-    wanted = ("VARIABLES", "VAR_SOURCES", "RESTRICTED_EXPORT_SOURCES", "EXPORT_META")
+    wanted = ("VARIABLES", "VAR_SOURCES", "RESTRICTED_EXPORT_SOURCES",
+              "RESTRICTED_REASONS", "EXPORT_META")
     out: dict = {}
     for node in tree.body:
         if not isinstance(node, ast.Assign) or len(node.targets) != 1:
@@ -67,6 +70,47 @@ def restricted_keys(consts):
     ]
     assert keys, "No restricted variables found — RESTRICTED_EXPORT_SOURCES wired up wrong?"
     return keys
+
+
+def test_known_gated_sources_stay_restricted(consts):
+    """Sources audited 2026-07-27 as not redistributable must stay excluded.
+
+    Both were verified by hand; neither can be re-included without a licence
+    change at the source:
+
+    - Healthy Places Index: non-commercial terms, conflicts with CC BY 4.0.
+    - CalHeatScore heat-hospitalisation estimates: the input file arrived as an
+      emailed attachment with no published licence and no public download.
+      CalHeatScore's public release is daily scores plus a REST API; the
+      per-ZCTA effect estimates are not part of it.
+    """
+    restricted = consts["RESTRICTED_EXPORT_SOURCES"]
+    for url in ("https://www.healthyplacesindex.org/",
+                "https://calheatscore.calepa.ca.gov/"):
+        assert url in restricted, (
+            f"{url} was audited as not redistributable but is no longer in "
+            "RESTRICTED_EXPORT_SOURCES. Its variables would ship in the download."
+        )
+
+
+def test_restricted_sources_explain_themselves(consts):
+    """Every restricted source needs a reason shown in the data dictionary."""
+    missing = sorted(
+        consts["RESTRICTED_EXPORT_SOURCES"] - set(consts["RESTRICTED_REASONS"])
+    )
+    assert not missing, (
+        f"Restricted sources with no RESTRICTED_REASONS entry: {missing}. The "
+        "data dictionary would fall back to a generic note instead of telling "
+        "users where to obtain the data."
+    )
+
+
+def test_no_export_reasons_reach_the_page(viewer_html_text):
+    """NO_EXPORT_WHY must cover every key in NO_EXPORT."""
+    no_export = set(_json_var(viewer_html_text, "NO_EXPORT"))
+    why = _json_var(viewer_html_text, "NO_EXPORT_WHY")
+    uncovered = sorted(no_export - set(why))
+    assert not uncovered, f"Withheld variables with no explanation: {uncovered}"
 
 
 def test_every_variable_has_a_source(consts):

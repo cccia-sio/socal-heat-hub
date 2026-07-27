@@ -221,7 +221,9 @@ _SRC_PLACES = "https://www.cdc.gov/places/index.html"
 _SRC_SVI = "https://www.atsdr.cdc.gov/place-health/php/svi/index.html"
 _SRC_HPI = "https://www.healthyplacesindex.org/"
 _SRC_LACE = "https://www.census.gov/newsroom/press-releases/2026/2023-lace.html"
-_SRC_ROMITTI = "https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629"
+# Point at the Harvard Dataverse deposit, not the article: the deposit is the
+# redistributable artifact. Paper is CC BY (PNAS Nexus, doi:10.1093/pnasnexus/pgac210).
+_SRC_ROMITTI = "https://doi.org/10.7910/DVN/HWFVP6"
 _SRC_ACS_B25034 = "https://censusreporter.org/tables/B25034/"
 _SRC_ACS_B25003 = "https://censusreporter.org/tables/B25003/"
 _SRC_ACS_C24030 = "https://censusreporter.org/tables/C24030/"
@@ -301,11 +303,94 @@ VAR_SOURCES = {
     "dieselpm_pctile": _SRC_HPI,
 }
 
-# Sources whose terms bar unrestricted (commercial) redistribution. Their raw
-# values are dropped from the "Download Data" export so the downloadable dataset
-# stays CC BY-clean; they still render on the map, used under each source's own
-# terms with attribution. HPI is non-commercial, which conflicts with CC BY.
-RESTRICTED_EXPORT_SOURCES = {_SRC_HPI}
+# Human-readable name for each source URL. The "(Source)" links in the sidebar
+# only carry a URL; the exported data dictionary names the provenance in words
+# so a downloaded file is self-describing without a network round-trip.
+SOURCE_NAMES = {
+    _SRC_MESOWEST: "MesoWest / Synoptic Data (+ CIMIS), IDW to tract centroids",
+    _SRC_PLACES: "CDC PLACES (model-based small-area estimates)",
+    _SRC_SVI: "CDC/ATSDR Social Vulnerability Index 2022",
+    _SRC_HPI: "Healthy Places Index (HPI) 3.0",
+    _SRC_LACE: "U.S. Census Bureau LACE 2023",
+    _SRC_ROMITTI: "Romitti et al. 2022, PNAS Nexus (modeled AC prevalence)",
+    _SRC_ACS_B25034: "ACS 5-year, table B25034 (year structure built)",
+    _SRC_ACS_B25003: "ACS 5-year, table B25003 (tenure)",
+    _SRC_ACS_C24030: "ACS 5-year, table C24030 (industry by sex)",
+    _SRC_ACS_B11007: "ACS 5-year, table B11007 (households by age)",
+    _SRC_SANGIS: "SANDAG / SanGIS regional land use",
+    _SRC_LANDSAT: "USGS Landsat (Collection 2 surface temperature)",
+    _SRC_HRRR: "NOAA HRRR 3 km analysis, WBGT via Liljegren/Dimiceli",
+    _SRC_CALHEATSCORE: "CalHeatScore (CalEPA / OEHHA), per-ZCTA, crosswalked to tract",
+    _SRC_LEAD: "DOE LEAD Tool (2022)",
+    _SRC_NLCD: "NLCD / MRLC land cover",
+}
+
+# ── Units, for the exported data dictionary ──────────────────────────────
+# Resolved per variable so an analyst never has to guess whether a column is
+# 0–1, 0–100, or degrees. Keep in sync with fmtCmpRaw() in HTML_TEMPLATE,
+# which formats these same values for on-screen display.
+_U_C = "degrees Celsius"
+_U_PCT = "percent (0-100)"
+_UNITS_EXPLICIT = {
+    "mean_tmax": _U_C, "p85_tmax": _U_C, "p99_tmax": _U_C, "max_tmax": _U_C,
+    "mean_lst": _U_C, "p85_wbgt": _U_C, "p99_wbgt": _U_C,
+    "mean_tmin_overnight": _U_C, "p90_tmin_overnight": _U_C,
+    "p95_dewpoint": _U_C,
+    "no_relief_fraction": "fraction of May-Oct nights above 20 C (0-1)",
+    "ac_prob": "share of homes with air conditioning (0-1)",
+    "ac_prob_romitti": "share of homes with air conditioning (0-1)",
+    "energy_burden": "percent of household income spent on energy",
+    "heat_hosp_day": (
+        "relative-scale effect estimate, centered near 0 "
+        "(higher = more excess hospitalizations on extreme-heat days)"
+    ),
+    "heat_hosp_night": (
+        "relative-scale effect estimate, centered near 0 "
+        "(higher = more excess hospitalizations after extreme-warm nights)"
+    ),
+    "extreme_day_fraction": "fraction of days (0-1)",
+}
+
+
+def _var_units(key: str) -> str:
+    """Units string for a variable key, used by the exported data dictionary."""
+    if key in _UNITS_EXPLICIT:
+        return _UNITS_EXPLICIT[key]
+    if key.startswith("RPL_"):
+        return "percentile rank as published by CDC/ATSDR (0-1)"
+    if key.startswith(("EP_", "pct_")):
+        return _U_PCT
+    if key.endswith("_prev"):
+        return "percent of adults 18+ (0-100)"
+    if key.endswith("_pctile"):
+        return "HPI percentile (0-100)"
+    return ""
+
+
+# Sources we cannot demonstrate are redistributable. Their raw values are dropped
+# from the "Download Data" export so the downloadable dataset stays CC BY-clean;
+# they still render on the map, used under each source's own terms with
+# attribution. Adding a source here is the ONLY switch needed — NO_EXPORT, the
+# data dictionary and tests/test_export_licensing.py all derive from it.
+RESTRICTED_EXPORT_SOURCES = {_SRC_HPI, _SRC_CALHEATSCORE}
+
+# Why each restricted source is withheld. Surfaced verbatim in the exported data
+# dictionary so an absent column is explained rather than mysterious.
+RESTRICTED_REASONS = {
+    _SRC_HPI: (
+        "Shown on the map but omitted from this download: the Healthy Places "
+        "Index is licensed for non-commercial use, which conflicts with the "
+        "CC BY 4.0 terms of this file. Get it from HPI directly."
+    ),
+    _SRC_CALHEATSCORE: (
+        "Shown on the map but omitted from this download: these estimates come "
+        "from a collaborator-supplied file with no published license or public "
+        "download, so we cannot establish a right to redistribute them. "
+        "CalHeatScore publishes daily scores and a REST API; per-ZCTA effect "
+        "estimates are not part of that public release. Request them from "
+        "CalHeatScore@oehha.ca.gov."
+    ),
+}
 
 # Attribution stamped onto every row of the "Download Data" export — as CSV
 # columns and as GeoJSON feature properties — so a file that travels away from
@@ -315,9 +400,10 @@ RESTRICTED_EXPORT_SOURCES = {_SRC_HPI}
 EXPORT_META = {
     "citation": (
         "San Diego Heat Risk Explorer - Southern California Extreme Heat "
-        "Research Hub & San Diego Regional Climate Collaborative. Healthy "
-        "Places Index variables are shown on the map but omitted from this "
-        "export under HPI's non-commercial terms."
+        "Research Hub & San Diego Regional Climate Collaborative. Variables "
+        "whose source terms bar redistribution (Healthy Places Index; "
+        "CalHeatScore heat-hospitalization estimates) are shown on the map "
+        "but omitted from this export - see the data dictionary."
     ),
     "license": "CC BY 4.0",
     "sources_url": "https://cccia-sio.github.io/socal-heat-hub/userguide/#data",
@@ -648,11 +734,25 @@ def main():
         {k: v for k, v in VAR_SOURCES.items() if k in tracts.columns},
         ensure_ascii=True,
     )
+    # url -> plain-English source name, and key -> units. Both exist only to
+    # make the "Download Data" dictionary self-describing.
+    source_names_str = json.dumps(SOURCE_NAMES, ensure_ascii=True)
+    var_units_str = json.dumps(
+        {v[0]: _var_units(v[0]) for v in VARIABLES if v[0] in tracts.columns},
+        ensure_ascii=True,
+    )
     # Variable keys excluded from the Download Data export (restricted source
     # terms). They stay on the map; only the bulk download omits them.
     no_export_str = json.dumps(
         sorted(k for k, v in VAR_SOURCES.items()
                if v in RESTRICTED_EXPORT_SOURCES and k in tracts.columns),
+        ensure_ascii=True,
+    )
+    # varKey -> why it is withheld, for the data dictionary's notes column.
+    no_export_reasons_str = json.dumps(
+        {k: RESTRICTED_REASONS[v] for k, v in VAR_SOURCES.items()
+         if v in RESTRICTED_EXPORT_SOURCES and k in tracts.columns
+         and v in RESTRICTED_REASONS},
         ensure_ascii=True,
     )
     export_meta_str = json.dumps(EXPORT_META, ensure_ascii=True)
@@ -786,7 +886,10 @@ def main():
     html = html.replace("__GEOJSON_PLACEHOLDER__", geojson_str)
     html = html.replace("__VARMETA_PLACEHOLDER__", var_meta_str)
     html = html.replace("__VARSOURCES_PLACEHOLDER__", var_sources_str)
+    html = html.replace("__SOURCENAMES_PLACEHOLDER__", source_names_str)
+    html = html.replace("__VARUNITS_PLACEHOLDER__", var_units_str)
     html = html.replace("__NOEXPORT_PLACEHOLDER__", no_export_str)
+    html = html.replace("__NOEXPORTWHY_PLACEHOLDER__", no_export_reasons_str)
     html = html.replace("__EXPORTMETA_PLACEHOLDER__", export_meta_str)
     html = html.replace("__HEATMODES_PLACEHOLDER__", heat_modes_str)
     html = html.replace("__DELTAS_PLACEHOLDER__", deltas_str)
@@ -1835,7 +1938,6 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     <span class="cf-name" id="cf-name">—</span>
     <span class="cf-hint">click tracts to explore</span>
     <button class="cf-primary" id="cf-pdf-btn" onclick="downloadCityPdf()">Export risk PDF</button>
-    <button id="cf-compare-btn" onclick="openCityCompareModal(focusedCity)">Compare cities</button>
     <button class="cf-exit" onclick="exitCityView()" title="Exit city view (ESC)">&times;</button>
   </div>
 </div>
@@ -1861,7 +1963,9 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <div class="exp-section">
         <div class="exp-section-label">Columns</div>
         <label class="exp-radio" style="cursor:pointer"><input type="checkbox" id="exp-incl-pctile" checked>Include within-county percentile ranks<span class="exp-radio-desc">adds <code>&lt;var&gt;_sd_pctile</code></span></label>
-        <div class="exp-note">Raw source values are included, except <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy&nbsp;Places&nbsp;Index</a> variables (tree canopy, park access, income, education, life expectancy, pollution, &amp;c.), which are shown on the map but omitted from download under HPI's non-commercial terms &mdash; get those from HPI directly. Percentile ranks (0&ndash;100) are computed within San Diego County and match the map and PCA. Every row carries <code>citation</code>, <code>license</code> (CC&nbsp;BY&nbsp;4.0) and <code>sources_url</code> columns; the per-variable source list is in the <a href="../userguide/index.html#data" target="_blank" rel="noopener">User&nbsp;Guide</a>.</div>
+        <label class="exp-radio" style="cursor:pointer;margin-top:6px"><input type="checkbox" id="exp-incl-dict" checked>Include the data dictionary<span class="exp-radio-desc">second file: label, units, direction &amp; source for every column</span></label>
+        <div class="exp-note"><b>Read the dictionary first.</b> Column headers in the data file are raw variable keys (<code>EP_NOINT</code>, <code>shututility_prev</code>); <code>&lt;stem&gt;_data_dictionary.csv</code> gives each one a plain-English label, its units, whether a higher value means more or less risk, and a link to the original source. It also records the heat mode, scenario and switched-on variables the index columns were built from. GeoJSON downloads carry the same information at <code>metadata</code>. <b>Watch the direction:</b> <code>adaptive_score</code> is stored capacity-side (100&nbsp;=&nbsp;most capacity, least risk), the opposite of <code>exposure_score</code> and <code>sensitivity_score</code>.</div>
+        <div class="exp-note">Raw source values are included, except where a source's terms bar redistribution: <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy&nbsp;Places&nbsp;Index</a> variables (tree canopy, park access, income, education, life expectancy, pollution, &amp;c.) are non-commercial, and the CalHeatScore heat-hospitalization variables have no published license. Both stay on the map and are listed in the dictionary with <code>in_download&nbsp;=&nbsp;no</code> and a note on where to request them. Percentile ranks (0&ndash;100) are always computed against all San Diego County tracts, even when you export a single jurisdiction. Every row carries <code>citation</code>, <code>license</code> (CC&nbsp;BY&nbsp;4.0) and <code>sources_url</code> columns; the full source table is in the <a href="../userguide/index.html#data" target="_blank" rel="noopener">User&nbsp;Guide</a>.</div>
       </div>
       <div class="exp-section">
         <div class="exp-section-label">Scope</div>
@@ -2058,7 +2162,10 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 var GJ  = __GEOJSON_PLACEHOLDER__;
 var VM  = __VARMETA_PLACEHOLDER__;
 var VSRC = __VARSOURCES_PLACEHOLDER__;
+var SRCNAME = __SOURCENAMES_PLACEHOLDER__;    // {sourceUrl: plain-English name} — for the export data dictionary
+var VUNITS = __VARUNITS_PLACEHOLDER__;        // {varKey: units string} — for the export data dictionary
 var NO_EXPORT = __NOEXPORT_PLACEHOLDER__;     // var keys omitted from Download Data (restricted source terms; still shown on map)
+var NO_EXPORT_WHY = __NOEXPORTWHY_PLACEHOLDER__; // {varKey: why it is withheld} — shown in the data dictionary
 var EXPORT_META = __EXPORTMETA_PLACEHOLDER__; // {citation,license,sources_url} stamped on every exported row
 var DELTAS = __DELTAS_PLACEHOLDER__;         // {period:{ssp:{tasmax:[...],tasmin:[...]}}} or null
 var DELTA_MAP = __DELTAMAP_PLACEHOLDER__;    // {varKey:"tasmax"|"tasmin"}
@@ -3144,7 +3251,11 @@ function openDetailDrawer(geoid){
     html+='</div>';
     html+='<div class="dt-note">County percentile \\u2014 higher score = higher risk (Adaptive Capacity is scored as a capacity gap, so higher = less capacity).</div>';
     if(pr._drv){
-      html+='<div class="dt-driver">Dominant driver: <b>'+_addrEsc(pr._drv)+'</b></div>';
+      // PMETA label, not the raw pillar key — the Dominant Driver legend prints
+      // "Heat Exposure"/"Population Sensitivity"/"Adaptive Capacity", and this
+      // card used to contradict it with the internal key ("exposure").
+      var drvLbl=(PMETA[pr._drv]&&PMETA[pr._drv].label)||pr._drv;
+      html+='<div class="dt-driver">Dominant driver: <b>'+_addrEsc(drvLbl)+'</b></div>';
     }
   }else{
     html+='<div class="dt-hint">Click <b>Build Composite Risk Map</b> in the left panel to populate composite and pillar scores. The map and variable rows below work without it.</div>';
@@ -5074,6 +5185,15 @@ function _isRankVar(key){
   return /_pctile$/.test(key) || /^RPL_/.test(key);
 }
 
+// UNREACHABLE — the city-compare modal markup was never written. This function
+// and everything below it through closeCityCompareModal() target #city-compare-modal
+// and its children (city-cmp-sel-a/b, city-cmp-vars-a/b, city-cmp-context,
+// city-cmp-name/meta/map-*), none of which exist in the template; the CSS is there,
+// the HTML never was. Calling this throws on the first getElementById deref, so the
+// two entry points that used to call it (the city-focus bar's "Compare cities" and
+// showTribalNoData's "Compare <city>") have been removed rather than left as dead
+// buttons. To finish the feature, add the modal markup next to #compare-modal and
+// restore those two buttons.
 function openCityCompareModal(initialName){
   if(typeof JURIS==='undefined'||!JURIS){return;}
   _ensureJurisTractCache();
@@ -5249,8 +5369,6 @@ function showTribalNoData(latlng,fullName,type){
   for(var i=0;i<GJ.features.length;i++){
     if(_ptInGeometry(pt,GJ.features[i].geometry)){hit=i;break;}
   }
-  _ensureTractJuris();
-  var jurisName=(hit>=0&&_tractJurisName[hit])?_tractJurisName[hit]:null;
   var typeLabel=(type==='trust')?'off-reservation trust land':'reservation';
   var html='<div style="font-size:12px;line-height:1.45;max-width:240px">'+
     '<div style="font-weight:700;margin-bottom:4px">'+fullName+'</div>'+
@@ -5259,10 +5377,6 @@ function showTribalNoData(latlng,fullName,type){
     var geoid=GJ.features[hit].properties.GEOID;
     html+='<div style="font-size:11px;color:#666;margin-bottom:4px">Compare the surrounding tract instead:</div>'+
       '<button class="popup-compare-btn" onclick="map.closePopup();startCompare(\\''+geoid+'\\')">Compare Tract '+geoid.slice(-6)+'</button>';
-  }
-  if(jurisName){
-    var safeName=jurisName.replace(/'/g,"\\\\'");
-    html+='<div style="margin-top:6px"><button class="popup-compare-btn" onclick="map.closePopup();openCityCompareModal(\\''+safeName+'\\')">Compare '+jurisName+'</button></div>';
   }
   html+='</div>';
   L.popup({offset:[0,-4],className:'tribal-popup'}).setLatLng(latlng).setContent(html).openOn(map);
@@ -6793,7 +6907,9 @@ function _tractPdfBuild(idx,feat,radarC,mapC,luC){
     pdf.text('Dominant driver:',M,y);
     var lw=pdf.getTextWidth('Dominant driver:')+4;
     pdf.setFont('helvetica','bold');pdf.setTextColor(15,23,42);
-    pdf.text(String(pr._drv),M+lw,y);
+    // PMETA label, matching the Dominant Driver legend and the detail modal —
+    // this printed the raw pillar key ("exposure") on the handout.
+    pdf.text((PMETA[pr._drv]&&PMETA[pr._drv].label)||String(pr._drv),M+lw,y);
   }else if(pr._comp==null){
     pdf.setFont('helvetica','italic');pdf.setFontSize(8.5);pdf.setTextColor(148,163,184);
     pdf.text('No composite built \\u2014 scores omitted. The readings below are unaffected.',M,y);
@@ -7123,6 +7239,10 @@ function _selectedExportFormat(){
   var r=document.querySelector('input[name=exp-format]:checked');
   return r?r.value:'csv';
 }
+function _dictWanted(){
+  var b=document.getElementById('exp-incl-dict');
+  return b?!!b.checked:true;
+}
 function _selectedExportScope(){
   var r=document.querySelector('input[name=exp-scope]:checked');
   return r?r.value:'all';
@@ -7247,11 +7367,203 @@ function _featuresToGeoJSON(indices,cols){
     cols.forEach(function(c){props[c.label]=_rowValueFor(c,i,pr);});
     return {type:'Feature',properties:props,geometry:src.geometry};
   });
-  return JSON.stringify({type:'FeatureCollection',features:feats});
+  // Non-standard top-level member. GIS clients ignore it, but it survives a
+  // plain JSON read, so the file names its own fields and sources in-band.
+  return JSON.stringify({type:'FeatureCollection',
+    metadata:_exportManifest(cols,indices.length),
+    features:feats});
+}
+
+/* ================================================================
+   DATA DICTIONARY  (ships with every download)
+   ================================================================
+   Column headers in the data file are raw keys — EP_NOINT, shututility_prev,
+   houseing_pctile — with no units, no polarity and no provenance. Away from
+   the map that file is not interpretable, so every download is accompanied by
+   this dictionary and GeoJSON embeds it at metadata.fields. */
+
+var _DICT_COLS=['column','label','pillar','group','units','higher_value_means',
+                'source','source_url','in_download','notes'];
+var _PILLAR_LABEL={exposure:'Heat Exposure',sensitivity:'Population Sensitivity',
+                   adaptive:'Adaptive Capacity'};
+var _SRC_TIGER='https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html';
+var _SRC_LOCA='https://loca.ucsd.edu/';
+var _SRC_SELF='https://cccia-sio.github.io/socal-heat-hub/';
+
+// Columns the viewer derives rather than reads from a source table.
+var _DICT_DERIVED={
+  GEOID:{label:'Census tract identifier',group:'Geography',
+    units:'11-digit 2020 Census FIPS code (state+county+tract)',
+    source:'U.S. Census Bureau TIGER/Line 2020',source_url:_SRC_TIGER,
+    notes:'Join key. Read as text \\u2014 the leading zero is significant.'},
+  jurisdiction:{label:'Jurisdiction',group:'Geography',units:'city or tribal land name',
+    source:'SANDAG / SanGIS jurisdiction boundaries',
+    source_url:'https://sdgis-sandag.opendata.arcgis.com/',
+    notes:'Whichever boundary contains the tract centroid. Blank = unincorporated county.'},
+  scenario:{label:'Climate scenario',group:'Scenario',units:'SSP label',
+    source:'LOCA2 downscaled CMIP6',source_url:_SRC_LOCA,
+    notes:'Only present when a future scenario is active.'},
+  period:{label:'Scenario period',group:'Scenario',units:'year range',
+    source:'LOCA2 downscaled CMIP6',source_url:_SRC_LOCA,
+    notes:'Only present when a future scenario is active.'},
+  composite_risk:{label:'Composite heat risk',group:'Index output',
+    units:'percentile within San Diego County (0-100)',
+    higher_value_means:'higher value = HIGHER heat risk',
+    source:'Computed by this tool',source_url:_SRC_SELF,
+    notes:'Mean of the active pillar scores with Adaptive Capacity inverted, '+
+          're-ranked to 0-100. Depends on which variables were switched on when '+
+          'you downloaded \\u2014 it is not a fixed published index.'},
+  composite_driver:{label:'Dominant pillar',group:'Index output',
+    units:'exposure | sensitivity | adaptive',
+    source:'Computed by this tool',source_url:_SRC_SELF,
+    notes:'Whichever of the three pillar scores is highest on the risk side for this tract.'},
+  exposure_score:{label:'Heat Exposure score',group:'Index output',
+    units:'percentile within San Diego County (0-100)',
+    higher_value_means:'higher value = HIGHER heat risk',
+    source:'Computed by this tool',source_url:_SRC_SELF,
+    notes:'Mean of the z-scored member layers of the selected heat mode, re-ranked '+
+          'to 0-100. Not a PCA. See the heat_mode field in this dictionary header.'},
+  sensitivity_score:{label:'Population Sensitivity score',group:'Index output',
+    units:'percentile within San Diego County (0-100)',
+    higher_value_means:'higher value = HIGHER heat risk',
+    source:'Computed by this tool',source_url:_SRC_SELF,
+    notes:'Variance-weighted blend of the retained principal components (eigenvalue > 1) '+
+          'of the switched-on sensitivity variables, re-ranked to 0-100.'},
+  adaptive_score:{label:'Adaptive Capacity score',group:'Index output',
+    units:'percentile within San Diego County (0-100)',
+    higher_value_means:'higher value = MORE capacity = LOWER heat risk',
+    source:'Computed by this tool',source_url:_SRC_SELF,
+    notes:'CAUTION: stored capacity-side, the OPPOSITE direction from exposure_score '+
+          'and sensitivity_score. 100 = most adaptive capacity = least risk. '+
+          'composite_risk already flips it; use 100 - adaptive_score to put this '+
+          'column on the risk side.'},
+  citation:{label:'Citation',group:'Attribution',units:'text',
+    source:'Computed by this tool',source_url:_SRC_SELF,
+    notes:'Repeated on every row so a row that travels alone keeps its attribution.'},
+  license:{label:'License',group:'Attribution',units:'text',
+    source:'Computed by this tool',source_url:'https://creativecommons.org/licenses/by/4.0/',
+    notes:'Applies to this download. Individual sources carry their own terms \\u2014 see source_url per row.'},
+  sources_url:{label:'Source list URL',group:'Attribution',units:'text',
+    source:'Computed by this tool',source_url:_SRC_SELF,
+    notes:'Human-readable source table in the User Guide.'}
+};
+
+function _dictRow(o){
+  return {column:o.column||'',label:o.label||'',pillar:o.pillar||'',
+          group:o.group||'',units:o.units||'',
+          higher_value_means:o.higher_value_means||'',
+          source:o.source||'',source_url:o.source_url||'',
+          in_download:(o.in_download||'yes'),notes:o.notes||''};
+}
+function _dictPolarity(key){
+  if(POLARITY[key]===undefined)return '';
+  return POLARITY[key]?'higher value = HIGHER heat risk'
+                      :'higher value = LOWER heat risk';
+}
+function _dictVarRow(v,over){
+  var url=VSRC[v.key]||'';
+  var r=_dictRow({column:v.key,label:v.label,pillar:_PILLAR_LABEL[v.pillar]||v.pillar,
+    group:v.sub||'',units:VUNITS[v.key]||'',higher_value_means:_dictPolarity(v.key),
+    source:SRCNAME[url]||'',source_url:url});
+  if(over)for(var k in over)r[k]=over[k];
+  return r;
+}
+
+// One row per column in the data file, in the same order, then one row per
+// variable that is on the map but withheld from the download.
+function _buildDataDictionary(cols){
+  var vmByKey={};VM.forEach(function(v){vmByKey[v.key]=v;});
+  var nTracts=GJ.features.length;
+  var rows=[];
+  cols.forEach(function(c){
+    if(_DICT_DERIVED[c.key]){
+      var d=_DICT_DERIVED[c.key];
+      rows.push(_dictRow({column:c.label,label:d.label,group:d.group,units:d.units,
+        higher_value_means:d.higher_value_means,source:d.source,
+        source_url:d.source_url,notes:d.notes}));
+      return;
+    }
+    if(c.pctOf){
+      var vp=vmByKey[c.pctOf];if(!vp)return;
+      rows.push(_dictVarRow(vp,{column:c.label,
+        label:vp.label+' \\u2014 county percentile rank',
+        units:'percentile within San Diego County (0-100)',
+        notes:'Rank of the raw '+c.pctOf+' value against all '+nTracts+
+              ' county tracts \\u2014 not just the tracts in this file, and not '+
+              'recomputed for a jurisdiction subset. Ties take the average rank. '+
+              'This is the value the map colours. Ranked on the RAW value, so the '+
+              'higher_value_means column applies here too.'}));
+      return;
+    }
+    if(c.adjOf){
+      var va=vmByKey[c.adjOf];if(!va)return;
+      rows.push(_dictVarRow(va,{column:c.label,
+        label:va.label+' \\u2014 scenario-adjusted',
+        notes:'Raw '+c.adjOf+' plus the LOCA2 '+(DELTA_MAP[c.adjOf]||'')+' delta for '+
+              curScenario+' '+(curPeriod||'')+'. A uniform per-tract temperature '+
+              'offset applied to the observed present-day value; the underlying '+
+              'observation is unchanged. LOCA2: '+_SRC_LOCA}));
+      return;
+    }
+    var v=vmByKey[c.key];
+    if(v)rows.push(_dictVarRow(v,{column:c.label}));
+  });
+  // Withheld variables, so an absent column is explained rather than mysterious.
+  (NO_EXPORT||[]).forEach(function(k){
+    var v=vmByKey[k];if(!v)return;
+    rows.push(_dictVarRow(v,{in_download:'no',
+      notes:(NO_EXPORT_WHY&&NO_EXPORT_WHY[k])||
+            'Shown on the map but omitted from this download: this project '+
+            'cannot establish a right to redistribute it. Get it from the source.'}));
+  });
+  return rows;
+}
+
+// Provenance header for the GeoJSON, and the comment block atop the dictionary
+// CSV. Records the settings the scores depend on — without these, the index
+// columns cannot be reproduced.
+function _exportManifest(cols,nRows){
+  var md=heatModeDef(heatMode);
+  var onVars=[];VM.forEach(function(v){if(enabled[v.key])onVars.push(v.key);});
+  return {citation:EXPORT_META.citation,license:EXPORT_META.license,
+    sources_url:EXPORT_META.sources_url,
+    generated:new Date().toISOString(),
+    tool:_SRC_SELF,
+    tracts:nRows,
+    tract_vintage:'2020 Census tracts (TIGER/Line)',
+    heat_mode:md?(md.key+' \\u2014 '+md.label):heatMode,
+    heat_mode_layers:md?md.layers.join(' + '):'',
+    scenario:curScenario,
+    period:(curScenario==='present'?'':(curPeriod||'')),
+    variables_switched_on:onVars.join(' '),
+    fields:_buildDataDictionary(cols)};
+}
+
+function _dictionaryToCSV(cols,nRows){
+  var man=_exportManifest(cols,nRows);
+  // Leading '#' lines: ignore with pandas.read_csv(..., comment='#').
+  var head=[
+    '# San Diego Heat Risk Explorer \\u2014 data dictionary',
+    '# Describes the columns of the data file downloaded alongside this one.',
+    '# generated: '+man.generated,
+    '# tool: '+man.tool,
+    '# tracts: '+man.tracts+'  ('+man.tract_vintage+')',
+    '# heat mode: '+man.heat_mode+'  [layers: '+man.heat_mode_layers+']',
+    '# scenario: '+man.scenario+(man.period?'  period: '+man.period:''),
+    '# variables switched on when downloaded: '+(man.variables_switched_on||'(none)'),
+    '# license: '+man.license,
+    '# full source table: '+man.sources_url,
+    '#'
+  ].join('\\n');
+  var lines=[head,_DICT_COLS.join(',')];
+  man.fields.forEach(function(r){
+    lines.push(_DICT_COLS.map(function(k){return _csvEscape(r[k]);}).join(','));
+  });
+  return lines.join('\\n')+'\\n';
 }
 
 function _slugify(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');}
-function _exportFilename(scope,jurisNames,fmt){
+function _exportStem(scope,jurisNames){
   var parts=['san_diego_heat_risk'];
   if(scope==='juris'&&jurisNames.length){
     var slugs=jurisNames.map(_slugify).filter(Boolean);
@@ -7259,9 +7571,11 @@ function _exportFilename(scope,jurisNames,fmt){
   }else{
     parts.push('all_tracts');
   }
-  var scn=(curScenario==='present')?'present':(curScenario+(curPeriod?'_'+curPeriod:''));
-  parts.push(scn);
-  return parts.join('_')+'.'+(fmt==='geojson'?'geojson':'csv');
+  parts.push((curScenario==='present')?'present':(curScenario+(curPeriod?'_'+curPeriod:'')));
+  return parts.join('_');
+}
+function _exportFilename(scope,jurisNames,fmt){
+  return _exportStem(scope,jurisNames)+'.'+(fmt==='geojson'?'geojson':'csv');
 }
 function _triggerDownload(text,filename,mime){
   var blob=new Blob([text],{type:mime+';charset=utf-8'});
@@ -7289,11 +7603,19 @@ function doExportDownload(){
   if(btn)btn.disabled=true;
   try{
     var cols=_exportColumnSpec();
+    var stem=_exportStem(scope,jurisNames);
     var fname=_exportFilename(scope,jurisNames,fmt);
     if(fmt==='geojson'){
       _triggerDownload(_featuresToGeoJSON(indices,cols),fname,'application/geo+json');
     }else{
       _triggerDownload(_featuresToCSV(indices,cols),fname,'text/csv');
+    }
+    // Second file: what each column is, its units, its polarity and its source.
+    // On by default — a data file that leaves here without its key is not
+    // interpretable. Browsers may ask to "allow multiple downloads"; expected.
+    if(_dictWanted()){
+      _triggerDownload(_dictionaryToCSV(cols,indices.length),
+                       stem+'_data_dictionary.csv','text/csv');
     }
     closeExportModal();
   }catch(err){

@@ -221,6 +221,53 @@ under `data/context/population/`, gitignored). Impervious and canopy read the
 sibling `heat-risk-sd` repo, located via `$HEAT_RISK_SD_DIR` or fallback
 candidate paths. Only the PNG + JSON products are committed and deployed.
 
+## The Cool Zones pipeline
+
+`scripts/build_coolzones.py` rebuilds the map's cooling-site overlay from the
+County's two published sources. Neither is sufficient alone:
+
+```
+HLTH_COOL_ZONES_OES (ArcGIS FeatureServer)   CoolZoneSiteList.pdf
+   72 sites, County-geocoded coordinates        80 sites, addresses only
+                        ↘                      ↙
+              data/cool_zones/coolzone_sites.csv   (80 sites)
+                        ↓  inlined at build time
+              __COOLZONES_PLACEHOLDER__ in heat_risk_map.html
+```
+
+The service is the **geometry** authority — HHSA Office of Business Intelligence
+geocodes the program's tabular data into `SDEP2.SANGIS.HLTH_COOL_ZONES`, and the
+service is a view over it. The PDF is the **coverage** authority: as of
+2026-07-23 it is a strict superset, carrying 8 sites the service omits (several
+backcountry — Fallbrook, Lakeside, Santa Ysabel, Valley Center). So the script
+takes coordinates from the service where it can and geocodes the remainder (US
+Census, Nominatim fallback, each result bbox-checked against the county). The
+`geocode_source` column records which path every row took.
+
+The sibling view `HLTH_COOL_ZONES_PUBLIC` went token-gated in 2026 and is dead;
+don't reach for it. If the County later adds the 8 to the service, the next run
+picks up their official coordinates and the geocoding fallback stops firing.
+
+**Designated sites only.** An earlier hand-built CSV carried 28 extra City of San
+Diego libraries and rec centers with no upstream feed and no recorded origin.
+Those were never Cool Zones — the County program already designates 18 City
+library branches (and some rec centers) *by name*, and the extras were precisely
+the facilities it did not designate. Undesignated sites carry no commitment to
+air conditioning, heat-event hours, or capacity, so the map must not present
+them as refuge. Don't reintroduce a site that isn't in a County source.
+
+Needs `pdfplumber`, which is in the `heat-risk-sd` env (the default `python3`)
+but **not** in `socal-heat` — the env the viewer build needs. Two commands:
+
+```
+python3 scripts/build_coolzones.py                    # heat-risk-sd env
+python3 scripts/build_diy_pca_viewer.py               # socal-heat env
+```
+
+Without `pdfplumber` the script still runs, emitting the 72 service sites and
+logging what it skipped. The CSV is gitignored; only the regenerated
+`heat_risk_map.html` is committed and deployed.
+
 ## The user guide PDF pipeline
 
 `scripts/build_userguide_pdf.sh` renders `userguide/index.html` to

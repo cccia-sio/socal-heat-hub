@@ -5,21 +5,45 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
+  # The deploy gate. These tests are the only thing between a push and a public
+  # leak: they assert the staging step below stays an allow-list, that geocoder
+  # output is escaped before reaching innerHTML, and that CDN scripts keep their
+  # SRI hashes. Running them locally is optional, and a push that skipped it
+  # already shipped a red main once. They import nothing beyond pytest and the
+  # standard library — no geopandas, no numpy — so the gate costs ~10 seconds.
+  #
+  # Permissions are per-job, not workflow-wide: the job that executes repo test
+  # code has no business holding `pages: write` or `id-token: write`.
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - run: pip install pytest==8.4.2
+
+      - run: pytest -q
+
   deploy:
+    needs: test
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v6
 

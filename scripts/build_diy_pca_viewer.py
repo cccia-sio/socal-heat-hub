@@ -862,10 +862,11 @@ def main():
     else:
         logger.warning("No unincorporated file — unincorporated overlay will not be shown")
 
-    # Load cool zone sites (optional) — county-published list of cooling sites
-    # for hot-weather refuge. Extracted from CoolZoneSiteList.pdf and geocoded
-    # via US Census + Nominatim. Inlined into the HTML so the static page is
-    # self-contained.
+    # Load cool zone sites (optional) — sites designated by the County Cool
+    # Zones program as free air-conditioned refuge during extreme heat. Built by
+    # scripts/build_coolzones.py from the County's feature service + site-list
+    # PDF; the `source` column carries provenance so the popup can attribute
+    # each marker. Inlined into the HTML so the static page is self-contained.
     coolzones_str = "null"
     if COOLZONES_PATH.exists():
         import csv as _csv
@@ -884,6 +885,7 @@ def main():
                     "zip": row.get("zip", "").strip(),
                     "phone": row.get("phone", "").strip(),
                     "lat": lat, "lon": lon,
+                    "src": row.get("source", "").strip(),
                 })
         coolzones_str = _json.dumps(feats, separators=(",", ":"))
         logger.info(f"Loaded {len(feats)} cool-zone sites")
@@ -1823,7 +1825,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     </details>
     <details class="subsec" id="coolzones-subsec" style="margin-top:6px"><summary>Cool Zones</summary>
       <div class="ov-row" style="margin-left:6px"><label><input type="checkbox" id="cb-coolzones" onchange="toggleCoolZones(this.checked)">Show cool-zone sites</label></div>
-      <div style="font-size:10px;color:#666;margin:2px 0 0 6px">Public cooling sites from the County Cool Zones program and the City of San Diego (libraries, rec centers, civic buildings). Click a marker for address &amp; phone.</div>
+      <div style="font-size:10px;color:#666;margin:2px 0 0 6px">Sites designated by the County Cool Zones program &mdash; free, air-conditioned refuge during extreme heat (libraries, community &amp; senior centers). Click a marker for address &amp; phone.</div>
     </details>
   </div>
   <details id="scenario-bar">
@@ -2192,7 +2194,7 @@ var DELTA_MAP = __DELTAMAP_PLACEHOLDER__;    // {varKey:"tasmax"|"tasmin"}
 var JURIS = __JURIS_PLACEHOLDER__;           // city jurisdiction GeoJSON or null
 var TRIBAL = __TRIBAL_PLACEHOLDER__;         // tribal lands GeoJSON or null
 var UNINCORP = __UNINCORP_PLACEHOLDER__;     // unincorporated county boundary GeoJSON or null
-var COOLZONES = __COOLZONES_PLACEHOLDER__;   // [{name,address,city,zip,phone,lat,lon}, ...] or null
+var COOLZONES = __COOLZONES_PLACEHOLDER__;   // [{name,address,city,zip,phone,lat,lon,src}, ...] or null
 var LST   = __LST_PLACEHOLDER__;             // Landsat LST overlay meta or null
 var POP        = __POP_PLACEHOLDER__;        // population density overlay meta or null
 var DS_ENC     = __DS_ENC_PLACEHOLDER__;     // base64 PNG: R=exposure pct, G/B=tract idx, A=pop mask
@@ -3808,8 +3810,11 @@ function toggleUnincorp(on){
 }
 
 /* ================================================================
-   Cool Zones — point overlay of county-published cooling sites
+   Cool Zones — point overlay of sites designated by the County Cool
+   Zones program. s.src carries provenance so a marker is attributed
+   to the list it came from rather than to a hardcoded label.
    ================================================================ */
+var COOLZONE_SRC={county:"SD County Cool Zones"};
 var coolZonesLayer=null;
 if(COOLZONES&&COOLZONES.length){
   coolZonesLayer=L.layerGroup();
@@ -3819,12 +3824,13 @@ if(COOLZONES&&COOLZONES.length){
       fillColor:"#111111", fillOpacity:0.95
     });
     var addr=s.address+(s.city?", "+s.city:"")+(s.zip?" "+s.zip:"");
-    var phone=s.phone?'<div style="color:#444;margin-top:2px">'+s.phone+'</div>':'';
+    var phone=s.phone?'<div style="color:#444;margin-top:2px">'+_addrEsc(s.phone)+'</div>':'';
+    var src=COOLZONE_SRC[s.src]||"SD County Cool Zones";
     m.bindPopup(
       '<div style="font-size:12px;line-height:1.35;max-width:240px">'+
-      '<div style="font-weight:600;margin-bottom:3px">'+s.name+'</div>'+
-      '<div>'+addr+'</div>'+phone+
-      '<div style="margin-top:4px;font-size:10px;color:#888">Source: SD County Cool Zones</div>'+
+      '<div style="font-weight:600;margin-bottom:3px">'+_addrEsc(s.name)+'</div>'+
+      '<div>'+_addrEsc(addr)+'</div>'+phone+
+      '<div style="margin-top:4px;font-size:10px;color:#888">Source: '+src+'</div>'+
       '</div>',
       {closeButton:true, autoPan:true, maxWidth:260}
     );

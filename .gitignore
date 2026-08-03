@@ -7,6 +7,7 @@ scripts/*
 !scripts/build_data_overlays.py
 !scripts/build_ucla_heat_tract_xwalk.py
 !scripts/build_hero_figure.py
+!scripts/build_coolzones.py
 data/*
 !data/exposure
 data/exposure/*

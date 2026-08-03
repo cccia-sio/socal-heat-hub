@@ -34,7 +34,8 @@ ship.
 
 **Tracked build scripts** (un-ignored via `!scripts/...`):
 `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`,
-`build_userguide_pdf.sh`. Everything else in `scripts/` is local-only.
+`build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`, `build_hero_figure.py`,
+`build_coolzones.py`. Everything else in `scripts/` is local-only.
 
 **Tracked data products** (un-ignored via `!data/...`):
 `data/exposure/processed/landsat/` (LST overlay PNGs + bounds JSON),
@@ -148,7 +149,7 @@ What it does (top-down through the script):
    - climate deltas: `__DELTAS_PLACEHOLDER__`, `__DELTAMAP_PLACEHOLDER__`
    - boundary / point overlays: `__JURIS_PLACEHOLDER__`,
      `__UNINCORP_PLACEHOLDER__`, `__TRIBAL_PLACEHOLDER__`,
-     `__COOLZONES_PLACEHOLDER__` (County + City of San Diego cool-zone sites)
+     `__COOLZONES_PLACEHOLDER__` (County-designated Cool Zone sites)
    - raster-overlay bounds (shape matches the LST sidecar): `__LST_PLACEHOLDER__`,
      `__POP_PLACEHOLDER__`, `__IMPERVIOUS_PLACEHOLDER__`, `__CANOPY_PLACEHOLDER__`
    - preset layer bundles: `__HEATMODES_PLACEHOLDER__` (from the `HEAT_MODES` list)
@@ -282,7 +283,7 @@ data/
 │   └── tract_exploration.csv                ← pct_green
 │
 └── cool_zones/
-    └── coolzone_sites.csv                   ← County + City of San Diego cool-zone sites (COOLZONES overlay); `source` column marks provenance
+    └── coolzone_sites.csv                   ← County-designated Cool Zone sites (COOLZONES overlay); `source` = provenance, `geocode_source` = where the coordinates came from. Built by build_coolzones.py
 ```
 
 The mapping from CSV columns → variables shown in the viewer is in
@@ -473,6 +474,7 @@ See `literature/README.md` for the full workflow.
 | Change polarity of a variable         | `INVERTED_VARS` in build script                | rebuild + commit                  |
 | Update Landsat LST overlay            | run `scripts/build_lst_overlay.py`             | rebuild viewer + commit           |
 | Update a Data-Layer overlay           | run `scripts/build_data_overlays.py`           | rebuild viewer + commit           |
+| Refresh cool-zone sites               | run `scripts/build_coolzones.py` (needs `pdfplumber`; use the `heat-risk-sd` env, not `socal-heat`) | rebuild viewer + commit |
 | Add a logo to the top-right card      | drop PNG in `assets/`, edit logo block in `HTML_TEMPLATE` | rebuild + commit       |
 | Change deployment behavior            | `.github/workflows/pages.yml`                  | commit (rerun `pytest`)           |
 | Add / curate a literature source      | `literature/sources/<citekey>.md`              | `python3 literature/build_index.py` (local-only, no commit) |

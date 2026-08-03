@@ -38,25 +38,47 @@ MUST_NOT_DEPLOY = [
 
 # Assets the three linked pages fetch at runtime. If one of these stops being
 # staged the site deploys broken (blank basemap / missing overlay), so the
-# allow-list has to be checked in this direction too.
+# allow-list has to be checked in this direction too. Named file by file rather
+# than by directory: the staging step enumerates them individually, so a
+# directory prefix would keep passing after someone dropped one from the list.
 MUST_DEPLOY = [
     "index.html",
     "main/heat_risk_map.html",
     "userguide/index.html",
     "data/context/sandag_landuse.pmtiles",
-    "data/context/overlays",
-    "data/exposure/processed/landsat",
+    "data/context/overlays/population_4326.png",
+    "data/context/overlays/population_4326_cb.png",
+    "data/context/overlays/impervious_4326.png",
+    "data/context/overlays/impervious_4326_cb.png",
+    "data/context/overlays/canopy_4326.png",
+    "data/context/overlays/canopy_4326_cb.png",
+    "data/exposure/processed/landsat/annual_lst_4326.png",
+    "data/exposure/processed/landsat/annual_lst_4326_cb.png",
 ]
+
+_STAGED_DATA = re.compile(r"(?<!_site/)\bdata/\S+")
+_VIEWER_DATA_REF = re.compile(r"\.\./(data/[^\"']+)")
 
 
 @pytest.fixture(scope="session")
 def staging_block(pages_workflow_text: str) -> str:
-    """The `Stage site` step body — the only place that decides what ships."""
+    """The `Stage site` step body — the only place that decides what ships.
+
+    Shell comments are stripped first. The step documents which files are
+    deliberately left unstaged, so naming a path in a comment must neither
+    satisfy "this asset IS staged" nor trip "this path must NEVER ship" — it
+    would do both, in opposite directions, on the same text. Same reasoning as
+    strip_js_comments() in conftest: the code that fixes a bug usually also
+    describes it.
+    """
     match = re.search(
         r"- name: Stage site.*?(?=\n      - )", pages_workflow_text, re.DOTALL
     )
     assert match, "No `Stage site` step found in pages.yml."
-    return match.group(0)
+    return "\n".join(
+        line for line in match.group(0).splitlines()
+        if not line.lstrip().startswith("#")
+    )
 
 
 @pytest.mark.parametrize("path", MUST_NOT_DEPLOY)
@@ -73,6 +95,51 @@ def test_required_assets_staged(staging_block: str, path: str):
     assert path in staging_block, (
         f"`{path}` is no longer staged in pages.yml. The viewer fetches it at "
         "runtime, so the site would deploy broken."
+    )
+
+
+def test_staged_data_matches_what_the_viewer_fetches(
+    staging_block: str, viewer_html_text: str
+):
+    """The staged `data/` files must be exactly the ones the viewer asks for.
+
+    Both sides are literals — every asset URL in the built viewer is a hardcoded
+    string, nothing is concatenated at runtime — so the correct list is knowable
+    and this can be checked in both directions at once:
+
+      * staged but never fetched — dead weight, and the symptom of a recursive
+        copy. The bounds JSON and `downscaled_*` rasters live in these same
+        directories but are read at BUILD time and inlined into the HTML; a
+        `cp -R` shipped all 1.1 MB of them a second time.
+      * fetched but not staged — the site deploys visibly broken.
+
+    Checking membership by filename can't catch the first case, because under
+    `cp -R` the files that ship are never named anywhere. Comparing sets can.
+    """
+    staged = set(_STAGED_DATA.findall(staging_block))
+    fetched = set(_VIEWER_DATA_REF.findall(viewer_html_text))
+    assert staged == fetched, (
+        "pages.yml and the built viewer disagree about which data files ship.\n"
+        f"  staged, never fetched: {sorted(staged - fetched) or 'none'}\n"
+        f"  fetched, never staged: {sorted(fetched - staged) or 'none'}\n"
+        "If the first list is non-empty and the paths are whole directories, the "
+        "staging step went back to `cp -R`."
+    )
+
+
+def test_data_dirs_are_not_copied_recursively(staging_block: str):
+    """`cp -R` on a data directory re-creates the deny-list default.
+
+    The allow-list's promise is that adding a file to the repo never publishes
+    it. A recursive copy silently breaks that promise for everything under the
+    directory it targets, which is how the build-time-only assets above started
+    shipping in the first place.
+    """
+    recursive = re.findall(r"cp\s+-[a-zA-Z]*[rR][a-zA-Z]*\s+\S*data/\S*", staging_block)
+    assert not recursive, (
+        f"Recursive copy of a data directory in pages.yml: {recursive}. "
+        "Name each file the viewer fetches instead — every asset path in the "
+        "built viewer is a literal, so the list is knowable."
     )
 
 

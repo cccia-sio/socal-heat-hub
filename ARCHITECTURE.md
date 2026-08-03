@@ -35,12 +35,23 @@ ship.
 **Tracked build scripts** (un-ignored via `!scripts/...`):
 `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`,
 `build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`, `build_hero_figure.py`,
-`build_coolzones.py`. Everything else in `scripts/` is local-only.
+`build_coolzones.py`, `build_hospitalizations_viewer.py`. Everything else in
+`scripts/` is local-only.
+
+Tracking a script takes **three** agreeing edits, and the tests only compare two
+of them: the `!scripts/...` line here, `ALLOWED_SCRIPT_FILES` in
+`tests/test_tracked_files.py`, and an actual `git add`. Miss the second and the
+suite stays green until the commit that makes the file visible to `git ls-files`
+— which is how `main` went red after `build_coolzones.py` landed.
 
 **Tracked data products** (un-ignored via `!data/...`):
 `data/exposure/processed/landsat/` (LST overlay PNGs + bounds JSON),
 `data/context/sandag_landuse.pmtiles`, and `data/context/overlays/` (Data-Layer
 raster PNGs + bounds JSON). All other `data/**` is local-only.
+
+Tracked ≠ published: the bounds JSON and the `downscaled_*` rasters in those
+directories are read at *build* time and inlined into the viewer, so the deploy
+allow-list deliberately does not stage them.
 
 Also tracked at the root: `CLAUDE.md`, `pytest.ini`, `tests/`, plus `docs/`,
 `assets/`, and the site pages. **Gitignored local-only:** raw `data/` inputs,

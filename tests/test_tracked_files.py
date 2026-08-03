@@ -20,6 +20,7 @@ ALLOWED_SCRIPT_FILES = {
     "build_ucla_heat_tract_xwalk.py",
     "build_hero_figure.py",
     "build_coolzones.py",
+    "build_hospitalizations_viewer.py",
 }
 
 # Tracked data files. The landsat and context/overlays directories are wholly
@@ -73,4 +74,25 @@ def test_only_allowed_data_tracked(project_root):
 def test_allowed_script_actually_present(project_root, script_name):
     assert (project_root / "scripts" / script_name).exists(), (
         f"Allow-listed script scripts/{script_name} is missing from working tree."
+    )
+
+
+@pytest.mark.parametrize("script_name", sorted(ALLOWED_SCRIPT_FILES))
+def test_allowed_script_is_tracked(project_root, script_name):
+    """Allow-listing a script doesn't track it — `git add` does.
+
+    Three things have to agree for a script to really be in the repo: the
+    `!scripts/...` line in .gitignore, the set above, and git's index. Only the
+    first two were ever checked against each other, and every check here reads
+    `git ls-files`, which sees the index. So an un-ignored, allow-listed, but
+    never-staged script looks fine from in here while not being in the repo at
+    all — and the mirror-image mistake (staged but not allow-listed) stays green
+    right up until the commit that makes it visible, which is how main last went
+    red.
+    """
+    tracked = set(_ls_files(project_root, "scripts/"))
+    assert f"scripts/{script_name}" in tracked, (
+        f"scripts/{script_name} is allow-listed in .gitignore and in this test, "
+        "but git isn't tracking it — so it exists only on one machine. Stage it: "
+        f"git add scripts/{script_name}"
     )

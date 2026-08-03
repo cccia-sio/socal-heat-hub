@@ -73,10 +73,28 @@ jobs:
           # Logos referenced by the linked pages (sio_logoCroped.png is unused)
           cp assets/ccsd_logo.png assets/sio_logo.png assets/usd-logo-horizontal.png _site/assets/
 
-          # Raster/vector overlays the viewer fetches at runtime
+          # Raster/vector overlays the viewer fetches at runtime. Named one file
+          # at a time rather than `cp -R` on the directories: a recursive copy is
+          # the deny-list pattern in miniature — it publishes whatever lands in
+          # those directories next, which is exactly the default this allow-list
+          # exists to remove. Every path below is a literal string in the built
+          # viewer; nothing constructs an asset URL at runtime.
+          #
+          # Both directories also hold build-time-only files that must NOT ship:
+          # the `*_bounds.json` and the `downscaled_*` rasters are read by
+          # build_diy_pca_viewer.py and base64-inlined into the HTML, so serving
+          # them again is 1.1 MB of dead weight.
           cp data/context/sandag_landuse.pmtiles _site/data/context/
-          cp -R data/context/overlays/. _site/data/context/overlays/
-          cp -R data/exposure/processed/landsat/. _site/data/exposure/processed/landsat/
+          cp data/context/overlays/population_4326.png \
+             data/context/overlays/population_4326_cb.png \
+             data/context/overlays/impervious_4326.png \
+             data/context/overlays/impervious_4326_cb.png \
+             data/context/overlays/canopy_4326.png \
+             data/context/overlays/canopy_4326_cb.png \
+             _site/data/context/overlays/
+          cp data/exposure/processed/landsat/annual_lst_4326.png \
+             data/exposure/processed/landsat/annual_lst_4326_cb.png \
+             _site/data/exposure/processed/landsat/
 
           echo "--- staged for deploy ---"
           find _site -type f | sort

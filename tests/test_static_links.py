@@ -13,6 +13,12 @@ import pytest
 _HREF_OR_SRC = re.compile(r'(?:href|src)\s*=\s*"([^"]+)"', re.IGNORECASE)
 _MD_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 
+# A bare `#` — not `#section-id`, which is a real in-page anchor.
+_DEAD_ANCHOR = re.compile(r'<a\b[^>]*\bhref="#"[^>]*>(.*?)</a>', re.IGNORECASE | re.DOTALL)
+
+# Every page the deploy allow-list publishes as a browsable HTML page.
+_DEPLOYED_PAGES = ("index.html", "userguide/index.html")
+
 
 def _local_targets(text: str, patterns) -> list[str]:
     targets = []
@@ -50,6 +56,28 @@ def test_index_local_link_resolves(source_file, target):
     resolved = (source_file.parent / target).resolve()
     assert resolved.exists(), (
         f"{source_file.name} links to '{target}' but {resolved} does not exist."
+    )
+
+
+@pytest.mark.parametrize("page", _DEPLOYED_PAGES)
+def test_no_placeholder_anchors(project_root, page):
+    """`href="#"` is a link to nowhere dressed up as a link to something.
+
+    The landing page shipped a "Technical Guide" hero button pointing at `#`,
+    sitting between "Launch the Tool" and "User Guide" on the public site. The
+    resolver above cannot see it: it skips every target starting with `#` so
+    that real fragment links (`#data`, `#privacy`) aren't checked against the
+    filesystem, and a bare `#` rides along in that exemption.
+
+    A placeholder for a page that doesn't exist yet belongs in an issue, not in
+    the nav.
+    """
+    text = (project_root / page).read_text(encoding="utf-8")
+    dead = [re.sub(r"\s+", " ", m).strip() for m in _DEAD_ANCHOR.findall(text)]
+    assert not dead, (
+        f"{page} has anchor(s) pointing at a bare '#': {dead}. "
+        "Point them at a real target or remove them — on a deployed page this "
+        "is a nav item that silently does nothing."
     )
 
 

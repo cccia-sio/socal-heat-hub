@@ -73,6 +73,20 @@ UA = "socal-heat-hub/1.0 (+https://github.com/cccia-sio/socal-heat-hub)"
 SD_BBOX = (-117.7, 32.4, -116.0, 33.6)
 DUPE_METRES = 250          # same street address within this range == same building
 
+# Matches the service's own maxRecordCount. ArcGIS silently truncates at that
+# ceiling, and the geojson response format -- unlike f=json -- carries no
+# `exceededTransferLimit` flag, so a full page is the ONLY truncation signal
+# available. 72 sites today, but a silent drop would quietly shrink the map.
+PAGE_SIZE = 2000
+
+# PDF table layout, column index per field. The County's table is wider than the
+# fields we take (pet policy sits at 9), so a narrower row means the layout
+# moved. Organization and Address are load-bearing -- without them a site can be
+# neither identified nor geocoded -- and the rest are display-only.
+PDF_COLS = {"organization": 0, "address": 1, "city": 2, "zip": 3,
+            "phone": 4, "hours": 5, "pet_policy": 9}
+PDF_MIN_COLS = max(PDF_COLS.values()) + 1
+
 FIELDS = ["id", "organization", "address", "city", "state", "zip", "phone",
           "hours", "pet_policy", "lat", "lon", "geocode_source", "source"]
 
@@ -87,6 +101,12 @@ def clean(s):
     """Collapse PDF cell whitespace, including hyphen-split city names."""
     s = re.sub(r"\s+", " ", (s or "").replace("\n", " ")).strip()
     return re.sub(r"(?<=-) (?=\w)", "", s)          # "Cardiff-by- the-Sea"
+
+
+def _cell(row, field):
+    """PDF cell by field name, or '' if the row is too narrow to reach it."""
+    i = PDF_COLS[field]
+    return clean(row[i]) if i < len(row) else ""
 
 
 def norm_name(s):
@@ -119,8 +139,15 @@ def fetch_service():
     """County sites with authoritative County-geocoded coordinates."""
     url = OES_QUERY + "?" + urllib.parse.urlencode({
         "where": "1=1", "outFields": "*", "outSR": 4326,
-        "f": "geojson", "resultRecordCount": 2000})
+        "f": "geojson", "resultRecordCount": PAGE_SIZE})
     feats = json.loads(_get(url))["features"]
+    if len(feats) >= PAGE_SIZE:
+        raise RuntimeError(
+            f"the feature service returned a full page ({len(feats)} features), "
+            "so the response is probably truncated and sites are missing. "
+            "f=geojson reports no exceededTransferLimit flag, so this count is "
+            "the only warning available. Page the query with resultOffset before "
+            "trusting the output.")
     out = []
     for f in feats:
         g, p = f.get("geometry"), f["properties"]
@@ -158,22 +185,40 @@ def fetch_pdf_sites():
     logger.info(f"downloaded {PDF_URL.rsplit('/', 1)[-1]} "
                 f"({PDF_CACHE.stat().st_size // 1024} KB)")
 
-    sites = []
+    sites, data_rows, narrow = [], 0, 0
     with pdfplumber.open(PDF_CACHE) as pdf:
         for page in pdf.pages:
             table = page.extract_table()
             if not table:
                 continue
             for row in table:
-                org = clean(row[0])
+                org = _cell(row, "organization")
                 if not org or org == "Organization":
                     continue                    # spillover row or repeated header
+                data_rows += 1
+                if len(row) < PDF_MIN_COLS:
+                    narrow += 1
+                # Address is not optional: it is what the geocoder resolves for
+                # the sites the feature service omits, so a row without one
+                # cannot reach the map at all. Say so rather than emitting a
+                # site that silently fails to place later.
+                address = _cell(row, "address")
+                if not address:
+                    logger.error(f"  DROPPED, no address to geocode: {org}")
+                    continue
                 sites.append({
-                    "organization": org, "address": clean(row[1]),
-                    "city": clean(row[2]), "state": "CA",
-                    "zip": clean(row[3]), "phone": clean(row[4]),
-                    "hours": clean(row[5]), "pet_policy": clean(row[9]),
+                    "organization": org, "address": address,
+                    "city": _cell(row, "city"), "state": "CA",
+                    "zip": _cell(row, "zip"), "phone": _cell(row, "phone"),
+                    "hours": _cell(row, "hours"),
+                    "pet_policy": _cell(row, "pet_policy"),
                 })
+    if narrow:
+        logger.warning(
+            f"{narrow}/{data_rows} PDF rows have fewer than {PDF_MIN_COLS} "
+            "columns -- the County's table layout has probably changed. Sites "
+            "still load, but hours and pet policy may be blank; check PDF_COLS "
+            "against the published PDF.")
     logger.info(f"CoolZoneSiteList.pdf: {len(sites)} County sites (no coordinates)")
     return sites
 

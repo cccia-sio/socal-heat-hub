@@ -1927,7 +1927,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   <div id="map-controls-br">
     <div id="basemap-picker">
       <button class="bm-thumb" data-bm="light" onclick="setBasemap('light')" title="Light basemap"
-              style="background-image:url('https://a.basemaps.cartocdn.com/light_all/11/358/825.png')">
+              style="background-image:url('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/11/825/358'),url('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/11/825/358')">
         <span class="bm-thumb-lbl">Light</span>
       </button>
       <button class="bm-thumb active" data-bm="satellite" onclick="setBasemap('satellite')" title="Satellite basemap"
@@ -2403,10 +2403,23 @@ function updateDeltaRange(){
    MAP
    ================================================================ */
 var map = L.map("map").setView([32.85,-117.05],10);
+// Esri Light Gray Canvas — free, no API key, attribution required. It
+// replaces CARTO Positron, which started stamping "API KEY REQUIRED" across
+// every keyless tile. Two differences from CARTO drive the helpers below:
+// Esri splits the style into an unlabeled base plus a transparent label
+// raster, so the light basemap is always TWO tile layers; and it has no tiles
+// past z16 (it serves a "Map data not yet available" placeholder there), so
+// maxNativeZoom upscales beyond that instead of requesting them.
+var ESRI_CANVAS = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/";
+var LIGHT_BASE_URL = ESRI_CANVAS + "World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+var LIGHT_REF_URL  = ESRI_CANVAS + "World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
+var LIGHT_MAX_NATIVE_ZOOM = 16;
+var LIGHT_ATTRIB = "Esri, HERE, Garmin, \\u00a9 OpenStreetMap contributors";
 var BASEMAPS = {
   light: {
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    opts: {attribution:"\\u00a9 CARTO \\u00a9 OpenStreetMap contributors", maxZoom:18}
+    url: LIGHT_BASE_URL,
+    labels: LIGHT_REF_URL,
+    opts: {attribution:LIGHT_ATTRIB, maxNativeZoom:LIGHT_MAX_NATIVE_ZOOM, maxZoom:19}
   },
   satellite: {
     // Esri World Imagery — free, no API key, attribution required.
@@ -2414,8 +2427,26 @@ var BASEMAPS = {
     opts: {attribution:"Imagery \\u00a9 Esri, Maxar, Earthstar Geographics, and the GIS User Community", maxZoom:19}
   }
 };
+
+// The two rasters of the light basemap, in draw order, ready to drop into a
+// map or a LayerGroup. Every mini-map in this file builds its base through
+// here so the label layer is never forgotten.
+function lightTiles(maxZoom){
+  var o={maxNativeZoom:LIGHT_MAX_NATIVE_ZOOM, maxZoom:maxZoom||19};
+  return [L.tileLayer(LIGHT_BASE_URL,o), L.tileLayer(LIGHT_REF_URL,o)];
+}
+// One layer handle for a BASEMAPS entry. A multi-raster basemap comes back as
+// a LayerGroup, which has no bringToBack() of its own — forward it to the
+// children so setBasemap() can treat both entries identically.
+function makeBasemap(name){
+  var b=BASEMAPS[name];
+  if(!b.labels) return L.tileLayer(b.url,b.opts);
+  var g=L.layerGroup([L.tileLayer(b.url,b.opts), L.tileLayer(b.labels,b.opts)]);
+  g.bringToBack=function(){g.eachLayer(function(l){l.bringToBack();});return g;};
+  return g;
+}
 var currentBasemap = 'satellite';
-var basemapLayer = L.tileLayer(BASEMAPS.satellite.url, BASEMAPS.satellite.opts).addTo(map);
+var basemapLayer = makeBasemap('satellite').addTo(map);
 L.control.scale({position:'bottomright'}).addTo(map);
 var tLayer = null;
 // User-adjustable opacity for the composite-risk choropleth (see #map-opacity-slider).
@@ -2578,7 +2609,7 @@ function _updateBivLegend(){
 function setBasemap(name){
   if(!BASEMAPS[name] || name===currentBasemap) return;
   if(basemapLayer){map.removeLayer(basemapLayer);}
-  basemapLayer = L.tileLayer(BASEMAPS[name].url, BASEMAPS[name].opts).addTo(map);
+  basemapLayer = makeBasemap(name).addTo(map);
   basemapLayer.bringToBack();
   currentBasemap = name;
   var btns = document.querySelectorAll('#basemap-picker .bm-thumb');
@@ -3429,10 +3460,9 @@ function _dtSetView(view){
     if(view==='sat'){
       _dtLayers.sat=L.tileLayer(BASEMAPS.satellite.url,BASEMAPS.satellite.opts);
     }else if(view==='lu'){
-      // CARTO base + SANDAG parcels via protomaps-leaflet. We bundle them
+      // Light basemap + SANDAG parcels via protomaps-leaflet. We bundle them
       // into a LayerGroup so we can add/remove with a single handle.
-      var carto=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19});
-      var group=L.layerGroup([carto]);
+      var group=L.layerGroup(lightTiles());
       if(window.protomapsL){
         var luLayer=_buildLanduseLayer();
         if(luLayer){group.addLayer(luLayer); group._luLayer=luLayer;}
@@ -3440,12 +3470,11 @@ function _dtSetView(view){
       }else{
         console.warn('detail-modal: protomaps-leaflet not loaded');
       }
-      // Switch tract-outline color to dark for visibility over CARTO.
+      // Switch tract-outline color to dark for visibility over the light base.
       group._outlineColor='#111';
       _dtLayers.lu=group;
     }else if(view==='lst'){
-      var carto2=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19});
-      var grp=L.layerGroup([carto2]);
+      var grp=L.layerGroup(lightTiles());
       var lv=lstVariant();
       if(lv){
         var b=LST.bounds;
@@ -5115,7 +5144,7 @@ function buildMiniMap(elId,slot,feat){
   _landuseLayers[slot]=null; _cmpLST[slot]=null;
   var m=L.map(elId,{zoomControl:false,attributionControl:false,
     scrollWheelZoom:true,dragging:true});
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{maxZoom:19}).addTo(m);
+  lightTiles().forEach(function(t){t.addTo(m);});
   // Custom pane so the protomaps PMTiles canvas (a GridLayer) renders ABOVE
   // the LST imageOverlay. Without this it lands in tilePane (z=200) under
   // overlayPane (z=400) and the LST visually swamps the parcels.
@@ -5278,7 +5307,7 @@ function buildCityMiniMap(elId,slot,name){
   if(cityCmpMaps[slot]){cityCmpMaps[slot].remove();}
   var m=L.map(elId,{zoomControl:false,attributionControl:false,
     scrollWheelZoom:true,dragging:true});
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{maxZoom:19}).addTo(m);
+  lightTiles().forEach(function(t){t.addTo(m);});
   var idxs=_jurisTractIdxs(name);
   if(idxs.length){
     var feats=idxs.map(function(i){return GJ.features[i];});
@@ -5677,7 +5706,7 @@ function renderScnCompareSide(side){
   // Lazy init Leaflet
   if(!scnCmpMaps[side]){
     var m=L.map(elId,{zoomControl:true,attributionControl:false}).setView([32.85,-117.05],9);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(m);
+    lightTiles(18).forEach(function(t){t.addTo(m);});
     scnCmpMaps[side]=m;
   }
   var map2=scnCmpMaps[side];
@@ -5872,6 +5901,64 @@ function _scenarioLabel(){
   return sl[curScenario]+' \\u2022 '+(pl[curPeriod]||'');
 }
 
+// Paint the light basemap onto a 2D context for the PDF blitters, which draw
+// raster tiles by hand rather than screenshotting Leaflet (see
+// _captureStudyAreaMap). `pb` is a Leaflet pixel-bounds at zoom `zoom`; `S` is
+// the retina scale of the target canvas. Resolves with the number of base
+// tiles that actually loaded, so a caller can tell "blocked" from "drawn".
+//
+// Two Esri quirks are handled here. It serves no @2x tiles, so print density
+// comes from fetching one zoom level deeper and drawing each tile at half its
+// map size — 256 source pixels land on 256 canvas pixels at S=2. And it has no
+// tiles at all past LIGHT_MAX_NATIVE_ZOOM, so beyond that we sample the
+// sub-rectangle of the deepest real ancestor tile and let drawImage upscale
+// it, which is what maxNativeZoom does on the live map.
+function _paintLightBasemap(ctx,zoom,pb,S){
+  var TILE=256;
+  var rz=zoom+1;                       // one level deeper == retina density
+  var f=S/2;                           // 256px tile -> 256*f physical px
+  var min={x:pb.min.x*2,y:pb.min.y*2}, max={x:pb.max.x*2,y:pb.max.y*2};
+  var nWorld=Math.pow(2,rz);
+  // Source tile + sub-rectangle for one tile of the rz grid.
+  function src(x,y){
+    var d=Math.max(0,rz-LIGHT_MAX_NATIVE_ZOOM), n=1<<d, sub=TILE/n;
+    var sx=Math.floor(x/n), sy=Math.floor(y/n);
+    var q={z:rz-d,x:sx,y:sy,sx:(x%n)*sub,sy:(y%n)*sub,sw:sub,sh:sub};
+    q.base=LIGHT_BASE_URL.replace('{z}',q.z).replace('{y}',q.y).replace('{x}',q.x);
+    q.ref =LIGHT_REF_URL .replace('{z}',q.z).replace('{y}',q.y).replace('{x}',q.x);
+    return q;
+  }
+  function loadImage(url){
+    return new Promise(function(res){
+      var im=new Image();
+      im.crossOrigin='anonymous';
+      im.onload=function(){res(im);};
+      im.onerror=function(){res(null);};
+      im.src=url;
+    });
+  }
+  var tasks=[], got={n:0};
+  for(var tx=Math.floor(min.x/TILE);tx<=Math.floor(max.x/TILE);tx++){
+    for(var ty=Math.floor(min.y/TILE);ty<=Math.floor(max.y/TILE);ty++){
+      if(ty<0||ty>=nWorld)continue;
+      var q=src(((tx%nWorld)+nWorld)%nWorld,ty);
+      var dx=(tx*TILE-min.x)*f, dy=(ty*TILE-min.y)*f, dw=TILE*f;
+      (function(x,y,p){
+        // Base first, then the transparent label raster directly over it. Each
+        // label tile covers exactly its own base tile, so per-tile ordering is
+        // enough — no second pass needed.
+        tasks.push(loadImage(p.base).then(function(im){
+          if(im){got.n++;ctx.drawImage(im,p.sx,p.sy,p.sw,p.sh,x,y,dw,dw);}
+          return loadImage(p.ref);
+        }).then(function(im){
+          if(im)ctx.drawImage(im,p.sx,p.sy,p.sw,p.sh,x,y,dw,dw);
+        }));
+      })(dx,dy,q);
+    }
+  }
+  return Promise.all(tasks).then(function(){return got.n;});
+}
+
 // Build a publication-quality figure of the study area without html2canvas.
 //
 // Approach: render to a 3200x2400 canvas ourselves using Leaflet only as a
@@ -5887,7 +5974,6 @@ function _captureStudyAreaMap(opts){
     // Logical figure size; canvas is rendered at 2x for retina-print output.
     var TARGET_W=1600, TARGET_H=1200;
     var SCALE=2;
-    var TILE_SIZE=256;
 
     // Off-screen Leaflet map used solely for projection math (zoom-fit +
     // latLngToContainerPoint). It carries no tile layer and is never captured.
@@ -5928,41 +6014,7 @@ function _captureStudyAreaMap(opts){
     }
 
     // ── Basemap tiles ──────────────────────────────────────────
-    // Tile coords cover the container's pixel range at the chosen zoom.
-    var minTX=Math.floor(pixelBounds.min.x/TILE_SIZE);
-    var maxTX=Math.floor(pixelBounds.max.x/TILE_SIZE);
-    var minTY=Math.floor(pixelBounds.min.y/TILE_SIZE);
-    var maxTY=Math.floor(pixelBounds.max.y/TILE_SIZE);
-    var nWorld=Math.pow(2,zoom);
-    var subdomains=['a','b','c'];
-
-    function loadImage(src){
-      return new Promise(function(res){
-        var img=new Image();
-        img.crossOrigin='anonymous';
-        img.onload=function(){res(img);};
-        img.onerror=function(){res(null);};
-        img.src=src;
-      });
-    }
-
-    var tileTasks=[];
-    for(var tx=minTX;tx<=maxTX;tx++){
-      for(var ty=minTY;ty<=maxTY;ty++){
-        if(ty<0||ty>=nWorld)continue;
-        var wrapTx=((tx%nWorld)+nWorld)%nWorld;
-        var sd=subdomains[Math.abs(tx+ty)%subdomains.length];
-        var url='https://'+sd+'.basemaps.cartocdn.com/light_all/'+
-                zoom+'/'+wrapTx+'/'+ty+'@2x.png';
-        var dx=(tx*TILE_SIZE-pixelBounds.min.x)*SCALE;
-        var dy=(ty*TILE_SIZE-pixelBounds.min.y)*SCALE;
-        (function(x,y,src){
-          tileTasks.push(loadImage(src).then(function(img){
-            if(img)ctx.drawImage(img,x,y,TILE_SIZE*SCALE,TILE_SIZE*SCALE);
-          }));
-        })(dx,dy,url);
-      }
-    }
+    var tileTasks=[_paintLightBasemap(ctx,zoom,pixelBounds,SCALE)];
 
     // ── Vector overlays ────────────────────────────────────────
     function addRings(rings){
@@ -6268,7 +6320,7 @@ function _captureStudyAreaMap(opts){
     }
 
     function drawAttribution(){
-      var text='© OpenStreetMap contributors  © CARTO';
+      var text='Esri, HERE, Garmin  © OpenStreetMap contributors';
       ctx.font=(10*SCALE)+'px -apple-system,Segoe UI,Roboto,sans-serif';
       var tw=ctx.measureText(text).width;
       var pad=6*SCALE;
@@ -6442,7 +6494,7 @@ function downloadMapPdf(){
     btn.disabled=false;
     var bar=document.getElementById('error-bar');
     bar.textContent='PDF export failed: '+err.message+
-      '. If basemap tiles were blocked, allow basemaps.cartocdn.com, or use the browser\\u2019s Print \\u2192 Save as PDF.';
+      '. If basemap tiles were blocked, allow server.arcgisonline.com, or use the browser\\u2019s Print \\u2192 Save as PDF.';
     bar.style.display='block';
     setTimeout(function(){bar.style.display='none';},9000);
   });
@@ -6504,7 +6556,7 @@ function downloadCityPdf(){
     if(btn)btn.disabled=false;
     var bar=document.getElementById('error-bar');
     bar.textContent='PDF export failed: '+err.message+
-      '. If basemap tiles were blocked, allow basemaps.cartocdn.com, or use the browser\\u2019s Print \\u2192 Save as PDF.';
+      '. If basemap tiles were blocked, allow server.arcgisonline.com, or use the browser\\u2019s Print \\u2192 Save as PDF.';
     bar.style.display='block';
     setTimeout(function(){bar.style.display='none';},9000);
   });
@@ -6688,7 +6740,7 @@ function _pdfPaintLanduse(pm,ctx,S){
         // failed PMTiles fetch still leaves protomaps with blank-but-valid tile
         // canvases, so "we drew some tiles" is NOT evidence that any parcels
         // rendered. Only the pixels can tell us, and once they're composited
-        // over CARTO we can no longer distinguish them from the basemap.
+        // over the basemap we can no longer distinguish them from it.
         var sc=document.createElement('canvas');
         sc.width=ctx.canvas.width;sc.height=ctx.canvas.height;
         var sctx=sc.getContext('2d');
@@ -6724,7 +6776,7 @@ function _pdfPaintLanduse(pm,ctx,S){
 
 // Locator inset for one tract, in either of two views:
 //   'sat' — Esri World Imagery
-//   'lu'  — CARTO light basemap + SANDAG land-use parcels (protomaps/PMTiles)
+//   'lu'  — Esri light basemap + SANDAG land-use parcels (protomaps/PMTiles)
 // Same approach as _captureStudyAreaMap: Leaflet is used purely as a projector
 // and the raster tiles are drawn by hand, because html2canvas cannot composite
 // Leaflet's tile and vector panes in alignment. Resolves to null (rather than
@@ -6768,30 +6820,35 @@ function _captureTractInset(feat,mode){
     }
     function tileUrl(z,x,y){
       // Esri World Imagery is ordered {z}/{y}/{x}, not the usual {z}/{x}/{y}.
-      if(mode==='lu')
-        return 'https://a.basemaps.cartocdn.com/light_all/'+z+'/'+x+'/'+y+'@2x.png';
       return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/'+
              'MapServer/tile/'+z+'/'+y+'/'+x;
     }
-    var minTX=Math.floor(pb.min.x/TILE),maxTX=Math.floor(pb.max.x/TILE);
-    var minTY=Math.floor(pb.min.y/TILE),maxTY=Math.floor(pb.max.y/TILE);
-    var nW=Math.pow(2,z), tasks=[], got={n:0};
-    for(var tx=minTX;tx<=maxTX;tx++){
-      for(var ty=minTY;ty<=maxTY;ty++){
-        if(ty<0||ty>=nW)continue;
-        var wx=((tx%nW)+nW)%nW;
-        var url=tileUrl(z,wx,ty);
-        var dx=(tx*TILE-pb.min.x)*S, dy=(ty*TILE-pb.min.y)*S;
-        (function(x,y,u){
-          tasks.push(loadImage(u).then(function(im){
-            if(im){got.n++;ctx.drawImage(im,x,y,TILE*S,TILE*S);}
-          }));
-        })(dx,dy,url);
+    var tasks=[], got={n:0};
+    if(mode==='lu'){
+      // Two rasters and a native-zoom ceiling to respect — _paintLightBasemap
+      // owns that math for both PDF blitters.
+      tasks.push(_paintLightBasemap(ctx,z,pb,S).then(function(n){got.n+=n;}));
+    }else{
+      var minTX=Math.floor(pb.min.x/TILE),maxTX=Math.floor(pb.max.x/TILE);
+      var minTY=Math.floor(pb.min.y/TILE),maxTY=Math.floor(pb.max.y/TILE);
+      var nW=Math.pow(2,z);
+      for(var tx=minTX;tx<=maxTX;tx++){
+        for(var ty=minTY;ty<=maxTY;ty++){
+          if(ty<0||ty>=nW)continue;
+          var wx=((tx%nW)+nW)%nW;
+          var url=tileUrl(z,wx,ty);
+          var dx=(tx*TILE-pb.min.x)*S, dy=(ty*TILE-pb.min.y)*S;
+          (function(x,y,u){
+            tasks.push(loadImage(u).then(function(im){
+              if(im){got.n++;ctx.drawImage(im,x,y,TILE*S,TILE*S);}
+            }));
+          })(dx,dy,url);
+        }
       }
     }
     Promise.all(tasks).then(function(){
       if(!got.n){done(null);return;}   // basemap blocked — drop the panel
-      // Parcels go on top of the CARTO base. If they don't render there is no
+      // Parcels go on top of the light base. If they don't render there is no
       // land-use panel to show, so drop it rather than pass off a plain basemap.
       return (mode==='lu')?_pdfPaintLanduse(pm,ctx,S):true;
     }).then(function(ok){
@@ -7069,7 +7126,7 @@ function _tractPdfBuild(idx,feat,radarC,mapC,luC){
   var srcTxt='Sources incl. MesoWest/Synoptic, NOAA HRRR, USGS Landsat, CDC PLACES & SVI, '+
              'Healthy Places Index, U.S. Census.'+
              (mapC?' Imagery \\u00a9 Esri, Maxar, Earthstar Geographics.':'')+
-             (luC?' Land use \\u00a9 SANDAG; basemap \\u00a9 CARTO, \\u00a9 OpenStreetMap contributors.':'')+
+             (luC?' Land use \\u00a9 SANDAG; basemap Esri, HERE, Garmin, \\u00a9 OpenStreetMap contributors.':'')+
              ' Full list: '+EXPORT_META.sources_url;
   var fy=footTop+30;
   pdf.splitTextToSize(srcTxt,CW).forEach(function(line){

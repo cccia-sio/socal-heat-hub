@@ -131,7 +131,7 @@ def test_inset_failure_is_non_fatal(tract_pdf_js):
 # vector PMTiles layer rendered by protomaps into canvas tiles inside a Leaflet
 # GridLayer, and when the PMTiles fetch fails (file://, a server with no Range
 # support, a 404) protomaps still creates the tile canvases — they are just
-# empty. A tile-count check therefore passes, and the PDF ships a plain CARTO
+# empty. A tile-count check therefore passes, and the PDF ships a plain light
 # basemap captioned "Land use (SANDAG)", credited to SANDAG. That is worse than
 # no panel: it is a plausible-looking lie. Only the pixels can tell us.
 # ------------------------------------------------------------------------
@@ -148,8 +148,8 @@ def test_landuse_inset_is_a_mode_of_the_shared_capture(js_code):
         "_captureTractInset() no longer takes a mode — the land-use and satellite "
         "insets must share one capture path or they can drift out of alignment."
     )
-    assert "basemaps.cartocdn.com" in src, (
-        "the land-use inset no longer draws the CARTO basemap under the parcels"
+    assert "_paintLightBasemap(" in src, (
+        "the land-use inset no longer draws the light basemap under the parcels"
     )
 
 
@@ -184,7 +184,7 @@ def test_landuse_panel_is_dropped_when_no_parcels_render(js_code):
 def test_landuse_pixel_check_uses_a_scratch_canvas(js_code):
     """The parcels must be tested BEFORE they're composited over the basemap.
 
-    Once the tiles are drawn onto the CARTO base, their pixels are
+    Once the tiles are drawn onto the light base, their pixels are
     indistinguishable from it and the emptiness check becomes impossible.
     """
     src = js_code("_pdfPaintLanduse")

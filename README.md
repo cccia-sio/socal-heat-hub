@@ -11,7 +11,7 @@ under mid-century and end-of-century warming. The tool runs entirely in the
 browser — no server, no account, and no analytics or tracking of any kind.
 
 Two things do leave your browser, both to third parties, neither logged by us:
-map tiles are fetched from CARTO and Esri as you pan, and **anything you type
+map tiles are fetched from Esri as you pan, and **anything you type
 into the address search is sent to OpenStreetMap's Nominatim** geocoder to be
 turned into a location. If you'd rather not send an address to a third party,
 click the map instead of searching for it.

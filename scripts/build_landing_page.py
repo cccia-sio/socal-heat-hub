@@ -214,7 +214,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       align-items:center;
       flex-wrap:wrap;
       gap:24px;
-      margin-bottom:36px;
+      margin-top:56px;
+      padding-top:28px;
+      border-top:1px solid var(--border);
     }
     .partners-right{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
     .partners img{
@@ -226,9 +228,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     }
     .partners a:hover img{opacity:1}
     @media(max-width:520px){
-      .partners{justify-content:center;gap:16px}
+      .partners{justify-content:center}
       .partners-right{justify-content:center}
-      .partners img{height:28px}
     }
     footer{
       margin-top:28px;
@@ -314,7 +315,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
       .src{break-inside:avoid}
 
-      .partners{break-inside:avoid;margin-bottom:18px}
+      .partners{break-inside:avoid;margin-top:24px;padding-top:14px}
       .partners img{height:32px;opacity:1}
 
       footer{font-size:9pt;margin-top:18px}
@@ -323,20 +324,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
   <div class="wrap">
-    <div class="partners">
-      <a href="https://socalheathub.ucsd.edu/" aria-label="UC San Diego — Scripps Institution of Oceanography">
-        <img src="assets/sio_logo.png" alt="UC San Diego — Scripps Institution of Oceanography">
-      </a>
-      <div class="partners-right">
-        <a href="https://www.sandiego.edu/" aria-label="University of San Diego">
-          <img src="assets/usd-logo-horizontal.png" alt="University of San Diego">
-        </a>
-        <a href="https://www.sandiego.edu/soles/centers-and-institutes/nonprofit-institute/signature-programs/climate-collaborative/" aria-label="San Diego Regional Climate Collaborative">
-          <img src="assets/ccsd_logo.png" alt="San Diego Regional Climate Collaborative">
-        </a>
-      </div>
-    </div>
-
     <header>
       <h1>San Diego Heat Risk Explorer</h1>
     </header>
@@ -366,6 +353,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <h2>Data sources</h2>
     <div class="sources">
 __SOURCES_PLACEHOLDER__
+    </div>
+
+    <div class="partners">
+      <a href="https://socalheathub.ucsd.edu/" aria-label="UC San Diego — Scripps Institution of Oceanography">
+        <img src="assets/sio_logo.png" alt="UC San Diego — Scripps Institution of Oceanography">
+      </a>
+      <div class="partners-right">
+        <a href="https://www.sandiego.edu/" aria-label="University of San Diego">
+          <img src="assets/usd-logo-horizontal.png" alt="University of San Diego">
+        </a>
+        <a href="https://www.sandiego.edu/soles/centers-and-institutes/nonprofit-institute/signature-programs/climate-collaborative/" aria-label="San Diego Regional Climate Collaborative">
+          <img src="assets/ccsd_logo.png" alt="San Diego Regional Climate Collaborative">
+        </a>
+      </div>
     </div>
 
     <h2>Feedback</h2>

@@ -66,7 +66,7 @@ def test_no_placeholder_anchors(project_root, page):
     The landing page shipped a "Technical Guide" hero button pointing at `#`,
     sitting between "Launch the Tool" and "User Guide" on the public site. The
     resolver above cannot see it: it skips every target starting with `#` so
-    that real fragment links (`#data`, `#privacy`) aren't checked against the
+    that real fragment links (`#data`, `#feedback`) aren't checked against the
     filesystem, and a bare `#` rides along in that exemption.
 
     A placeholder for a page that doesn't exist yet belongs in an issue, not in

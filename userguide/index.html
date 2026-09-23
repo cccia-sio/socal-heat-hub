@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>San Diego Heat Risk Explorer user guide</title>
   <meta name="description" content="User guide for the San Diego Heat Risk Explorer: variables, methodology, and how to interpret the maps.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8C%A1%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <!-- favicon: three bars in the pillar colours (--exposure / --sensitivity / --adaptive) -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='7' width='3.5' height='8' rx='0.8' fill='%23c0392b'/%3E%3Crect x='6.25' y='3' width='3.5' height='12' rx='0.8' fill='%23d4a017'/%3E%3Crect x='10.5' y='5' width='3.5' height='10' rx='0.8' fill='%2316a085'/%3E%3C/svg%3E">
   <style>
     :root{
       --exposure:#c0392b;
@@ -192,6 +193,18 @@
     }
     figure.screenshot figcaption{margin-top:6px}
 
+    /* webinar embed */
+    .video{
+      aspect-ratio:16/9;
+      margin:18px 0;
+      border:1px solid var(--border);
+      border-radius:6px;
+      overflow:hidden;
+      background:#000;
+    }
+    .video iframe{display:block;width:100%;height:100%;border:0}
+    .print-only{display:none}
+
     /* data sources table */
     table{
       width:100%;
@@ -293,7 +306,8 @@
       a{color:#1d4ed8;text-decoration:none}
 
       /* hide screen-only chrome */
-      .launch,.crumbs,footer,.back{display:none !important}
+      .launch,.crumbs,footer,.back,.video{display:none !important}
+      .print-only{display:block}
 
       /* keep header tighter on the body pages */
       header{margin-top:0;padding-bottom:14px;margin-bottom:18px}
@@ -349,7 +363,7 @@
         <li><a href="#examples">Examples</a></li>
         <li><a href="#feedback">Feedback &amp; bug reports</a></li>
         <li><a href="#data">Data sources</a></li>
-        <li><a href="#privacy">Privacy</a></li>
+        <li><a href="#webinar">Webinar</a></li>
       </ol>
     </nav>
 
@@ -544,7 +558,6 @@
     <!-- =================== 5. Feedback =================== -->
     <h2 class="section" id="feedback">Feedback &amp; bug reports</h2>
     <p>To submit a correction, comment, or feature request, open an issue on the <a href="https://github.com/cccia-sio/socal-heat-hub/issues">project GitHub</a>, or email <a href="mailto:cjmack@ucsd.edu?subject=San%20Diego%20Heat%20Risk%20Explorer%20-%20feedback">cjmack@ucsd.edu</a>.</p>
-    <p>If something on the map looks wrong, include the census tract ID, shown at the top of the tract popup, and the heat mode and variables you had turned on. Those details make the problem quickest to track down.</p>
 
     <!-- =================== 6. Data sources =================== -->
     <h2 class="section" id="data">Data sources</h2>
@@ -584,32 +597,12 @@
     </table>
     <p>Each variable name in the tool has a small <code>(Source)</code> link that opens the original source.</p>
 
-    <!-- =================== 7. Privacy =================== -->
-    <h2 class="section" id="privacy">Privacy</h2>
-    <p>
-      The map runs entirely in your browser. There is no server, no account, and
-      no analytics or tracking. We do not log who you are, what you look at, or
-      what you build. Everything you select stays on your device, and your
-      browser generates any data you download.
-    </p>
-    <p>
-      Two things do leave your browser, and both go to third parties rather than
-      to us:
-    </p>
-    <ul>
-      <li>
-        <strong>Map tiles.</strong> As you pan and zoom, your browser fetches the
-        background map from <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a>,
-        so Esri sees which part of the map you are looking at.
-      </li>
-      <li>
-        <strong>Address search.</strong> The address box sends anything you type
-        to <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener">OpenStreetMap's
-        Nominatim</a> geocoder, which converts it to a location. <strong>If you
-        search your home address, OpenStreetMap receives that address.</strong>
-        To avoid that, click the map instead of searching. Clicking sends nothing.
-      </li>
-    </ul>
+    <!-- =================== 7. Webinar =================== -->
+    <h2 class="section" id="webinar">Webinar</h2>
+    <div class="video">
+      <iframe src="https://www.youtube-nocookie.com/embed/YUXmkqhmQB0" title="Heat Risk Explorer webinar" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    </div>
+    <p class="print-only">Watch the webinar at <a href="https://www.youtube.com/watch?v=YUXmkqhmQB0">youtube.com/watch?v=YUXmkqhmQB0</a>.</p>
 
     <div class="partners">
       <a href="https://socalheathub.ucsd.edu/" aria-label="UC San Diego — Scripps Institution of Oceanography">

@@ -8,6 +8,8 @@ scripts/*
 !scripts/build_ucla_heat_tract_xwalk.py
 !scripts/build_hero_figure.py
 !scripts/build_coolzones.py
+# index.html is generated; the page can't be rebuilt without its builder.
+!scripts/build_landing_page.py
 # main/hospitalizations.html is a tracked artifact; without its builder tracked
 # too, the committed page could not be regenerated from this repo.
 !scripts/build_hospitalizations_viewer.py

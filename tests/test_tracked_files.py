@@ -21,6 +21,7 @@ ALLOWED_SCRIPT_FILES = {
     "build_hero_figure.py",
     "build_coolzones.py",
     "build_hospitalizations_viewer.py",
+    "build_landing_page.py",
 }
 
 # Tracked data files. The landsat and context/overlays directories are wholly

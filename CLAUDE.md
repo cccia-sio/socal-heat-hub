@@ -12,7 +12,7 @@ python3 scripts/build_diy_pca_viewer.py
 
 ## `scripts/` and `data/` are gitignored except allow-list entries
 
-Tracked scripts: `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`, `build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`, `build_hero_figure.py`, `build_coolzones.py`, `build_hospitalizations_viewer.py`. Tracked data: `data/exposure/processed/landsat/`, `data/context/sandag_landuse.pmtiles`, and `data/context/overlays/` (Data-Layer raster PNGs + `*_bounds.json`). Source CSV/GeoJSON/raster inputs live under `data/` locally but aren't committed — files dropped elsewhere under `data/` won't deploy.
+Tracked scripts: `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`, `build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`, `build_hero_figure.py`, `build_coolzones.py`, `build_hospitalizations_viewer.py`, `build_landing_page.py`. Tracked data: `data/exposure/processed/landsat/`, `data/context/sandag_landuse.pmtiles`, and `data/context/overlays/` (Data-Layer raster PNGs + `*_bounds.json`). Source CSV/GeoJSON/raster inputs live under `data/` locally but aren't committed — files dropped elsewhere under `data/` won't deploy.
 
 Tracking a script takes **three** agreeing edits: the `!scripts/...` line in `.gitignore`, `ALLOWED_SCRIPT_FILES` in `tests/test_tracked_files.py`, and an actual `git add`. Miss the middle one and the suite stays green until the commit that makes the file visible to `git ls-files` — which is how `main` went red after `build_coolzones.py` landed.
 
@@ -41,3 +41,4 @@ Guarded by `tests/test_frontend_security.py`; all fixes go in `HTML_TEMPLATE`, n
 - UCLA excess-ER + CalHeatScore thresholds (tract crosswalk): `python3 scripts/build_ucla_heat_tract_xwalk.py` (fetches the SD slice live from the UCLA Heat Maps ArcGIS service, crosswalks ZIP→tract by centroid → `data/context/ucla_heat_tract.csv`, baked into the viewer's Exploratory Data Layers at build time)
 - User guide hero figure: `python3 scripts/build_hero_figure.py` → `userguide/figure_hero_composite.png`. Reproduces the viewer's **default view** (Daytime heat mode + the six `DEFAULT_ON` variables) by porting `exposureScore()`, `pillarPCA()` and `compute()` out of `HTML_TEMPLATE`. If you change that math, change it here too — the script's header documents where the two intentionally differ.
 - User guide PDF: `bash scripts/build_userguide_pdf.sh` (when `userguide/index.html` changes)
+- Landing page: `python3 scripts/build_landing_page.py` → `index.html`. Generated — edit `HTML_TEMPLATE` in the script, never `index.html`. Its Data sources list is read from the viewer's `VARIABLES` table, so rebuild it whenever a viewer variable changes.

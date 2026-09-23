@@ -35,7 +35,7 @@ ship.
 **Tracked build scripts** (un-ignored via `!scripts/...`):
 `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`,
 `build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`, `build_hero_figure.py`,
-`build_coolzones.py`, `build_hospitalizations_viewer.py`. Everything else in
+`build_coolzones.py`, `build_hospitalizations_viewer.py`, `build_landing_page.py`. Everything else in
 `scripts/` is local-only.
 
 Tracking a script takes **three** agreeing edits, and the tests only compare two
@@ -68,7 +68,7 @@ deploy time: many tracked files (`tests/`, `docs/`, `ARCHITECTURE.md`,
 
 ```
 socal-heat-hub/
-├── index.html                ← landing page
+├── index.html                ← landing page (built by scripts/build_landing_page.py)
 ├── README.md                 ← short project blurb + launch link
 ├── ARCHITECTURE.md           ← this file
 ├── CLAUDE.md                 ← repo conventions for Claude Code
@@ -110,6 +110,7 @@ socal-heat-hub/
 │   ├── build_lst_overlay.py       ← [tracked] Landsat LST → PNG overlay + bounds JSON
 │   ├── build_data_overlays.py     ← [tracked] Data-Layer rasters → data/context/overlays/
 │   ├── build_userguide_pdf.sh     ← [tracked] userguide/index.html → docs/userguide PDF
+│   ├── build_landing_page.py      ← [tracked] landing page → index.html (sources from the viewer's VARIABLES)
 │   └── …                          ← (local-only) slide/figure builders, data fetchers, mockups
 │
 ├── data/                     ← source data + rendered products (only allow-listed products tracked)
@@ -525,10 +526,10 @@ See `literature/README.md` for the full workflow.
 
 | Task                                  | Where to edit                                  | Then                              |
 |---------------------------------------|------------------------------------------------|-----------------------------------|
-| Landing page copy / styling           | `index.html`                                   | commit                            |
+| Landing page copy / styling           | `HTML_TEMPLATE` in `scripts/build_landing_page.py` | rebuild + commit `index.html` |
 | User guide content                    | `userguide/index.html`                         | commit (rerun PDF script optional)|
 | Viewer UI / map / legend / modals     | `HTML_TEMPLATE` in `scripts/build_diy_pca_viewer.py` | rebuild + commit `main/heat_risk_map.html` |
-| Add or remove a viewer variable       | `VARIABLES` + `VAR_SOURCES` (+ source-file load in `load_data()`) | rebuild + commit |
+| Add or remove a viewer variable       | `VARIABLES` + `VAR_SOURCES` (+ source-file load in `load_data()`) | rebuild viewer + landing page, commit both |
 | Change polarity of a variable         | `INVERTED_VARS` in build script                | rebuild + commit                  |
 | Update Landsat LST overlay            | run `scripts/build_lst_overlay.py`             | rebuild viewer + commit           |
 | Update a Data-Layer overlay           | run `scripts/build_data_overlays.py`           | rebuild viewer + commit           |

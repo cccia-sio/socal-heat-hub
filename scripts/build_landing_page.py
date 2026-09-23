@@ -105,7 +105,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <meta property="og:description" content="Interactive heat risk mapping for San Diego County — pick the variables that matter to you.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary">
-  <link rel="icon" href="data:,">
+  <!-- favicon: three bars in the pillar colours (--exposure / --sensitivity / --adaptive) -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='7' width='3.5' height='8' rx='0.8' fill='%23c0392b'/%3E%3Crect x='6.25' y='3' width='3.5' height='12' rx='0.8' fill='%23d4a017'/%3E%3Crect x='10.5' y='5' width='3.5' height='10' rx='0.8' fill='%2316a085'/%3E%3C/svg%3E">
   <style>
     :root{
       --exposure:#c0392b;

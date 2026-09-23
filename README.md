@@ -66,8 +66,8 @@ see [CITATION.cff](CITATION.cff).
 The MIT grant covers the **code**, not the tract data baked into the generated
 `main/heat_risk_map.html`. That file embeds third-party data (HPI, UCLA Heat
 Maps) that this project cannot sublicense commercially — so copying the
-generated HTML is not an MIT-covered act. See the scope note in
-[LICENSE](LICENSE).
+generated HTML is not an MIT-covered act. See
+[what the MIT license does not cover](DATA_LICENSE.md#what-the-mit-license-does-not-cover).
 
 Incorporated third-party data keeps its own terms. In particular, **Healthy
 Places Index** data is non-commercial, so HPI-derived columns are shown on the

@@ -17,6 +17,31 @@ give appropriate credit.** Suggested attribution:
 > San Diego Heat Risk Explorer — Southern California Extreme Heat Research Hub &
 > San Diego Regional Climate Collaborative. Licensed CC BY 4.0.
 
+## What the MIT license does not cover
+
+The MIT license covers the **code**: the build pipeline under `scripts/`, the
+HTML/CSS/JavaScript written for this project (including the `HTML_TEMPLATE`
+string in `scripts/build_diy_pca_viewer.py`), and the test suite. It does not
+cover data. Three things fall outside it, because this project has no right to
+license them the way MIT does:
+
+1. **The tract data embedded in the generated viewer.** `main/heat_risk_map.html`
+   is a build artifact: front-end code with a complete tract-level dataset built
+   into it. The code in that file is MIT. The embedded data is governed by this
+   file and includes third-party material this project cannot sublicense (items
+   2 and 3). The MIT grant does not cover copying the generated HTML.
+2. **Healthy Places Index (HPI) data, which is non-commercial.** MIT permits
+   selling copies, but HPI's terms forbid commercial use, so MIT cannot extend to
+   HPI-derived values. They are embedded so the map can display them, under HPI's
+   own terms with attribution, and are excluded from the "Download Data" export.
+3. **UCLA Heat Maps / CalHeatScore derived values.** These are aggregated from
+   California HCAI emergency-department records and used only as a display
+   layer. They are excluded from the export and not sublicensed here.
+
+To reuse the code, take `scripts/` and the front-end source under MIT. To reuse
+the data, see below: this project's own contributions are CC BY 4.0, and each
+third-party input keeps its original terms.
+
 ## Third-party source data retains its own terms
 
 This tool incorporates data from external sources. **CC BY 4.0 applies only to

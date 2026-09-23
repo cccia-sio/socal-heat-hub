@@ -31,7 +31,7 @@ license: MIT
 license-url: 'https://github.com/cccia-sio/socal-heat-hub/blob/main/LICENSE'
 # The MIT license covers the CODE only. The data and derived content are CC BY
 # 4.0, and embedded third-party data (HPI, UCLA Heat Maps) keeps its own terms.
-# See DATA_LICENSE.md and the scope note in LICENSE.
+# See DATA_LICENSE.md, which spells out what the MIT grant does not cover.
 
 # TODO: mint a DOI (Zenodo -> "New version" on each release) and add it here.
 # A DOI is what makes reuse citable and makes being scooped provable — it

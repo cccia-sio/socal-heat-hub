@@ -110,6 +110,25 @@ def test_drawer_row_bar_and_rank_both_use_the_risk_percentile(js_code):
     )
 
 
+def test_drawer_polarity_note_sits_with_the_value_not_the_percentile(js_code):
+    """"86th percentile risk · higher value = less risk" read as "86 is good".
+
+    A City of San Diego user read a low Neighborhood Quality score (17.4, 86th
+    percentile risk) as the 86th percentile of quality, because the polarity
+    note sat beside the risk rank. The note describes the raw value, so it must
+    live in the value span and the percentile line must carry only the rank.
+    """
+    src = js_code("_dtRow")
+
+    pct_line = _line_containing(src, 'dt-var-pct">')
+    assert "dirNote" not in pct_line, (
+        f"The percentile line carries the polarity note again: {pct_line.strip()!r}. "
+        "Put it beside the value (dt-var-dir)."
+    )
+    val_line = _line_containing(src, "dt-var-dir")
+    assert "dirNote" in val_line, "_dtRow() no longer prints the polarity note beside the value."
+
+
 def test_drawer_polarity_comes_from_the_polarity_table(js_code):
     src = js_code("openDetailDrawer")
     assert "POLARITY[key]!==false" in src.replace(" ", ""), (

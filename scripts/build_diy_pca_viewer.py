@@ -1546,6 +1546,9 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 .dt-var-label{color:#374151;flex:1;min-width:0}
 .dt-var-val{font-weight:600;color:#111;font-variant-numeric:tabular-nums;
   white-space:nowrap}
+.dt-var-dir{font-weight:400;font-size:10px;color:#9ca3af;margin-left:4px}
+.dt-rows-note{margin:6px 0 10px}
+.dt-risk-legend{font-size:10px;color:#666}
 .dt-var-bar-wrap{position:relative;height:6px;background:#e5e7eb;
   border-radius:3px;overflow:hidden}
 .dt-var-bar{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
@@ -3330,6 +3333,7 @@ function openDetailDrawer(geoid){
   '</div>';
 
   // ---- Selected-variable rows per pillar (driven by the current selection)
+  var rowsNoted=false;
   ['exposure','sensitivity','adaptive'].forEach(function(pid){
     var pm=PMETA[pid];
     var keys=dtPillarKeys(pid);
@@ -3353,8 +3357,10 @@ function openDetailDrawer(geoid){
     });
     if(rows){
       html+='<div class="dt-section">'+
+        (rowsNoted?'':_dtRiskLegend()+'<div class="dt-note dt-rows-note">Bars show each tract\\'s risk percentile among San Diego County tracts, not the value itself. Where higher values = less risk, a low <em>value</em> translates to high percentile <em>risk</em>.</div>')+
         '<div class="dt-pillar-hdr" style="color:'+pm.color+'">'+hdr+'</div>'+
         rows+'</div>';
+      rowsNoted=true;
     }
   });
 
@@ -3384,6 +3390,11 @@ function closeDetailDrawer(){
 // which plots protective variables (POLARITY===false) as deficits. The value
 // on the right stays the real-world reading, so a high-canopy tract reads
 // "85.6 / 0th percentile risk".
+// The polarity note sits beside the VALUE it describes, not the percentile:
+// "86th percentile risk · higher value = less risk" was read as "86 is high,
+// high is good" (City of SD feedback, 2026-10). No "lower than X% of tracts"
+// gloss either — pctRank midranks ties, so it would be false for zero-heavy
+// variables (ag workers: 522 of 735 tracts at 0%).
 function _dtRow(label, dispVal, pct, higherIsWorse){
   if(pct==null){
     return '<div class="dt-var-row">'+
@@ -3394,12 +3405,12 @@ function _dtRow(label, dispVal, pct, higherIsWorse){
   var riskPct = higherIsWorse ? p : (100 - p);
   var color = _dtRiskColor(riskPct);
   var width = Math.max(2, riskPct).toFixed(1);   // toFixed: 100-p can land on 10.299999999999997
-  var dirNote = higherIsWorse ? 'higher = more risk' : 'higher value = less risk';
+  var dirNote = higherIsWorse ? 'higher = more risk' : 'higher = less risk';
   return '<div class="dt-var-row">'+
     '<div class="dt-var-top"><span class="dt-var-label">'+_addrEsc(label)+'</span>'+
-    '<span class="dt-var-val">'+_addrEsc(dispVal)+'</span></div>'+
+    '<span class="dt-var-val">'+_addrEsc(dispVal)+'<span class="dt-var-dir">\\u00b7 '+dirNote+'</span></span></div>'+
     '<div class="dt-var-bar-wrap"><div class="dt-var-bar" style="width:'+width+'%;background:'+color+'"></div></div>'+
-    '<div class="dt-var-pct">'+_ord(riskPct)+' percentile risk \\u00b7 '+dirNote+'</div>'+
+    '<div class="dt-var-pct">'+_ord(riskPct)+' percentile risk</div>'+
   '</div>';
 }
 function _dtRowNA(label){
@@ -3420,6 +3431,16 @@ function _dtRiskColor(rp){
     }
   }
   return 'rgb(220,60,40)';
+}
+// Colour key for the variable-row bars. Sampled from _dtRiskColor itself so
+// the legend can't drift from the bars it explains.
+function _dtRiskLegend(){
+  var stops=[0,25,50,75,100].map(_dtRiskColor).join(',');
+  return '<div class="dt-risk-legend">'+
+    '<div style="font-weight:600;color:#444;margin-bottom:2px">Percentile risk</div>'+
+    '<div class="dt-lst-bar" style="background:linear-gradient(to right,'+stops+')"></div>'+
+    '<div class="dt-lst-ticks"><span>0 \\u00b7 lower risk</span><span>50</span><span>100 \\u00b7 higher risk</span></div>'+
+  '</div>';
 }
 
 // Build the single detail-modal map. We always start in 'sat' view; the

@@ -6104,6 +6104,8 @@ function _captureStudyAreaMap(opts){
       ctx.strokeStyle='rgba(15,23,42,0.20)';
       ctx.lineWidth=1*SCALE;
       ctx.strokeRect(bx*SCALE, by*SCALE, totalW*SCALE, totalH*SCALE);
+      // The map PDF stacks its variable box on top of this.
+      canvas._scaleBarRect={x:bx*SCALE, y:by*SCALE, w:totalW*SCALE, h:totalH*SCALE};
 
       ctx.strokeStyle='#0f172a';
       ctx.lineWidth=2*SCALE;
@@ -6464,6 +6466,14 @@ function _heroPdf(canvas,opts){
   pdf.setLineWidth(0.6);
   pdf.rect(imgX,imgY,imgW,imgH);
 
+  // Variable box over the lower-left (open ocean at the study-area framing),
+  // stacked on the scale bar. A raw-variable or heat-mode preview has no build
+  // behind it, so it gets no box.
+  if(results&&!rawVar&&curLayer!=='heatmode'){
+    var k=imgW/canvas.width, sb=canvas._scaleBarRect||{x:0,y:canvas.height};
+    _pdfVarBox(pdf,imgX+sb.x*k,imgY+sb.y*k-6,170,sb.y*k-12);
+  }
+
   // SSP info hotspot — clickable link area mapped from canvas to PDF coords
   if(canvas._sspLinkRect){
     var r=canvas._sspLinkRect;
@@ -6479,7 +6489,7 @@ function _heroPdf(canvas,opts){
   pdf.setLineWidth(0.5);
   pdf.line(M,ph-46,pw-M,ph-46);
 
-  pdf.setFontSize(8);pdf.setTextColor(100,116,139);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(100,116,139);
   var dt=new Date();
   var dStr=dt.toLocaleString(undefined,{year:'numeric',month:'short',day:'2-digit',
                                          hour:'2-digit',minute:'2-digit'});
@@ -6495,6 +6505,69 @@ function _heroPdf(canvas,opts){
   var ts=dt.toISOString().replace(/[:.]/g,'-').slice(0,19);
   var slug=opts.jurisName?('_'+opts.jurisName.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')):'';
   pdf.save('san_diego_heat_risk'+slug+'_'+ts+'.pdf');
+}
+
+// The map PDF's variable box: the inputs behind the build, by pillar, sized to
+// its content and anchored by its bottom-left corner. Reads the COMMITTED inputs
+// (results[pid]), not the `enabled` checkboxes — after a toggle the composite is
+// stale but the map still shows the last build, and the list has to describe
+// the map.
+function _pdfVarBox(pdf,x,bottom,maxW,maxH){
+  var pad=7, indent=9, bulletW=6;
+  var groups=['exposure','sensitivity','adaptive'].map(function(pid){
+    var r=results[pid], items=[];
+    if(r)items=(pid==='exposure')?[r.label]:r.keys.map(function(k){return varLabel[k]||k;});
+    return {pid:pid,items:items};
+  });
+  var maxN=Math.max.apply(null,groups.map(function(g){return g.items.length;}));
+
+  // One pass both measures and paints, so the fit check can't drift from the
+  // drawing. Paints only when given a top edge; returns the box size.
+  function layout(fs,cap,top){
+    var draw=(top!=null), lh=fs*1.3, by=(draw?top:0)+pad, w=0;
+    function line(txt,dx,style,rgb,bullet){
+      by+=lh;
+      pdf.setFont('helvetica',style);
+      w=Math.max(w,dx+pdf.getTextWidth(txt));
+      if(!draw)return;
+      pdf.setTextColor(rgb[0],rgb[1],rgb[2]);
+      pdf.text(txt,x+pad+dx,by);
+      if(bullet){
+        pdf.setFont('helvetica','normal');pdf.setTextColor(100,116,139);
+        pdf.text('\\u2022',x+pad+indent,by);
+      }
+    }
+    pdf.setFontSize(fs+1.5);
+    line('Selected Variables',0,'bold',[15,23,42]);
+    pdf.setFontSize(fs);
+    groups.forEach(function(g){
+      by+=lh*0.6;
+      var c=_hexToRgb(PMETA[g.pid].color), sq=fs*0.7;
+      if(draw){pdf.setFillColor(c[0],c[1],c[2]);pdf.rect(x+pad,by+lh-sq,sq,sq,'F');}
+      line(PMETA[g.pid].label,indent,'bold',c);
+      if(!g.items.length){line('None selected',indent,'italic',[148,163,184]);return;}
+      g.items.slice(0,cap).forEach(function(lbl){
+        pdf.setFont('helvetica','normal');
+        pdf.splitTextToSize(lbl,maxW-2*pad-indent-bulletW).forEach(function(seg,i){
+          line(seg,indent+bulletW,'normal',[51,65,85],i===0);
+        });
+      });
+      if(g.items.length>cap)line('+ '+(g.items.length-cap)+' more',indent+bulletW,'italic',[100,116,139]);
+    });
+    return {w:w+2*pad, h:by+pad-(draw?top:0)};
+  }
+
+  // Shrink the type first; if the smallest size still overflows, cap each
+  // pillar's list. Overflow is stated, never silent.
+  var sizes=[7,6.5,6,5.5], fs=sizes[sizes.length-1], cap=maxN;
+  for(var i=0;i<sizes.length;i++){if(layout(sizes[i],maxN).h<=maxH){fs=sizes[i];break;}}
+  while(cap>1&&layout(fs,cap).h>maxH)cap--;
+
+  // Same white card and hairline as the in-map legend and scale bar.
+  var box=layout(fs,cap), top=bottom-box.h;
+  pdf.setFillColor(255,255,255);pdf.rect(x,top,box.w,box.h,'F');
+  pdf.setDrawColor(207,209,213);pdf.setLineWidth(0.4);pdf.rect(x,top,box.w,box.h);
+  layout(fs,cap,top);
 }
 
 function downloadMapPdf(){

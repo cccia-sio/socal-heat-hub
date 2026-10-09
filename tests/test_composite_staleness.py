@@ -14,14 +14,19 @@ So the rule, in both directions:
     * compute() is the ONLY thing that may write _comp / the pillar scores.
     * Every change to an input marks the composite stale and highlights Build.
     * Previewing a heat mode reads its score live and writes nothing.
-
-Known gap, deliberately not asserted here: setScenario() still calls compute()
-when a composite exists, so switching to SSP5-8.5 silently rebuilds — the same
-bug, and it makes the scenario buttons a hidden "apply" for pending variable
-changes. Left as-is pending a product decision; do not enshrine it in a test.
+    * A scenario switch re-scores the COMMITTED build under the new scenario.
+      It used to call a bare compute(), which quietly applied any pending
+      variable or heat-mode changes and cleared the stale flag.
+    * Anything that describes or re-scores the build (radar, detail drawer,
+      tract PDF, export manifest, scenario compare) reads the settings saved on
+      `results`, never the live panel. While the composite is stale the two
+      differ, and reading the panel labels last build's scores with this
+      build's heat mode and variables.
 """
 
 import re
+
+import pytest
 
 
 def test_selecting_a_heat_mode_does_not_rebuild_the_composite(js_code):
@@ -135,4 +140,89 @@ def test_stale_state_is_visible_on_the_button(js_code, viewer_html_text):
     assert "#compute-btn.needs-build{" in viewer_html_text, (
         "the .needs-build style rule is gone — the button would relabel but look "
         "identical, which is the failure mode this whole feature exists to prevent."
+    )
+
+
+# ── The build's own settings ────────────────────────────────────────────────
+# The panel (heatMode, enabled) is what the user is editing; results.settings is
+# what the map was built from. After any unbuilt change they disagree.
+
+
+def test_build_saves_the_settings_it_scored(js_code):
+    src = js_code("compute")
+    assert re.search(r"\.settings\s*=\s*settings", src), (
+        "compute() no longer saves the settings it scored on `results`, so nothing "
+        "can tell which heat mode and variables the map was built from."
+    )
+    assert re.search(r"exposureScore\(\s*settings\.heatMode\s*\)", src), (
+        "compute() scores exposure from something other than the settings it saves."
+    )
+
+
+def test_build_clears_the_previous_builds_pillar_fields(js_code):
+    """A pillar left out of a rebuild used to keep its old score on every tract.
+
+    compute() skips pillars with no variables, so `_sensitivity` and its PCs from
+    the last build survived, and the radar, detail drawer, compare views and tract
+    PDF went on showing them next to a composite that no longer included them.
+    """
+    assert re.search(r"delete\s+pr\[", js_code("compute")), (
+        "compute() no longer clears the previous build's pillar fields before "
+        "writing, so an emptied pillar keeps showing its old score."
+    )
+
+
+def test_scenario_switch_rescores_the_committed_build(js_code):
+    src = js_code("setScenario")
+    assert not re.search(r"\bcompute\(\s*\)", src), (
+        "setScenario() calls a bare compute() again. That is a Build: it applies "
+        "pending checkbox and heat-mode changes and clears the stale flag, so the "
+        "scenario buttons become a hidden 'apply'."
+    )
+    assert re.search(r"compute\(\s*results\.settings\s*\)", src), (
+        "setScenario() no longer re-scores the committed build under the new scenario."
+    )
+
+
+def test_rescoring_leaves_the_stale_flag_alone(js_code):
+    """Re-scoring for a new scenario doesn't apply the panel, so it isn't a Build."""
+    src = js_code("compute")
+    assert re.search(r"if\(\s*!rescore\s*\)\s*compositeStale\s*=\s*false", src), (
+        "compute() clears the stale flag on a scenario re-score too, hiding the "
+        "user's pending changes."
+    )
+
+
+@pytest.mark.parametrize(
+    "fn",
+    [
+        "dtPillarKeys",
+        "openDetailDrawer",
+        "_tractPdfBuild",
+        "radarSpokes",
+        "radarSVG",
+        "_exportManifest",
+        "computeCompositeFor",
+        "computeExposureFor",
+        "exposureScore",
+    ],
+)
+def test_built_scores_are_described_by_the_build_not_the_panel(js_code, fn):
+    """Each of these labels or re-scores the build, so must not read the live panel.
+
+    Build with Daytime, pick Nighttime, export: the tract PDF's exposure card was
+    the daytime score under a "Nighttime heat" header, and the export manifest
+    said `nighttime` above daytime `exposure_score` columns.
+    """
+    src = js_code(fn)
+    live = [
+        p
+        for p in (r"\benabled\s*\[", r"heatModeDef\(\s*heatMode\s*\)", r"===\s*heatMode\b", r"\[\s*heatMode\s*\]")
+        if re.search(p, src)
+    ]
+    assert not live, (
+        f"{fn}() reads the live panel ({', '.join(live)}). While the composite is "
+        "stale the panel no longer matches the build, so this would describe the "
+        "last build's scores with settings they weren't built from. Read "
+        "_builtSettings() instead."
     )

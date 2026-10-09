@@ -2261,6 +2261,17 @@ function heatModeDef(key){
   return HEAT_MODES[0]||null;
 }
 
+// The inputs a composite is scored from. Build reads them off the panel; after
+// that, everything that describes or re-scores the build reads the copy saved on
+// `results`, because the panel may have moved on (the composite is then stale).
+function _panelSettings(){
+  var on={sensitivity:[],adaptive:[]};
+  VM.forEach(function(v){if(v.pillar!=="exposure"&&enabled[v.key])on[v.pillar].push(v.key);});
+  return {heatMode:heatMode,on:on};
+}
+// The build's settings, or the panel's before the first build.
+function _builtSettings(){ return results?results.settings:_panelSettings(); }
+
 // Pre-compute percentile ranks for every raw variable (for preview rendering)
 var rawPct = {}; // varKey -> array of percentile values (0-100), indexed by feature
 // Pre-compute present-day min/max per variable (fixed color scale for scenario comparison)
@@ -2335,7 +2346,9 @@ function setScenario(ssp,period){
   else{info.textContent=labels[ssp]+' projection, LOCA2 ensemble mean, '+pwin[curPeriod];}
   updateFixedBadges();
   updateDeltaRange();
-  if(results){compute();}
+  // Re-score the committed build under the new scenario. A bare compute() is a
+  // Build: it would apply pending panel changes and clear the stale flag.
+  if(results){compute(results.settings);}
   else if(rawVar){drawTracts();}
 }
 
@@ -3243,13 +3256,15 @@ var _DT_CURATED = {
 // pre-build, enabled vars in panel order; nothing enabled -> curated fallback.
 function dtPillarKeys(pid){
   if(pid==='exposure'){
-    var mode=heatModeDef(heatMode);
+    var mode=heatModeDef(_builtSettings().heatMode);
     return (mode&&mode.layers)?mode.layers.slice():(_DT_CURATED.exposure||[]);
   }
   var R=results&&results[pid];
   if(R&&R.keys&&R.keys.length)return radarImportance(R);
-  var ks=[];
-  VM.forEach(function(v){if(v.pillar===pid&&enabled[v.key])ks.push(v.key);});
+  // A pillar left out of the build has no score, so listing variables under it
+  // would suggest they're behind one.
+  if(results)return [];
+  var ks=_panelSettings().on[pid];
   return ks.length?ks:(_DT_CURATED[pid]||[]);
 }
 
@@ -3338,7 +3353,7 @@ function openDetailDrawer(geoid){
     var pm=PMETA[pid];
     var keys=dtPillarKeys(pid);
     var hdr=pm.label;
-    if(pid==='exposure'){var md=heatModeDef(heatMode);if(md)hdr+=' \\u2014 '+md.label;}
+    if(pid==='exposure'){var md=heatModeDef(_builtSettings().heatMode);if(md)hdr+=' \\u2014 '+md.label;}
     var rows='';
     keys.forEach(function(key){
       var meta=null;
@@ -4041,8 +4056,8 @@ function pillarPCA(pid,keys){
 // the mean of the mode's z-scored member layers (climate deltas applied),
 // percentile-ranked. Returns a result shaped like pillarPCA's (scores + empty
 // pcs) so the rest of the pipeline is unchanged. Returns null if no data.
-function exposureScore(){
-  var mode=heatModeDef(heatMode);if(!mode)return null;
+function exposureScore(modeKey){
+  var mode=heatModeDef(modeKey);if(!mode)return null;
   var feats=GJ.features,N=feats.length,i,j;
   var keys=mode.layers.filter(function(k){
     for(var t=0;t<N;t++){if(feats[t].properties[k]!=null)return true;}return false;});
@@ -4063,25 +4078,35 @@ function exposureScore(){
 /* ================================================================
    COMPUTE
    ================================================================ */
-function compute(){
+// Per-tract fields a build writes for each pillar: the score and its PCs.
+var _PILLAR_FIELD=/^_(exposure|sensitivity|adaptive)(_pc\\d+)?$/;
+// Build: score the panel's selection and commit it as the composite. Given
+// `settings` (a scenario switch), re-score the committed build under the new
+// scenario instead: pending panel changes stay pending and the view is kept.
+function compute(settings){
+  var rescore=!!settings;
   try{
     document.getElementById("prompt").style.display="none";
     document.getElementById("error-bar").style.display="none";
-    // collect enabled vars per pillar (exposure uses the selected heat mode, not toggles)
-    var pv={sensitivity:[],adaptive:[]};
-    VM.forEach(function(v){if(v.pillar!=="exposure"&&enabled[v.key])pv[v.pillar].push(v.key);});
-    rawVar=null; // switch from raw preview to results mode
-    // Building commits the heat-mode preview, so surface the thing they asked
-    // for: the composite. Any other built layer (driver, a PC) is left alone —
-    // it gets rebuilt in place rather than yanking the user back to composite.
-    if(curLayer==="heatmode")curLayer="composite";
+    settings=settings||_panelSettings();
+    if(!rescore){
+      rawVar=null; // switch from raw preview to results mode
+      // Building commits the heat-mode preview, so surface the thing they asked
+      // for: the composite. Any other built layer (driver, a PC) is left alone —
+      // it gets rebuilt in place rather than yanking the user back to composite.
+      if(curLayer==="heatmode")curLayer="composite";
+    }
     // Exposure = selected heat mode (no PCA); Sensitivity/Adaptive = PCA.
-    var res={exposure:exposureScore()};
-    ["sensitivity","adaptive"].forEach(function(pid){res[pid]=pillarPCA(pid,pv[pid]);});
+    var res={exposure:exposureScore(settings.heatMode)};
+    ["sensitivity","adaptive"].forEach(function(pid){res[pid]=pillarPCA(pid,settings.on[pid]);});
     // write to features
     var N=GJ.features.length;
     for(var i=0;i<N;i++){
       var pr=GJ.features[i].properties,sum=0,cnt=0;
+      // Drop the previous build's pillar fields first. A pillar left out of this
+      // build would otherwise keep its old score, and the radar, detail drawer,
+      // compare views and tract PDF would go on showing it.
+      for(var fld in pr)if(_PILLAR_FIELD.test(fld))delete pr[fld];
       ["exposure","sensitivity","adaptive"].forEach(function(pid){
         if(!res[pid])return;
         pr["_"+pid]=res[pid].scores[i];
@@ -4101,8 +4126,9 @@ function compute(){
       // kept for the trivariate Driver Mix layer's barycentric blend.
       pr._drvE=eS;pr._drvS=sS;pr._drvA=aD;
     }
+    res.settings=settings;
     results=res;
-    compositeStale=false;   // the panel and the map now agree again
+    if(!rescore)compositeStale=false;   // the panel and the map now agree again
     syncBuildBtn();
     drawTracts();
     showResults();
@@ -4306,11 +4332,11 @@ function radarImportance(R){
 // (active), backfilled with greyed default variables to fill four.
 function radarSpokes(sec,fi){
   if(sec.pillar==='exposure'){
-    var ms=expModeScores();
+    var ms=expModeScores(), built=_builtSettings().heatMode;
     return HEAT_MODES.map(function(m){
       var arr=ms[m.key], lead=(m.layers&&m.layers.length)?m.layers[0]:null;
       return {key:m.key, short:(_EXP_MODE_SHORT[m.key]||m.label), full:m.label,
-              pct:(arr&&arr[fi]!=null)?arr[fi]:null, active:(m.key===heatMode),
+              pct:(arr&&arr[fi]!=null)?arr[fi]:null, active:(m.key===built),
               rawKey:lead, isMode:true, inv:false};
     });
   }
@@ -4324,7 +4350,9 @@ function radarSpokes(sec,fi){
       have[k]=1;
     }
   }
-  var fillerActive=!(R&&R.keys&&R.keys.length); // pre-compute: show defaults normally
+  // Pre-build: show the defaults normally. After a build, a pillar left out of
+  // it shows them greyed, like any other filler.
+  var fillerActive=!results;
   for(var d=0;d<sec.defaults.length&&out.length<4;d++){
     var dk=sec.defaults[d];if(have[dk])continue;
     var div=_radarInv(dk);
@@ -4359,12 +4387,13 @@ function radarSVG(fi,pr){
     var col=PMETA[sec.pillar]?PMETA[sec.pillar].color:'#888', GRAY='#9aa1ab';
     var isExp=(sec.pillar==='exposure');
     var spokes=radarSpokes(sec,fi);
-    // Pillar score. Exposure reads the selected mode's composite so the centre
-    // dot and header reconcile exactly with the selected mode's spoke.
+    // Pillar score. Exposure reads the built mode's composite so the centre
+    // dot and header reconcile exactly with that mode's spoke.
     var score;
-    if(isExp){var ms=expModeScores(),sa=ms[heatMode];score=(sa&&sa[fi]!=null)?sa[fi]:0;}
+    if(isExp){var ms=expModeScores(),sa=ms[_builtSettings().heatMode];score=(sa&&sa[fi]!=null)?sa[fi]:0;}
     else{var sv=pr[sec.scoreKey];
       if(sv!=null){score=sec.invScore?100-sv:sv;}
+      else if(results){score=null;}   // pillar left out of the build: no score
       else{var sm=0,cn=0;spokes.forEach(function(sp){if(sp.active&&sp.pct!=null){sm+=sp.pct;cn++;}});score=cn?sm/cn:0;}}
     var pts=[
       {deg:sec.c+OFF[0],sp:spokes[0]||null},
@@ -4391,7 +4420,8 @@ function radarSVG(fi,pr){
       '" stroke-width="1.4" stroke-linejoin="round"/>';
     pts.forEach(function(pt){
       if(pt.main){
-        var pcm=pt.pct==null?0:pt.pct;
+        if(pt.pct==null)return;
+        var pcm=pt.pct;
         s+='<circle cx="'+PX(pt.deg,R*pcm/100)+'" cy="'+PY(pt.deg,R*pcm/100)+'" r="5.5" fill="'+col+
           '" stroke="#fff" stroke-width="1.4"><title>'+sec.label+' score: '+Math.round(pcm)+'</title></circle>';
         return;
@@ -4428,7 +4458,7 @@ function radarSVG(fi,pr){
     var isAdapt=(sec.pillar==='adaptive'), hx=mp[0]+(isAdapt?18:0);
     var tl=isAdapt?' textLength="116" lengthAdjust="spacingAndGlyphs"':'';
     s+='<text x="'+hx.toFixed(1)+'" y="'+mp[1].toFixed(1)+'" text-anchor="'+anc2+'"'+tl+' font-size="11.5" font-weight="700">'+
-      '<tspan fill="'+col+'">'+sec.label+' </tspan><tspan fill="#374151">'+Math.round(score)+'</tspan></text>';
+      '<tspan fill="'+col+'">'+sec.label+' </tspan><tspan fill="#374151">'+(score==null?'\\u2014':Math.round(score))+'</tspan></text>';
   });
   // Whole-compass reminder that every wedge is risk-oriented (higher = worse).
   // Easy to miss for Adaptive Capacity, whose map layer runs the opposite way.
@@ -5612,18 +5642,18 @@ function _scnCompareOptions(){
 }
 
 // Compute full composite-risk percentile per feature for an arbitrary
-// (scenario, period). Uses the current `enabled` variable set.
+// (scenario, period). Uses the committed build's settings (the panel's before
+// the first build), so it matches the main map even while that is stale.
 // Does NOT mutate GJ.features. Returns null if no variables enabled.
 function computeCompositeFor(scenario, period){
   var savedScn=curScenario, savedPer=curPeriod;
   curScenario=scenario;
   curPeriod=(scenario==='present')?'':(period||'');
   try{
-    var pv={sensitivity:[],adaptive:[]};
-    VM.forEach(function(v){if(v.pillar!=="exposure"&&enabled[v.key])pv[v.pillar].push(v.key);});
-    var res={exposure:exposureScore()};
+    var st=_builtSettings();
+    var res={exposure:exposureScore(st.heatMode)};
     ['sensitivity','adaptive'].forEach(function(pid){
-      res[pid]=pillarPCA(pid,pv[pid]);
+      res[pid]=pillarPCA(pid,st.on[pid]);
     });
     var N=GJ.features.length, comp=new Array(N);
     for(var i=0;i<N;i++){
@@ -5644,13 +5674,13 @@ function computeCompositeFor(scenario, period){
 }
 
 // Compute the exposure-pillar percentile per feature for an arbitrary
-// (scenario, period), using the currently-selected heat mode.
+// (scenario, period), using the build's heat mode (the panel's before a build).
 function computeExposureFor(scenario, period){
   var savedScn=curScenario, savedPer=curPeriod;
   curScenario=scenario;
   curPeriod=(scenario==='present')?'':(period||'');
   try{
-    var res=exposureScore();
+    var res=exposureScore(_builtSettings().heatMode);
     return res?res.scores:null;
   } finally {
     curScenario=savedScn;
@@ -7148,7 +7178,7 @@ function _tractPdfBuild(idx,feat,radarC,mapC,luC){
   var pillars=['exposure','sensitivity','adaptive'].map(function(pid){
     var d=_tractPdfPillar(pid,idx,pr);
     var hdr=PMETA[pid].label;
-    if(pid==='exposure'){var md=heatModeDef(heatMode);if(md)hdr+=' \\u2014 '+md.label;}
+    if(pid==='exposure'){var md=heatModeDef(_builtSettings().heatMode);if(md)hdr+=' \\u2014 '+md.label;}
     return {pid:pid,hdr:hdr,rows:d.rows,omitted:d.omitted};
   }).filter(function(p){return p.rows.length;});
 
@@ -7598,8 +7628,8 @@ var _DICT_DERIVED={
     higher_value_means:'higher value = HIGHER heat risk',
     source:'Computed by this tool',source_url:_SRC_SELF,
     notes:'Mean of the active pillar scores with Adaptive Capacity inverted, '+
-          're-ranked to 0-100. Depends on which variables were switched on when '+
-          'you downloaded \\u2014 it is not a fixed published index.'},
+          're-ranked to 0-100. Depends on the heat mode and variables the map was '+
+          'built from (listed in the file header) \\u2014 it is not a fixed published index.'},
   composite_driver:{label:'Dominant pillar',group:'Index output',
     units:'exposure | sensitivity | adaptive',
     source:'Computed by this tool',source_url:_SRC_SELF,
@@ -7708,10 +7738,11 @@ function _buildDataDictionary(cols){
 
 // Provenance header for the GeoJSON, and the comment block atop the dictionary
 // CSV. Records the settings the scores depend on — without these, the index
-// columns cannot be reproduced.
+// columns cannot be reproduced. They're the build's settings, not the panel's,
+// which may have changed since the scores in the file were built.
 function _exportManifest(cols,nRows){
-  var md=heatModeDef(heatMode);
-  var onVars=[];VM.forEach(function(v){if(enabled[v.key])onVars.push(v.key);});
+  var st=_builtSettings(), md=heatModeDef(st.heatMode);
+  var onVars=results?st.on.sensitivity.concat(st.on.adaptive):[];
   return {citation:EXPORT_META.citation,license:EXPORT_META.license,
     sources_url:EXPORT_META.sources_url,
     generated:new Date().toISOString(),
@@ -7722,7 +7753,7 @@ function _exportManifest(cols,nRows){
     heat_mode_layers:md?md.layers.join(' + '):'',
     scenario:curScenario,
     period:(curScenario==='present'?'':(curPeriod||'')),
-    variables_switched_on:onVars.join(' '),
+    composite_variables:onVars.join(' '),
     fields:_buildDataDictionary(cols)};
 }
 
@@ -7737,7 +7768,7 @@ function _dictionaryToCSV(cols,nRows){
     '# tracts: '+man.tracts+'  ('+man.tract_vintage+')',
     '# heat mode: '+man.heat_mode+'  [layers: '+man.heat_mode_layers+']',
     '# scenario: '+man.scenario+(man.period?'  period: '+man.period:''),
-    '# variables switched on when downloaded: '+(man.variables_switched_on||'(none)'),
+    '# variables in the composite: '+(man.composite_variables||'(none)'),
     '# license: '+man.license,
     '# full source table: '+man.sources_url,
     '#'

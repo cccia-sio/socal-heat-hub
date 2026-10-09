@@ -15,10 +15,11 @@ The public artifact is a static GitHub Pages site at
 Those three pages are the entire public site. `main/hospitalizations.html` — a
 standalone "Heat-attributable hospitalizations by ZIP" viewer, distinct from the
 tract-level "Heat hospitalizations" Data Layer inside the main viewer — is
-tracked but **no longer deployed**. It used to ship (unlinked but publicly
-reachable) purely because it lived under `main/`; the deploy allow-list now
-excludes it. To publish it, add it to the staging step in `pages.yml` and link
-it from the landing nav.
+**gitignored and not deployed**. It inlines per-ZCTA effect estimates that
+arrived by email with no license or right to redistribute (see
+`DATA_LICENSE.md`), so only its builder is tracked; run
+`scripts/build_hospitalizations_viewer.py` to produce it locally. It used to
+ship (unlinked but publicly reachable) purely because it lived under `main/`.
 
 The viewers run entirely in the browser. There is no backend, no API, and no
 runtime data fetching beyond the Leaflet basemap tiles and the deployed
@@ -78,7 +79,7 @@ socal-heat-hub/
 │
 ├── main/
 │   ├── heat_risk_map.html         ← the viewer (built; single-file HTML)
-│   └── hospitalizations.html      ← standalone hospitalizations-by-ZIP viewer (built)
+│   └── hospitalizations.html      ← standalone hospitalizations-by-ZIP viewer (built; gitignored)
 │
 ├── userguide/
 │   ├── index.html            ← user guide page

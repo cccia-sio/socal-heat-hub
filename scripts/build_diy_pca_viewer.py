@@ -5905,16 +5905,6 @@ function _ensurePdfLibs(){
   return Promise.all(needs);
 }
 
-function _layerLabel(){
-  if(rawVar)return varLabel[rawVar]||rawVar;
-  if(curLayer==='composite')return'Composite Risk';
-  if(curLayer==='exposure')return'Heat Exposure — '+((results&&results.exposure&&results.exposure.label)||'heat mode');
-  if(curLayer==='driver')return'Dominant Driver';
-  if(curLayer==='drivermix')return'Driver Mix';
-  var m=curLayer.match(/^(exposure|sensitivity|adaptive)_pc(\\d+)$/);
-  if(m)return PMETA[m[1]].label+' — Pattern '+m[2];
-  return curLayer;
-}
 function _scenarioLabel(){
   if(curScenario==='present')return'Present Day';
   var sl={'ssp245':'SSP2-4.5 (Moderate)','ssp370':'SSP3-7.0 (High)','ssp585':'SSP5-8.5 (Very High)'};
@@ -6436,16 +6426,10 @@ function _heroPdf(canvas,opts){
   pdf.setFillColor(37,99,235); // accent line
   pdf.rect(0,72,pw,2.4,'F');
 
+  // No layer/scenario subtitle: the in-map legend already names both.
   pdf.setFont('helvetica','bold');
   pdf.setFontSize(20);pdf.setTextColor(15,23,42);
-  pdf.text('San Diego Heat Risk Explorer',M,36);
-
-  pdf.setFont('helvetica','normal');
-  pdf.setFontSize(11);pdf.setTextColor(71,85,105);
-  var lead=opts.jurisName?(opts.jurisName+'  \\u2014  '+_layerLabel()):_layerLabel();
-  pdf.text(lead,M,55);
-  pdf.setTextColor(120,130,148);
-  pdf.text('  \\u2022  '+_scenarioLabel(),M+pdf.getTextWidth(lead),55);
+  pdf.text('San Diego Heat Risk Explorer',M,43);
 
   // ── Map figure ─────────────────────────────────────────────
   var top=92;

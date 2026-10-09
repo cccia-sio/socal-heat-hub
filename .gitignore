@@ -10,8 +10,8 @@ scripts/*
 !scripts/build_coolzones.py
 # index.html is generated; the page can't be rebuilt without its builder.
 !scripts/build_landing_page.py
-# main/hospitalizations.html is a tracked artifact; without its builder tracked
-# too, the committed page could not be regenerated from this repo.
+# The builder is tracked; the page it writes (main/hospitalizations.html) is
+# not — see the ignore entry below.
 !scripts/build_hospitalizations_viewer.py
 data/*
 !data/exposure
@@ -55,6 +55,10 @@ venv/
 # tracked and (before the deploy allow-list) served publicly.
 assets/*Comments*.pdf
 _mockup_*.png
+
+# Inlines the per-ZCTA heat-hospitalization estimates, which arrived by email
+# with no license or right to redistribute (see DATA_LICENSE.md). Build locally.
+main/hospitalizations.html
 
 # Local slide decks (not deployed)
 decks/

@@ -66,3 +66,22 @@ def test_welcome_modal_pieces_in_template(build_script_text):
     assert 'id="welcome-modal"' in template, "welcome-modal markup missing from template."
     assert "closeWelcome" in template, "closeWelcome dismiss handler missing from template."
     assert 'id="wlc-got-it"' in template, "Got-it dismiss button missing from template."
+
+
+def test_inlined_data_is_escaped_for_script_context(build_script_text):
+    """Every data blob spliced into the viewer's <script> goes through _script_safe().
+
+    Some strings come from outside services (Cool Zones names are from a County
+    feature service); one containing `</script>` would end the tag and run what
+    follows on the public site. The mailto is an href, not script, so it's exempt.
+    """
+    calls = re.findall(
+        r'\.replace\(\s*"(__[A-Z0-9_]+_PLACEHOLDER__)",\s*(.+)\)$', build_script_text, re.M
+    )
+    assert calls, "No placeholder replace() calls found — has the script been refactored?"
+    raw = [
+        ph
+        for ph, val in calls
+        if ph != "__FEEDBACK_MAILTO_PLACEHOLDER__" and not val.startswith("_script_safe(")
+    ]
+    assert not raw, f"Inlined without _script_safe(): {raw}"

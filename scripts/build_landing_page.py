@@ -33,8 +33,8 @@ OUTPUT_PATH = ROOT / "index.html"
 
 # (VARIABLES pillar key, CSS class shared with the pillar cards, label)
 PILLARS = [
-    ("exposure", "exp", "Exposure"),
-    ("sensitivity", "sen", "Sensitivity"),
+    ("exposure", "exp", "Heat Exposure"),
+    ("sensitivity", "sen", "Population Sensitivity"),
     ("adaptive", "ada", "Adaptive Capacity"),
 ]
 
@@ -337,16 +337,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <h2>Three pillars of heat risk</h2>
     <div class="pillars">
       <div class="pillar exp">
-        <h3>Exposure</h3>
-        <p>How much heat does this area face? Air temperature, humidity, number of extreme-heat days, and satellite-measured land surface temperature.</p>
+        <h3>Heat Exposure</h3>
+        <p>How much heat does this area face? Daytime and overnight air temperature, wet-bulb globe temperature, and satellite land surface temperature.</p>
       </div>
       <div class="pillar sen">
-        <h3>Sensitivity</h3>
+        <h3>Population Sensitivity</h3>
         <p>How vulnerable are the people living here? Age, chronic disease rates, social vulnerability, and environmental health.</p>
       </div>
       <div class="pillar ada">
         <h3>Adaptive Capacity</h3>
-        <p>What resources help residents cope with heat? Air conditioning access, tree canopy, income, healthcare access, and housing quality.</p>
+        <p>What resources help residents cope with heat? Air conditioning access, tree canopy, income, health insurance, and housing quality.</p>
       </div>
     </div>
 
@@ -371,9 +371,7 @@ __SOURCES_PLACEHOLDER__
 
     <h2>Feedback</h2>
     <p>
-      To submit a correction, comment, or feature request, open an issue on the
-      <a href="https://github.com/cccia-sio/socal-heat-hub/issues">project GitHub</a>,
-      or email <a href="mailto:cjmack@ucsd.edu?subject=San%20Diego%20Heat%20Risk%20Explorer%20-%20feedback">cjmack@ucsd.edu</a>.
+      To submit a correction, comment, or feature request, email <a href="mailto:cjmack@ucsd.edu?subject=San%20Diego%20Heat%20Risk%20Explorer%20-%20feedback">cjmack@ucsd.edu</a>.
     </p>
 
     <footer>

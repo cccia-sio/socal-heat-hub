@@ -21,9 +21,11 @@ arrived by email with no license or right to redistribute (see
 `scripts/build_hospitalizations_viewer.py` to produce it locally. It used to
 ship (unlinked but publicly reachable) purely because it lived under `main/`.
 
-The viewers run entirely in the browser. There is no backend, no API, and no
-runtime data fetching beyond the Leaflet basemap tiles and the deployed
-PNG / PMTiles overlays.
+The viewers run entirely in the browser. There is no backend and no API. At
+runtime the viewer fetches only the Esri basemap tiles, the deployed PNG /
+PMTiles overlays, its libraries from CDNs (Leaflet from jsDelivr,
+protomaps-leaflet from unpkg, and jsPDF from cdnjs on the first PDF export), and
+Nominatim results for the address search.
 
 ## What's tracked vs. what's not
 
@@ -85,19 +87,14 @@ socal-heat-hub/
 │   ├── index.html            ← user guide page
 │   └── figure_*.png          ← figures embedded in the guide
 │
-├── assets/                   ← logos (viewer top-right card) + comment PDFs
+├── assets/                   ← logos (viewer top-right card)
 │
 ├── tests/                    ← (tracked) pytest suite guarding build output & deploy config
 │   ├── conftest.py
-│   ├── test_build_script.py        ← build script constants / invariants
-│   ├── test_generated_html.py      ← generated viewer has expected structure
-│   ├── test_landsat_assets.py      ← LST overlay PNGs + bounds present/valid
-│   ├── test_pages_workflow.py      ← pages.yml include/exclude rules
-│   ├── test_static_links.py        ← internal links resolve
-│   └── test_tracked_files.py       ← gitignore allow-list stays correct
+│   └── test_*.py                   ← 14 test modules, described under Tests below
 │
-├── docs/                     ← ancillary docs (deployed, but not linked from nav)
-│   ├── userguide/            ← external/draft PDFs + older LaTeX guide
+├── docs/                     ← ancillary docs (tracked, not deployed)
+│   ├── userguide/            ← external/draft PDFs
 │   ├── pca_overview/         ← LaTeX beamer deck + figures on the PCA method
 │   ├── writing_guidelines/   ← AI-writing guardrail notes
 │   └── uhi_index_methodology.md
@@ -140,7 +137,7 @@ python3 scripts/build_diy_pca_viewer.py
 
 What it does (top-down through the script):
 
-1. **Constants & config** (lines ~28–230)
+1. **Constants & config** (lines ~28–450)
    - `OUTPUT_PATH = ROOT / "main" / "heat_risk_map.html"`
    - `TRACTS_PATH`, `JURIS_PATH` — census GeoJSON inputs
    - `LOCA2_DIR`, `FUTURE_PERIODS`, `SSPS` — CMIP6 projection settings
@@ -148,15 +145,18 @@ What it does (top-down through the script):
    - `DELTA_VAR_MAP` — which DIY-PCA variables receive a `tasmax`/`tasmin` delta
    - `VARIABLES` — the canonical list of `(key, label, pillar, subsection)` tuples
    - `VAR_SOURCES` — per-variable source URLs displayed in the legend
-2. **`load_data()`** (lines ~334–495) — reads each CSV under `data/`, joins on
+2. **`load_data()`** (lines ~461–656) — reads each CSV under `data/`, joins on
    `GEOID` (via the `_safe_merge` helper), imputes NaN with the column median,
    simplifies geometry, returns one GeoDataFrame keyed by tract.
-3. **`compute_tract_deltas(tracts)`** (lines ~497–565) — interpolates LOCA2
+3. **`compute_tract_deltas(tracts)`** (lines ~657–726) — interpolates LOCA2
    ensemble `.nc` deltas to tract centroids; returns
    `{period: {ssp: {var: [delta_per_tract]}}}`.
-4. **`main()`** (lines ~567–715) — serializes everything to JSON and splices it
-   into the `HTML_TEMPLATE` string at the `__*_PLACEHOLDER__` tokens, then writes
-   the result to `main/heat_risk_map.html`. The 15 placeholders group as:
+4. **`main()`** (lines ~763–970) — serializes everything to JSON (GeoJSON
+   coordinates rounded to 6 decimals by `_round_geojson_coords()`) and splices it
+   into the `HTML_TEMPLATE` string at the `__*_PLACEHOLDER__` tokens, each data
+   blob passed through `_script_safe()` so a `</script>` in a string can't end the
+   tag. Then writes the result to `main/heat_risk_map.html`. The 24 placeholders
+   group as:
    - tract data & polarity: `__GEOJSON_PLACEHOLDER__`, `__VARMETA_PLACEHOLDER__`,
      `__VARSOURCES_PLACEHOLDER__`, `__POLARITY_PLACEHOLDER__`
    - climate deltas: `__DELTAS_PLACEHOLDER__`, `__DELTAMAP_PLACEHOLDER__`
@@ -166,7 +166,13 @@ What it does (top-down through the script):
    - raster-overlay bounds (shape matches the LST sidecar): `__LST_PLACEHOLDER__`,
      `__POP_PLACEHOLDER__`, `__IMPERVIOUS_PLACEHOLDER__`, `__CANOPY_PLACEHOLDER__`
    - preset layer bundles: `__HEATMODES_PLACEHOLDER__` (from the `HEAT_MODES` list)
-5. **`HTML_TEMPLATE`** (lines ~718–end; the file is ~6,340 lines total) — a single
+   - data-download metadata: `__SOURCENAMES_PLACEHOLDER__`,
+     `__VARUNITS_PLACEHOLDER__`, `__NOEXPORT_PLACEHOLDER__`,
+     `__NOEXPORTWHY_PLACEHOLDER__`, `__EXPORTMETA_PLACEHOLDER__`
+   - downscaled view: `__DS_ENC_PLACEHOLDER__`, `__DS_GEOIDS_PLACEHOLDER__`,
+     `__DS_DENS_PLACEHOLDER__`
+   - feedback link: `__FEEDBACK_MAILTO_PLACEHOLDER__` (an `href`, not script data)
+5. **`HTML_TEMPLATE`** (lines ~972–end; the file is ~8,250 lines total) — a single
    triple-quoted string containing the full HTML, CSS, and JavaScript for the
    viewer (Leaflet UI, client-side PCA via Jacobi eigendecomposition, choropleth
    rendering, the compare-two-tracts modal, the legend, etc.).
@@ -180,15 +186,16 @@ must go to both files** to stay coherent:
   for UI changes, or in the data-loading / variable-definition blocks for
   pipeline changes).
 - Rebuild: `python3 scripts/build_diy_pca_viewer.py`
-- Commit: the regenerated `main/heat_risk_map.html` (the script itself stays
-  gitignored).
+- Commit: the script and the regenerated `main/heat_risk_map.html` together.
 
 If you only edit `main/heat_risk_map.html` directly, the next rebuild will revert
 your changes.
 
 ## The Landsat LST overlay pipeline
 
-Separate, optional pipeline used by the viewer's compare-mode mini-maps:
+Separate, optional pipeline for the Landsat LST overlay, used by the viewer's
+compare-mode mini-maps, the tract detail panel, and the LST Exploratory Data
+Layer:
 
 ```
 scripts/build_lst_overlay.py
@@ -286,10 +293,6 @@ logging what it skipped. The CSV is gitignored; only the regenerated
 `scripts/build_userguide_pdf.sh` renders `userguide/index.html` to
 `docs/userguide/user_guide_external.pdf` using headless Chrome. The HTML
 version is the source of truth; the PDF is a distributable snapshot.
-
-There is also an older LaTeX version of the user guide in `docs/userguide/`
-(`userguide.tex` → `userguide.pdf`). It is no longer the canonical source,
-but is kept for reference.
 
 ## Data layout (gitignored)
 
@@ -398,9 +401,15 @@ python3 -m pytest
 - `test_build_script.py` — constants/invariants in `build_diy_pca_viewer.py`.
 - `test_generated_html.py` — the committed viewer has the expected structure
   (no leftover `__*_PLACEHOLDER__` tokens, required elements present).
-- `test_export_licensing.py` — restricted sources (HPI) never reach the data
-  download, and every export carries its citation/license.
+- `test_export_licensing.py` — restricted sources (HPI, CalHeatScore) never
+  reach the data download, and every export carries its citation/license.
+- `test_landing_page.py` — the committed `index.html` matches what
+  `build_landing_page.py` generates from the viewer's variable tables.
 - `test_landsat_assets.py` — the LST overlay PNGs + bounds JSON exist and parse.
+- `test_license.py` — `LICENSE` stays the verbatim MIT text, so GitHub detects it.
+- `test_map_pdf.py` — the "Download Map as PDF" export: the selected-variables
+  box lists the build (not the live checkboxes), skips previews, states overflow,
+  and the map is framed tightly with room reserved for the legend.
 - `test_pages_workflow.py` — the deploy stays an allow-list: internal files
   (`ARCHITECTURE.md`, `CLAUDE.md`, `tests/`, `docs/`, the SDRCC review PDF) are
   never staged, the assets the viewer fetches at runtime always are, and nobody
@@ -421,7 +430,9 @@ python3 -m pytest
   and they have drifted apart twice.
 - `test_composite_staleness.py` — only `compute()` may write the composite.
   Changing a heat mode or a variable marks it stale and highlights Build instead
-  of silently rebuilding.
+  of silently rebuilding; a scenario switch re-scores the last build; and
+  everything that describes the build reads the settings saved on `results`, not
+  the live panel.
 
 These are the guardrails that catch the kinds of drift this document is prone to.
 
@@ -479,9 +490,10 @@ deploy** instead of silently disappearing from the site.
 `tests/test_pages_workflow.py` enforces both directions: internal paths must not
 appear in the staging step, and the assets the viewer fetches at runtime must.
 
-**What ships (27 files):** `.nojekyll`, `index.html`, `LICENSE`,
+**What ships (20 files):** `.nojekyll`, `index.html`, `LICENSE`,
 `DATA_LICENSE.md`, `main/heat_risk_map.html`, `userguide/` (page + 2 figures),
-three logos from `assets/`, and the three allow-listed `data/` subtrees.
+three logos from `assets/`, and nine data files: the SANDAG land-use PMTiles,
+six Data Layer PNGs, and two Landsat LST PNGs.
 
 **What does not:** `scripts/`, `.github/`, `tests/`, `docs/`, `README.md`,
 `ARCHITECTURE.md`, `CLAUDE.md`, `CITATION.cff`, `pytest.ini`,
@@ -540,8 +552,10 @@ See `literature/README.md` for the full workflow.
 | Add / curate a literature source      | `literature/sources/<citekey>.md`              | `python3 literature/build_index.py` (local-only, no commit) |
 | Run the test suite                    | n/a                                            | `python3 -m pytest`               |
 
-Local preview: open any HTML file directly in a browser, or run
-`python3 -m http.server 8000` from the repo root and visit
+Local preview: run `python3 -m http.server 8000` from the repo root and visit
 `http://localhost:8000/`. Relative paths (`../assets/*.png`,
 `../data/exposure/processed/landsat/*.png`) work the same locally and on
-GitHub Pages.
+GitHub Pages. The SANDAG land-use layer is the exception: PMTiles needs HTTP
+Range requests, which `http.server` ignores (it answers with a full 200), so land
+use renders only on the deployed site or behind a Range-capable local server.
+Opening the HTML from `file://` breaks it too.

@@ -21,24 +21,20 @@ for variables, methodology, and map interpretation.
 
 ## Three pillars of heat risk
 
-- **Exposure** — How much heat does this area face? Air temperature, humidity,
-  number of extreme-heat days, and satellite-measured land surface temperature.
-- **Sensitivity** — How vulnerable are the people living here? Age, chronic
+- **Heat Exposure** — How much heat does this area face? Daytime and overnight
+  air temperature, wet-bulb globe temperature, and satellite land surface
+  temperature.
+- **Population Sensitivity** — How vulnerable are the people living here? Age, chronic
   disease rates, social vulnerability, and environmental health.
 - **Adaptive Capacity** — What resources help residents cope with heat? Air
-  conditioning access, tree canopy, income, healthcare access, and housing
+  conditioning access, tree canopy, income, health insurance, and housing
   quality.
 
 ## Data sources
 
-- Weather stations: [MesoWest / Synoptic](https://synopticdata.com/)
-- Land surface temperature: [USGS Landsat](https://www.usgs.gov/landsat-missions)
-- Chronic disease: [CDC PLACES](https://www.cdc.gov/places/index.html)
-- Social vulnerability: [CDC SVI 2022](https://www.atsdr.cdc.gov/place-health/php/svi/index.html)
-- Healthy Places Index: [HPI](https://www.healthyplacesindex.org/)
-- AC prevalence: [Romitti et al. 2022](https://academic.oup.com/pnasnexus/article/1/4/pgac210/6713629), [Ahn et al. 2025](https://doi.org/10.1038/s41597-025-06104-3)
-- Demographics & housing: [ACS 5-year estimates](https://www.census.gov/programs-surveys/acs)
-- Climate projections: [LOCA2](https://loca.ucsd.edu/) downscaled CMIP6 (mid-century 2035–2064 and end-of-century 2065–2094)
+Every variable's source is listed in the User Guide's
+[Data sources](https://cccia-sio.github.io/socal-heat-hub/userguide/#data)
+table, and linked from each variable in the tool.
 
 ## Acknowledgments
 
@@ -71,5 +67,7 @@ generated HTML is not an MIT-covered act. See
 
 Incorporated third-party data keeps its own terms. In particular, **Healthy
 Places Index** data is non-commercial, so HPI-derived columns are shown on the
-map but **excluded from the "Download Data" export**. See
+map but **excluded from the "Download Data" export**. The CalHeatScore
+heat-hospitalization columns are excluded too, because that source has no
+published license. See
 [DATA_LICENSE.md](DATA_LICENSE.md) for the full breakdown.

@@ -18,20 +18,15 @@ down to the sample-std z-scoring, the tie-averaged percentile ranks, and JS
 `Math.round` half-up semantics. Tract data comes from that script's
 `load_data()`, so both read the same CSVs.
 
-KNOWN DIVERGENCE FROM THE VIEWER (multi-PC pillars only)
---------------------------------------------------------
-`pillarPCA()` builds its variance-weighted blend from raw eigenvectors and
-sign-anchors only the finished blend. Eigenvector signs are arbitrary, so any
-PC past the first can enter that blend with inverted risk polarity — cancelling
-risk instead of adding it — and the result depends on which eigen solver ran.
-Verified against the template's own JS on identical data: exposure and adaptive
-capacity (1 PC each at the default selection) match exactly, while sensitivity
-(2 PCs) diverges at r=0.33, moving 32% of tracts to a different dominant driver.
-
-This script anchors each retained PC *before* weighting, which is both correct
-and solver-independent — the two implementations then agree bit for bit. Until
-`pillarPCA()` does the same, this figure will differ from the live viewer on any
-pillar retaining more than one PC. The run logs each pillar's PC count.
+PC ORIENTATION
+--------------
+Eigenvector signs are arbitrary, so any PC past the first can enter the
+variance-weighted blend with inverted risk polarity, cancelling risk instead of
+adding it. Both this script and `pillarPCA()` orient each retained PC to the
+pillar's risk reference before weighting. The viewer used to anchor only the
+finished blend, which made multi-PC pillars (sensitivity at the default
+selection) diverge from this figure; that was fixed in `pillarPCA()`. The run
+logs each pillar's PC count.
 
 Usage:
     python3 scripts/build_hero_figure.py
@@ -242,10 +237,8 @@ def pillar_pca(df, pid, keys):
 
     # Orient EACH retained PC to the pillar's risk reference before weighting.
     # Eigenvector signs are arbitrary, so an unanchored PC can enter the blend
-    # with inverted polarity and cancel risk instead of adding it. The viewer
-    # anchors only the finished blend (see the module docstring), which is both
-    # wrong and solver-dependent; anchoring per PC makes the score identical
-    # across implementations.
+    # with inverted polarity and cancel risk instead of adding it. pillarPCA()
+    # in the viewer does the same, so the two agree.
     for k in range(nret):
         if np.corrcoef(rc, scores[:, k])[0, 1] < 0:
             scores[:, k] = -scores[:, k]

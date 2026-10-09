@@ -37,6 +37,18 @@ def test_geocoder_result_escaped_before_innerhtml(js_code):
     )
 
 
+def test_geocoder_error_escaped_before_innerhtml(js_code):
+    """The failure message goes to the same innerHTML status line.
+
+    A JSON parse error's message quotes the start of the response body, so a
+    non-JSON reply (an HTML error page) would land in the page as markup.
+    """
+    src = js_code("searchAddress")
+    assert re.search(r"'Search failed: '\+_addrEsc\(", src), (
+        "searchAddress() writes err.message to innerHTML unescaped. Wrap it in _addrEsc()."
+    )
+
+
 @pytest.mark.parametrize("pattern", [_REMOTE_SCRIPT, _REMOTE_STYLESHEET])
 def test_cdn_resources_pinned_with_sri(viewer_html_text: str, pattern: re.Pattern):
     """A CDN compromise otherwise yields arbitrary JS with full page privilege."""

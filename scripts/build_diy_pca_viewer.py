@@ -724,6 +724,42 @@ def compute_tract_deltas(tracts):
     return out
 
 
+def _round_geojson_coords(text, ndigits=6):
+    """Round every coordinate in a GeoJSON string; properties are untouched.
+
+    to_json() writes full float precision (15 decimals), which roughly doubled the
+    inlined geometry. 6 decimals is ~0.1 m.
+    """
+    obj = json.loads(text)
+
+    def rnd(c):
+        return round(c, ndigits) if isinstance(c, (int, float)) else [rnd(x) for x in c]
+
+    def walk(o):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k == "coordinates":
+                    o[k] = rnd(v)
+                else:
+                    walk(v)
+        elif isinstance(o, list):
+            for x in o:
+                walk(x)
+
+    walk(obj)
+    return json.dumps(obj)
+
+
+def _script_safe(blob):
+    """Escape `<` in data bound for an inline <script>.
+
+    A string containing `</script>` would close the tag and run whatever follows,
+    and some strings come from outside services (Cool Zones names are from a County
+    feature service). `\\u003c` is the same character to JS and JSON.
+    """
+    return blob.replace("<", "\\u003c")
+
+
 def main():
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     tracts = load_data()
@@ -732,7 +768,7 @@ def main():
     deltas = compute_tract_deltas(tracts)
 
     # Serialize — ensure_ascii so no raw unicode in JS source
-    geojson_str = tracts.to_json()
+    geojson_str = _round_geojson_coords(tracts.to_json())
     var_meta_str = json.dumps(
         [{"key": v[0], "label": v[1], "pillar": v[2], "sub": v[3]}
          for v in VARIABLES if v[0] in tracts.columns],
@@ -839,7 +875,7 @@ def main():
         juris = juris[juris["category"] == "City"][["NAME", "geometry"]].copy()
         juris = juris.to_crs(epsg=4326)
         juris["geometry"] = juris.geometry.simplify(0.0005)
-        juris_str = juris.to_json()
+        juris_str = _round_geojson_coords(juris.to_json())
         logger.info(f"Loaded {len(juris)} city jurisdictions")
     else:
         logger.warning("No jurisdictions file — city boundaries will not be shown")
@@ -857,7 +893,7 @@ def main():
     # territory is ~85% of the county by area, so it's drawn as one outlined region.
     unincorp_str = "null"
     if UNINCORP_PATH.exists():
-        unincorp_str = UNINCORP_PATH.read_text().strip()
+        unincorp_str = _round_geojson_coords(UNINCORP_PATH.read_text())
         logger.info(f"Loaded unincorporated boundary from {UNINCORP_PATH.name}")
     else:
         logger.warning("No unincorporated file — unincorporated overlay will not be shown")
@@ -893,33 +929,33 @@ def main():
         logger.warning("No cool-zone file — cool-zone overlay will not be shown")
 
     html = HTML_TEMPLATE
-    html = html.replace("__GEOJSON_PLACEHOLDER__", geojson_str)
-    html = html.replace("__VARMETA_PLACEHOLDER__", var_meta_str)
+    html = html.replace("__GEOJSON_PLACEHOLDER__", _script_safe(geojson_str))
+    html = html.replace("__VARMETA_PLACEHOLDER__", _script_safe(var_meta_str))
     feedback_mailto = (
         f"mailto:{FEEDBACK_EMAIL}?subject={urllib.parse.quote(FEEDBACK_SUBJECT)}"
     )
     html = html.replace("__FEEDBACK_MAILTO_PLACEHOLDER__", feedback_mailto)
-    html = html.replace("__VARSOURCES_PLACEHOLDER__", var_sources_str)
-    html = html.replace("__SOURCENAMES_PLACEHOLDER__", source_names_str)
-    html = html.replace("__VARUNITS_PLACEHOLDER__", var_units_str)
-    html = html.replace("__NOEXPORT_PLACEHOLDER__", no_export_str)
-    html = html.replace("__NOEXPORTWHY_PLACEHOLDER__", no_export_reasons_str)
-    html = html.replace("__EXPORTMETA_PLACEHOLDER__", export_meta_str)
-    html = html.replace("__HEATMODES_PLACEHOLDER__", heat_modes_str)
-    html = html.replace("__DELTAS_PLACEHOLDER__", deltas_str)
-    html = html.replace("__DELTAMAP_PLACEHOLDER__", delta_map_str)
-    html = html.replace("__JURIS_PLACEHOLDER__", juris_str)
-    html = html.replace("__TRIBAL_PLACEHOLDER__", tribal_str)
-    html = html.replace("__UNINCORP_PLACEHOLDER__", unincorp_str)
-    html = html.replace("__COOLZONES_PLACEHOLDER__", coolzones_str)
-    html = html.replace("__LST_PLACEHOLDER__", lst_str)
-    html = html.replace("__POP_PLACEHOLDER__", overlay_meta["population"])
-    html = html.replace("__DS_ENC_PLACEHOLDER__", ds_enc_uri)
-    html = html.replace("__DS_GEOIDS_PLACEHOLDER__", ds_geoids)
-    html = html.replace("__DS_DENS_PLACEHOLDER__", ds_dens_uri)
-    html = html.replace("__IMPERVIOUS_PLACEHOLDER__", overlay_meta["impervious"])
-    html = html.replace("__CANOPY_PLACEHOLDER__", overlay_meta["canopy"])
-    html = html.replace("__POLARITY_PLACEHOLDER__", polarity_str)
+    html = html.replace("__VARSOURCES_PLACEHOLDER__", _script_safe(var_sources_str))
+    html = html.replace("__SOURCENAMES_PLACEHOLDER__", _script_safe(source_names_str))
+    html = html.replace("__VARUNITS_PLACEHOLDER__", _script_safe(var_units_str))
+    html = html.replace("__NOEXPORT_PLACEHOLDER__", _script_safe(no_export_str))
+    html = html.replace("__NOEXPORTWHY_PLACEHOLDER__", _script_safe(no_export_reasons_str))
+    html = html.replace("__EXPORTMETA_PLACEHOLDER__", _script_safe(export_meta_str))
+    html = html.replace("__HEATMODES_PLACEHOLDER__", _script_safe(heat_modes_str))
+    html = html.replace("__DELTAS_PLACEHOLDER__", _script_safe(deltas_str))
+    html = html.replace("__DELTAMAP_PLACEHOLDER__", _script_safe(delta_map_str))
+    html = html.replace("__JURIS_PLACEHOLDER__", _script_safe(juris_str))
+    html = html.replace("__TRIBAL_PLACEHOLDER__", _script_safe(tribal_str))
+    html = html.replace("__UNINCORP_PLACEHOLDER__", _script_safe(unincorp_str))
+    html = html.replace("__COOLZONES_PLACEHOLDER__", _script_safe(coolzones_str))
+    html = html.replace("__LST_PLACEHOLDER__", _script_safe(lst_str))
+    html = html.replace("__POP_PLACEHOLDER__", _script_safe(overlay_meta["population"]))
+    html = html.replace("__DS_ENC_PLACEHOLDER__", _script_safe(ds_enc_uri))
+    html = html.replace("__DS_GEOIDS_PLACEHOLDER__", _script_safe(ds_geoids))
+    html = html.replace("__DS_DENS_PLACEHOLDER__", _script_safe(ds_dens_uri))
+    html = html.replace("__IMPERVIOUS_PLACEHOLDER__", _script_safe(overlay_meta["impervious"]))
+    html = html.replace("__CANOPY_PLACEHOLDER__", _script_safe(overlay_meta["canopy"]))
+    html = html.replace("__POLARITY_PLACEHOLDER__", _script_safe(polarity_str))
 
     OUTPUT_PATH.write_text(html)
     size_kb = len(html) // 1024
@@ -959,7 +995,7 @@ body{display:flex;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto
 #sidebar::-webkit-scrollbar{width:6px}
 #sidebar::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
 h1{font-size:17px;font-weight:700;letter-spacing:-0.3px}
-.subtitle{font-size:12px;color:#888;margin:4px 0 16px;line-height:1.4}
+.subtitle{font-size:12px;color:#666;margin:4px 0 16px;line-height:1.4}
 
 #scenario-bar{margin:18px 0 0;padding:14px 0 0;border-top:1px solid #e0e0e0;display:none}
 #scenario-bar>summary{font-size:11px;font-weight:700;text-transform:uppercase;
@@ -1912,7 +1948,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
       <h3>Find address</h3>
       <div class="addr-row">
         <div class="addr-input-wrap">
-          <input id="addr-input" type="text" placeholder="Search a county address" autocomplete="off" spellcheck="false" />
+          <input id="addr-input" type="text" aria-label="Search a county address" placeholder="Search a county address" autocomplete="off" spellcheck="false" />
           <ul id="addr-suggest" class="addr-suggest" role="listbox"></ul>
         </div>
         <button id="addr-go" onclick="searchAddress()">Go</button>
@@ -1923,7 +1959,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   </div>
   <div id="logos">
     <img src="../assets/usd-logo-horizontal.png" alt="University of San Diego">
-    <img src="../assets/ccsd_logo.png" alt="Climate Collaborative — San Diego Region">
+    <img src="../assets/ccsd_logo.png" alt="San Diego Regional Climate Collaborative">
   </div>
   <!-- Bottom-right stack: basemap picker with the colorblind toggle beneath it,
        anchored above the SIO logo. Reparented into the mobile drawer. -->
@@ -1962,7 +1998,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     <span class="cf-name" id="cf-name">—</span>
     <span class="cf-hint">click tracts to explore</span>
     <button class="cf-primary" id="cf-pdf-btn" onclick="downloadCityPdf()">Export risk PDF</button>
-    <button class="cf-exit" onclick="exitCityView()" title="Exit city view (ESC)">&times;</button>
+    <button aria-label="Exit city view" class="cf-exit" onclick="exitCityView()" title="Exit city view (ESC)">&times;</button>
   </div>
 </div>
 
@@ -1970,11 +2006,11 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   <div class="box"><div class="spinner"></div><span id="pdf-overlay-msg">Generating PDF\\u2026</span></div>
 </div>
 
-<div id="export-modal" onclick="if(event.target===this)closeExportModal()">
+<div id="export-modal" role="dialog" aria-modal="true" aria-labelledby="export-modal-title" onclick="if(event.target===this)closeExportModal()">
   <div class="exp-panel">
     <div class="exp-hdr">
-      <h2>Download Data</h2>
-      <button class="exp-close" onclick="closeExportModal()" title="Close (ESC)">&times;</button>
+      <h2 id="export-modal-title">Download Data</h2>
+      <button aria-label="Close" class="exp-close" onclick="closeExportModal()" title="Close (ESC)">&times;</button>
     </div>
     <div class="exp-body">
       <div class="exp-section">
@@ -2012,11 +2048,11 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   </div>
 </div>
 
-<div id="compare-modal" onclick="if(event.target===this)closeCompareModal()">
+<div id="compare-modal" role="dialog" aria-modal="true" aria-labelledby="compare-modal-title" onclick="if(event.target===this)closeCompareModal()">
   <div class="cmp-panel">
     <div class="cmp-hdr">
-      <h2>Census Tract Comparison<span class="cmp-sub" id="cmp-context"></span></h2>
-      <button class="cmp-close" onclick="closeCompareModal()" title="Close (ESC)">&times;</button>
+      <h2 id="compare-modal-title">Census Tract Comparison<span class="cmp-sub" id="cmp-context"></span></h2>
+      <button aria-label="Close" class="cmp-close" onclick="closeCompareModal()" title="Close (ESC)">&times;</button>
     </div>
     <div id="cmp-lst-legend" class="cmp-lst-legend"></div>
     <div class="cmp-toggle-row">
@@ -2045,13 +2081,13 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   </div>
 </div>
 
-<div id="scn-compare-modal" onclick="if(event.target===this)closeScnCompareModal()">
+<div id="scn-compare-modal" role="dialog" aria-modal="true" aria-labelledby="scn-compare-title" onclick="if(event.target===this)closeScnCompareModal()">
   <div class="cmp-panel scn-cmp-panel">
     <div class="cmp-hdr">
-      <h2>Compare Scenarios<span class="cmp-sub">Left: full heat risk &middot; Right: change in heat exposure</span></h2>
+      <h2 id="scn-compare-title">Compare Scenarios<span class="cmp-sub">Left: full heat risk &middot; Right: change in heat exposure</span></h2>
       <span style="flex:1"></span>
       <button class="scn-info-btn" onclick="openScnInfo()" title="How to read this panel">? How to read this</button>
-      <button class="cmp-close" onclick="closeScnCompareModal()" title="Close (ESC)">&times;</button>
+      <button aria-label="Close" class="cmp-close" onclick="closeScnCompareModal()" title="Close (ESC)">&times;</button>
     </div>
     <div class="scn-cmp-body">
       <div class="scn-cmp-col">
@@ -2076,11 +2112,11 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   </div>
 </div>
 
-<div id="scn-info-modal" onclick="if(event.target===this)closeScnInfo()">
+<div id="scn-info-modal" role="dialog" aria-modal="true" aria-labelledby="scn-info-title" onclick="if(event.target===this)closeScnInfo()">
   <div class="scn-info-panel">
     <div class="scn-info-hdr">
-      <h3>How to read this</h3>
-      <button class="scn-info-close" onclick="closeScnInfo()" title="Close (ESC)">&times;</button>
+      <h3 id="scn-info-title">How to read this</h3>
+      <button aria-label="Close" class="scn-info-close" onclick="closeScnInfo()" title="Close (ESC)">&times;</button>
     </div>
     <div class="scn-info-body">
       <div class="scn-info-row">
@@ -2103,11 +2139,11 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   </div>
 </div>
 
-<div id="welcome-modal" class="open" onclick="if(event.target===this)closeWelcome()">
+<div id="welcome-modal" class="open" role="dialog" aria-modal="true" aria-labelledby="welcome-title" onclick="if(event.target===this)closeWelcome()">
   <div class="wlc-panel">
     <div class="wlc-hdr">
-      <h2>Welcome to the San Diego Heat Risk Explorer</h2>
-      <button class="wlc-close" id="wlc-close-btn" title="Close (ESC)">&times;</button>
+      <h2 id="welcome-title">Welcome to the San Diego Heat Risk Explorer</h2>
+      <button aria-label="Close" class="wlc-close" id="wlc-close-btn" title="Close (ESC)">&times;</button>
     </div>
     <div class="wlc-body">
       <div class="wlc-quickstart">
@@ -2173,7 +2209,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
         <h2 id="dt-title">Tract</h2>
         <div class="dt-sub" id="dt-sub"></div>
       </div>
-      <button class="dt-close" onclick="closeDetailDrawer()" title="Close (ESC)">&times;</button>
+      <button aria-label="Close" class="dt-close" onclick="closeDetailDrawer()" title="Close (ESC)">&times;</button>
     </div>
     <div class="dt-ctx" id="dt-ctx"></div>
     <div class="dt-body" id="dt-body"></div>
@@ -2239,7 +2275,7 @@ var cbMode = (function(){try{return localStorage.getItem('hrv-cb-mode')==='1';}c
 // Exposure is a single-select heat mode, so its raw variables are excluded from
 // the `enabled` toggle set — only Sensitivity and Adaptive Capacity use toggles.
 // Open with a curated, high-contrast default rather than every variable: turning
-// on all ~60 makes each pillar's PCA collapse toward a generic "everything
+// on all 73 makes each pillar's PCA collapse toward a generic "everything
 // correlates" axis and washes out spatial contrast. Defaults below are one
 // composite signal + a couple of focused drivers per pillar (exposure stays on
 // the daytime heat mode). Every other variable stays in the panel, unchecked.
@@ -2325,7 +2361,6 @@ function selectScnPeriod(period){
 function setScenario(ssp,period){
   curScenario=ssp;
   curPeriod=(ssp==='present')?'':(period||'');
-  window._adjPct={};  // invalidate adjusted percentile cache
   document.querySelectorAll('.scn-btn').forEach(function(b){
     var match=(b.getAttribute('data-scn')===ssp)&&
               ((b.getAttribute('data-period')||'')===curPeriod);
@@ -3037,7 +3072,7 @@ function searchAddress(){
     .then(function(rows){
       if(rows && rows.length) return rows;
       return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q='+encodeURIComponent(q),
-        {headers:{'Accept':'application/json'}}).then(function(r){return r.json();});
+        {headers:{'Accept':'application/json'}}).then(function(r){if(!r.ok) throw new Error('HTTP '+r.status); return r.json();});
     })
     .then(function(rows){
       btn.disabled = false; btn.textContent = prev;
@@ -3048,7 +3083,7 @@ function searchAddress(){
     })
     .catch(function(err){
       btn.disabled = false; btn.textContent = prev;
-      _addrSetStatus('Search failed: '+(err && err.message ? err.message : 'network error'), true);
+      _addrSetStatus('Search failed: '+_addrEsc(err && err.message ? err.message : 'network error'), true);
     });
 }
 
@@ -4968,7 +5003,7 @@ function showLayerBtns(){
   [{id:"composite",label:"Composite Risk",dot:"#bd0026",
     info:"The overall score: the average of the three pillars (Heat Exposure, Population Sensitivity, and low Adaptive Capacity), each percentile-ranked across San Diego County tracts. Higher = greater heat risk."},
    {id:"driver",label:"Dominant Driver",dot:"#2c3e50",
-    info:"Colors each tract by its largest risk driver: Heat Exposure (red), Population Sensitivity (purple), or low Adaptive Capacity (green). Shows which pillar dominates, not the overall risk level."},
+    info:"Colors each tract by its largest risk driver: Heat Exposure, Population Sensitivity, or low Adaptive Capacity. Lighter shades mean lower composite risk."},
    {id:"drivermix",label:"Driver Mix",dot:"conic-gradient(#c0392b 0deg 120deg,#6a51a3 120deg 240deg,#16a052 240deg 360deg)"}].forEach(function(b){
     html+='<button class="lbtn'+(curLayer===b.id?" active":"")+'" onclick="setLyr(\\''+b.id+'\\')">'+
       '<span class="ldot" style="background:'+b.dot+'"></span>'+
@@ -6532,7 +6567,7 @@ function _heroPdf(canvas,opts){
   var dStr=dt.toLocaleString(undefined,{year:'numeric',month:'short',day:'2-digit',
                                          hour:'2-digit',minute:'2-digit'});
   pdf.text('Generated '+dStr,M,ph-30);
-  pdf.text('Sources: LOCA2-Hybrid CMIP6 \\u00b7 USGS Landsat \\u00b7 NOAA HRRR \\u00b7 CDC PLACES & SVI \\u00b7 HealthyPlacesIndex',
+  pdf.text('Sources: LOCA2 downscaled CMIP6 \\u00b7 USGS Landsat \\u00b7 NOAA HRRR \\u00b7 CDC PLACES & SVI \\u00b7 Healthy Places Index',
     M,ph-18);
 
   var url='cccia-sio.github.io/socal-heat-hub';
@@ -6771,7 +6806,7 @@ function _heroPdfTwoPanel(cL,cR,opts){
   var dt=new Date();
   var dStr=dt.toLocaleString(undefined,{year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'});
   pdf.text('Generated '+dStr,M,ph-30);
-  pdf.text('Sources: LOCA2-Hybrid CMIP6 \\u00b7 USGS Landsat \\u00b7 NOAA HRRR \\u00b7 CDC PLACES & SVI \\u00b7 HealthyPlacesIndex',M,ph-18);
+  pdf.text('Sources: LOCA2 downscaled CMIP6 \\u00b7 USGS Landsat \\u00b7 NOAA HRRR \\u00b7 CDC PLACES & SVI \\u00b7 Healthy Places Index',M,ph-18);
   var url='cccia-sio.github.io/socal-heat-hub';
   pdf.setFont('helvetica','bold');pdf.setTextColor(37,99,235);
   var urlW=pdf.getTextWidth(url);pdf.text(url,pw-M-urlW,ph-18);
@@ -7624,11 +7659,11 @@ var _DICT_DERIVED={
     source:'LOCA2 downscaled CMIP6',source_url:_SRC_LOCA,
     notes:'Only present when a future scenario is active.'},
   composite_risk:{label:'Composite heat risk',group:'Index output',
-    units:'percentile within San Diego County (0-100)',
+    units:'0-100 (mean of the pillar percentiles)',
     higher_value_means:'higher value = HIGHER heat risk',
     source:'Computed by this tool',source_url:_SRC_SELF,
-    notes:'Mean of the active pillar scores with Adaptive Capacity inverted, '+
-          're-ranked to 0-100. Depends on the heat mode and variables the map was '+
+    notes:'Mean of the active pillar scores, with Adaptive Capacity inverted '+
+          '(100 minus its score). Not re-ranked. Depends on the heat mode and variables the map was '+
           'built from (listed in the file header) \\u2014 it is not a fixed published index.'},
   composite_driver:{label:'Dominant pillar',group:'Index output',
     units:'exposure | sensitivity | adaptive',
@@ -7645,7 +7680,7 @@ var _DICT_DERIVED={
     higher_value_means:'higher value = HIGHER heat risk',
     source:'Computed by this tool',source_url:_SRC_SELF,
     notes:'Variance-weighted blend of the retained principal components (eigenvalue > 1) '+
-          'of the switched-on sensitivity variables, re-ranked to 0-100.'},
+          'of the sensitivity variables in the build, re-ranked to 0-100.'},
   adaptive_score:{label:'Adaptive Capacity score',group:'Index output',
     units:'percentile within San Diego County (0-100)',
     higher_value_means:'higher value = MORE capacity = LOWER heat risk',
@@ -7893,15 +7928,15 @@ function closeWelcome(){
 var TOUR_STEPS=[
   {key:"exposure",target:'[data-tour="pillar-exposure"]',side:"right",
    title:"1. Heat Exposure",
-   body:"The heat hazard itself. Choose one mode \\u2014 <b>Daytime</b>, <b>Nighttime</b>, <b>Humid Heat (WBGT)</b>, or <b>Surface Temperature</b>.",
+   body:"The heat hazard itself. Choose one mode \\u2014 <b>Daytime</b>, <b>Nighttime</b>, <b>Humid heat (WBGT)</b>, or <b>Surface temperature</b>.",
    prompt:"Pick a mode, then Next."},
   {key:"sensitivity",target:'[data-tour="pillar-sensitivity"]',side:"right",
    title:"2. Population Sensitivity",
-   body:"Who is more vulnerable \\u2014 age, income, language, health. Toggle the header for all of it, or open a subsection to choose variables.",
+   body:"Who is more vulnerable \\u2014 age, poverty, language, health. Toggle the header for all of it, or open a subsection to choose variables.",
    prompt:"Toggle a variable, then Next."},
   {key:"adaptive",target:'[data-tour="pillar-adaptive"]',side:"right",
    title:"3. Adaptive Capacity",
-   body:"What helps people cope \\u2014 air conditioning, tree canopy, access to cool spaces. Low capacity raises risk, so these are inverted in the blend.",
+   body:"What helps people cope \\u2014 air conditioning, tree canopy, income, health insurance. Low capacity raises risk, so these are inverted in the blend.",
    prompt:"Toggle a variable, then Next."},
   {key:"build",target:'#compute-btn',side:"right",
    title:"4. Build the map",

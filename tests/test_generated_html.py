@@ -85,6 +85,32 @@ def test_inlined_json_blob_parses(viewer_html_text, var_name):
         )
 
 
+# Every `var X = __..._PLACEHOLDER__;` payload, i.e. everything spliced in at build.
+SPLICED_VARS = INLINED_JSON_VARS + [
+    "SRCNAME", "VUNITS", "NO_EXPORT_WHY", "UNINCORP", "COOLZONES", "POP",
+    "DS_ENC", "DS_GEOIDS", "DS_DENS", "IMPERVIOUS", "CANOPY", "HEAT_MODES",
+]
+
+
+@pytest.mark.parametrize("var_name", SPLICED_VARS)
+def test_inlined_data_cannot_close_its_script_tag(viewer_html_text, var_name):
+    """A `</` inside spliced data ends the <script> early, so it must be escaped."""
+    match = re.search(rf"\bvar {var_name}\s*=\s*", viewer_html_text)
+    assert match, f"Variable declaration `var {var_name}` not found."
+    _, end = json.JSONDecoder().raw_decode(viewer_html_text, match.end())
+    assert "</" not in viewer_html_text[match.end() : end], (
+        f"`var {var_name}` contains `</`. Pass it through _script_safe() in the build."
+    )
+
+
+def test_ocean_tract_is_not_in_the_viewer(viewer_html_text):
+    """Tract 9901 is the Pacific Ocean (ALAND=0) and draws as a blob offshore."""
+    assert "06073990100" not in viewer_html_text, (
+        "The ocean tract 06073990100 is back in the viewer. The ALAND filter in "
+        "load_data() must drop it."
+    )
+
+
 def test_viewer_html_is_nontrivial(viewer_html_path):
     """A viewer that's <100 KB almost certainly means the data splice failed."""
     size_kb = viewer_html_path.stat().st_size / 1024

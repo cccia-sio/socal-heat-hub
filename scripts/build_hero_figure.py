@@ -9,7 +9,8 @@ guide matches the tool it illustrates:
                       z-scored member layers, percentile-ranked (NOT PCA).
   - Sensitivity     : PCA over the viewer's three default-on variables.
   - Adaptive Cap.   : PCA over the viewer's three default-on variables.
-  - Composite       : (exposure + sensitivity + (100 - adaptive)) / 3
+  - Composite       : (exposure + sensitivity + (100 - adaptive)) / 3,
+                      percentile-ranked
   - Dominant driver : argmax(exposure, sensitivity, 100 - adaptive)
 
 The scoring functions below are direct ports of `exposureScore()`,
@@ -271,9 +272,8 @@ def build_composite(tracts):
     out["sensitivity_score"] = sensitivity
     out["adaptive_score"] = adaptive
     out["adaptive_deficit"] = 100.0 - adaptive
-    out["composite_risk"] = _js_round(
-        (exposure + sensitivity + (100.0 - adaptive)) / 3.0, 1
-    )
+    # Mean of the pillar percentiles, ranked again so the composite is one too.
+    out["composite_risk"] = pct_rank((exposure + sensitivity + (100.0 - adaptive)) / 3.0)
 
     e, s, a = exposure, sensitivity, 100.0 - adaptive
     out["driver"] = np.where(

@@ -226,3 +226,18 @@ def test_built_scores_are_described_by_the_build_not_the_panel(js_code, fn):
         "last build's scores with settings they weren't built from. Read "
         "_builtSettings() instead."
     )
+
+
+# ── The composite is a percentile ───────────────────────────────────────────
+# Everything else in the tool is a county percentile and the guide says the
+# index is one. A plain mean of three percentiles isn't: it bunches around 50
+# and a "75" was really the 99th percentile.
+
+
+@pytest.mark.parametrize("fn", ["compute", "computeCompositeFor"])
+def test_composite_is_ranked_not_just_averaged(js_code, fn):
+    assert re.search(r"pctRank\(\s*avg\s*\)", js_code(fn)), (
+        f"{fn}() writes the raw mean of the pillar scores as the composite. It "
+        "must percentile-rank the means across the county, or a composite of 75 "
+        "isn't the 75th percentile the guide promises."
+    )

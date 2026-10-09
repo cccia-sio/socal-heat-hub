@@ -4135,7 +4135,7 @@ function compute(settings){
     var res={exposure:exposureScore(settings.heatMode)};
     ["sensitivity","adaptive"].forEach(function(pid){res[pid]=pillarPCA(pid,settings.on[pid]);});
     // write to features
-    var N=GJ.features.length;
+    var N=GJ.features.length,avg=new Array(N);
     for(var i=0;i<N;i++){
       var pr=GJ.features[i].properties,sum=0,cnt=0;
       // Drop the previous build's pillar fields first. A pillar left out of this
@@ -4151,15 +4151,24 @@ function compute(settings){
         if(pid==="adaptive")s=100-s;
         sum+=s;cnt++;
       });
-      pr._comp=cnt>0?Math.round(sum/cnt*10)/10:50;
+      avg[i]=cnt>0?sum/cnt:50;
       var eS=res.exposure?res.exposure.scores[i]:0;
       var sS=res.sensitivity?res.sensitivity.scores[i]:0;
       var aD=res.adaptive?(100-res.adaptive.scores[i]):0;
       pr._drv=(eS>=sS&&eS>=aD)?"exposure":(sS>=aD)?"sensitivity":"adaptive";
-      pr._drvI=pr._comp/100;
       // Per-pillar risk contributions (exposure, sensitivity, adaptive deficit)
       // kept for the trivariate Driver Mix layer's barycentric blend.
       pr._drvE=eS;pr._drvS=sS;pr._drvA=aD;
+    }
+    // The composite is the mean of the pillar percentiles, ranked again across
+    // the county so it is a percentile too. The raw mean bunches around 50 (a
+    // tract is rarely at the top of all three pillars), so a "75" was really the
+    // 99th percentile and the top of the colour ramp was never used.
+    var compR=pctRank(avg);
+    for(var i=0;i<N;i++){
+      var pr=GJ.features[i].properties;
+      pr._comp=compR[i];
+      pr._drvI=pr._comp/100;
     }
     res.settings=settings;
     results=res;
@@ -5001,7 +5010,7 @@ function _patternBlurb(r,k){
 function showLayerBtns(){
   var el=document.getElementById("layer-buttons"),html="";
   [{id:"composite",label:"Composite Risk",dot:"#bd0026",
-    info:"The overall score: the average of the three pillars (Heat Exposure, Population Sensitivity, and low Adaptive Capacity), each percentile-ranked across San Diego County tracts. Higher = greater heat risk."},
+    info:"The overall score: the average of the three pillar percentiles (Heat Exposure, Population Sensitivity, and low Adaptive Capacity), ranked again across San Diego County tracts so it reads as a percentile. Higher = greater heat risk."},
    {id:"driver",label:"Dominant Driver",dot:"#2c3e50",
     info:"Colors each tract by its largest risk driver: Heat Exposure, Population Sensitivity, or low Adaptive Capacity. Lighter shades mean lower composite risk."},
    {id:"drivermix",label:"Driver Mix",dot:"conic-gradient(#c0392b 0deg 120deg,#6a51a3 120deg 240deg,#16a052 240deg 360deg)"}].forEach(function(b){
@@ -5690,7 +5699,7 @@ function computeCompositeFor(scenario, period){
     ['sensitivity','adaptive'].forEach(function(pid){
       res[pid]=pillarPCA(pid,st.on[pid]);
     });
-    var N=GJ.features.length, comp=new Array(N);
+    var N=GJ.features.length, avg=new Array(N);
     for(var i=0;i<N;i++){
       var sum=0,cnt=0;
       ['exposure','sensitivity','adaptive'].forEach(function(pid){
@@ -5699,9 +5708,9 @@ function computeCompositeFor(scenario, period){
         if(pid==='adaptive')s=100-s;
         sum+=s;cnt++;
       });
-      comp[i]=cnt>0?Math.round(sum/cnt*10)/10:50;
+      avg[i]=cnt>0?sum/cnt:50;
     }
-    return comp;
+    return pctRank(avg);   // ranked, as in compute()
   } finally {
     curScenario=savedScn;
     curPeriod=savedPer;
@@ -7659,11 +7668,11 @@ var _DICT_DERIVED={
     source:'LOCA2 downscaled CMIP6',source_url:_SRC_LOCA,
     notes:'Only present when a future scenario is active.'},
   composite_risk:{label:'Composite heat risk',group:'Index output',
-    units:'0-100 (mean of the pillar percentiles)',
+    units:'percentile within San Diego County (0-100)',
     higher_value_means:'higher value = HIGHER heat risk',
     source:'Computed by this tool',source_url:_SRC_SELF,
     notes:'Mean of the active pillar scores, with Adaptive Capacity inverted '+
-          '(100 minus its score). Not re-ranked. Depends on the heat mode and variables the map was '+
+          '(100 minus its score), percentile-ranked across the county. Depends on the heat mode and variables the map was '+
           'built from (listed in the file header) \\u2014 it is not a fixed published index.'},
   composite_driver:{label:'Dominant pillar',group:'Index output',
     units:'exposure | sensitivity | adaptive',

@@ -5926,9 +5926,13 @@ function _scenarioLabel(){
 // it, which is what maxNativeZoom does on the live map.
 function _paintLightBasemap(ctx,zoom,pb,S){
   var TILE=256;
-  var rz=zoom+1;                       // one level deeper == retina density
-  var f=S/2;                           // 256px tile -> 256*f physical px
-  var min={x:pb.min.x*2,y:pb.min.y*2}, max={x:pb.max.x*2,y:pb.max.y*2};
+  // One level deeper == retina density. `zoom` may be fractional (the map PDF
+  // fits the county exactly), so fetch the nearest whole level and scale its
+  // tiles by k onto zoom's pixel grid. For a whole zoom, k=1/2 as before.
+  var rz=Math.round(zoom)+1;
+  var k=Math.pow(2,zoom-rz);           // rz px -> zoom px
+  var f=S*k;                           // rz px -> physical px
+  var min={x:pb.min.x/k,y:pb.min.y/k}, max={x:pb.max.x/k,y:pb.max.y/k};
   var nWorld=Math.pow(2,rz);
   // Source tile + sub-rectangle for one tile of the rz grid.
   function src(x,y){
@@ -5953,18 +5957,21 @@ function _paintLightBasemap(ctx,zoom,pb,S){
     for(var ty=Math.floor(min.y/TILE);ty<=Math.floor(max.y/TILE);ty++){
       if(ty<0||ty>=nWorld)continue;
       var q=src(((tx%nWorld)+nWorld)%nWorld,ty);
-      var dx=(tx*TILE-min.x)*f, dy=(ty*TILE-min.y)*f, dw=TILE*f;
-      (function(x,y,p){
+      // Round each tile's edges, not its origin + size, so scaled tiles abut
+      // with no hairline seams.
+      var dx=Math.round((tx*TILE-min.x)*f), dy=Math.round((ty*TILE-min.y)*f);
+      var dw=Math.round(((tx+1)*TILE-min.x)*f)-dx, dh=Math.round(((ty+1)*TILE-min.y)*f)-dy;
+      (function(x,y,w,h,p){
         // Base first, then the transparent label raster directly over it. Each
         // label tile covers exactly its own base tile, so per-tile ordering is
         // enough — no second pass needed.
         tasks.push(loadImage(p.base).then(function(im){
-          if(im){got.n++;ctx.drawImage(im,p.sx,p.sy,p.sw,p.sh,x,y,dw,dw);}
+          if(im){got.n++;ctx.drawImage(im,p.sx,p.sy,p.sw,p.sh,x,y,w,h);}
           return loadImage(p.ref);
         }).then(function(im){
-          if(im)ctx.drawImage(im,p.sx,p.sy,p.sw,p.sh,x,y,dw,dw);
+          if(im)ctx.drawImage(im,p.sx,p.sy,p.sw,p.sh,x,y,w,h);
         }));
-      })(dx,dy,q);
+      })(dx,dy,dw,dh,q);
     }
   }
   return Promise.all(tasks).then(function(){return got.n;});
@@ -5983,7 +5990,8 @@ function _captureStudyAreaMap(opts){
   opts=opts||{};
   return new Promise(function(resolve,reject){
     // Logical figure size; canvas is rendered at 2x for retina-print output.
-    var TARGET_W=1600, TARGET_H=1200;
+    // opts.width widens the frame to fit a caller's page.
+    var TARGET_W=opts.width||1600, TARGET_H=1200;
     var SCALE=2;
 
     // Off-screen Leaflet map used solely for projection math (zoom-fit +
@@ -5993,18 +6001,16 @@ function _captureStudyAreaMap(opts){
       'width:'+TARGET_W+'px;height:'+TARGET_H+'px;';
     document.body.appendChild(projDiv);
 
+    // zoomSnap:0 lets fitBounds land on the exact zoom that fills the frame;
+    // snapping to a whole level left the county at ~70% of it.
     var projMap=L.map(projDiv,{zoomControl:false,attributionControl:false,
-      fadeAnimation:false,zoomAnimation:false});
+      fadeAnimation:false,zoomAnimation:false,zoomSnap:0});
 
     // Frame the requested bounds, else the study area (tract bounds → county bbox)
     var bounds=null;
     if(opts.bounds&&opts.bounds.isValid&&opts.bounds.isValid())bounds=opts.bounds;
     if(!bounds&&tLayer&&tLayer.getBounds){var b=tLayer.getBounds();if(b&&b.isValid())bounds=b;}
     if(!bounds)bounds=L.latLngBounds([32.53,-117.62],[33.51,-116.08]);
-    projMap.fitBounds(bounds,{padding:[20,20],animate:false});
-
-    var zoom=projMap.getZoom();
-    var pixelBounds=projMap.getPixelBounds();
 
     var canvas=document.createElement('canvas');
     canvas.width=TARGET_W*SCALE;
@@ -6012,6 +6018,16 @@ function _captureStudyAreaMap(opts){
     var ctx=canvas.getContext('2d');
     ctx.fillStyle='#ffffff';
     ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // Fit as tightly as the map furniture allows: the legend gets its own column
+    // on the right so it never covers a tract, and opts.padLeft makes room on
+    // the left (the map PDF's variable box).
+    var leg=opts.minimal?null:drawLegend(true);
+    projMap.fitBounds(bounds,{paddingTopLeft:[opts.padLeft||20,20],
+      paddingBottomRight:[leg?leg.w+18+16:20,20],animate:false});
+
+    var zoom=projMap.getZoom();
+    var pixelBounds=projMap.getPixelBounds();
 
     // latLng -> physical canvas pixel (after retina scaling).
     function project(lat,lng){
@@ -6121,14 +6137,21 @@ function _captureStudyAreaMap(opts){
       ctx.restore();
     }
 
-    function drawLegend(){
+    // With measureOnly, returns the legend's {w,h} (logical px) without drawing,
+    // so the fit can keep tracts out from under it.
+    function drawLegend(measureOnly){
       // Mirror the live in-page legend (showLegend) for the active view state.
       var sl={'ssp245':'SSP2-4.5','ssp370':'SSP3-7.0','ssp585':'SSP5-8.5'};
       var title='', subtitle='', stops=null;
       var lowLabel='Low', highLabel='High', lowLabel2='', highLabel2='';
       var driverRows=null, triMix=false;
 
-      if(rawVar){
+      if(curLayer==='heatmode'&&!rawVar){
+        var md=heatModeDef(heatMode);
+        title='Heat Exposure — '+((md&&md.label)||'heat mode');
+        subtitle=_scenarioLabel();
+        stops=pal('PCC').exposure||pal('CR');
+      }else if(rawVar){
         if(typeof getDeltaArr==='function'&&getDeltaArr(rawVar)&&window._deltaRange){
           var dr=window._deltaRange;
           title='Δ '+(varLabel[rawVar]||rawVar);
@@ -6256,6 +6279,7 @@ function _captureStudyAreaMap(opts){
         y+=rowH;
       }
       var boxH=y+pad-4;
+      if(measureOnly)return {w:boxW,h:boxH};
 
       var bx=TARGET_W-boxW-18, by=18;
 
@@ -6560,7 +6584,9 @@ function downloadMapPdf(){
   _pdfShow('Loading PDF library\\u2026');
   _ensurePdfLibs().then(function(){
     _pdfShow('Rendering study-area map\\u2026');
-    return _captureStudyAreaMap();
+    // width fills _heroPdf's 720x462pt map area (1200*720/462). padLeft pushes
+    // the coastline clear of its variable box, over the ocean in the lower-left.
+    return _captureStudyAreaMap({width:1870,padLeft:140});
   }).then(function(canvas){
     _pdfShow('Building PDF\\u2026');
     _heroPdf(canvas);

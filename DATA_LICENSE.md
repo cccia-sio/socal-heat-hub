@@ -47,7 +47,7 @@ third-party input keeps its original terms.
 This tool incorporates data from external sources. **CC BY 4.0 applies only to
 this project's own contributions, not to the underlying third-party data**, each
 of which keeps its original license. Most sources are U.S. federal public-domain
-works (Census/ACS, CDC PLACES & SVI, USGS Landsat, NOAA HRRR, NLCD, DOE LEAD),
+works (Census/ACS, CDC PLACES & SVI, USGS Landsat, NOAA HRRR, NLCD, DOE LEAD, HHS emPOWER),
 but several have their own conditions:
 
 | Source | Terms | Handling |
@@ -58,6 +58,8 @@ but several have their own conditions:
 | [MesoWest / Synoptic](https://synopticdata.com/tcs/) | Non-commercial; summary statistics may be published only if the underlying data "cannot be decompiled, reverse engineered, or otherwise extracted" | Derived per-tract temperature statistics only, each a blend of six stations with no station exceeding 40% of the value. See below. |
 | [Romitti et&nbsp;al. 2022](https://doi.org/10.7910/DVN/HWFVP6) | CC BY article; data deposited on Harvard Dataverse | Open. Cited to the Dataverse DOI (the redistributable artifact), not the article page. |
 | [UCLA Heat Maps](https://uclaheatmaps.org) | Public research product, aggregated from California HCAI emergency-department records | Display-only map layer; **not included in the export.** |
+| [Regional Task Force on Homelessness](https://www.rtfhsd.org/reports-data/) | Published point-in-time counts by census tract; no license stated | Display-only map layer; **not included in the export.** |
+| [SDG&E power shutoff filings (CPUC)](https://www.cpuc.ca.gov/consumer-support/psps/utility-company-psps-reports-post-event-and-post-season) | Public regulatory filings; no license stated | Display-only map layer; **not included in the export.** |
 
 ## Provenance audit, 2026-07-27
 

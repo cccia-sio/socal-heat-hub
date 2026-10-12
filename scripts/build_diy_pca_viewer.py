@@ -628,6 +628,16 @@ def load_data():
         ucla["GEOID"] = ucla["GEOID"].str.zfill(11)
         tracts = _safe_merge(tracts, ucla, ucla_cols)
 
+    # ── Exploratory — unsheltered count, electricity-dependent residents, power shutoffs ──
+    # Display-only Data Layers (not PCA variables); built by scripts/build_context_layers.py.
+    ctx_layer_path = ROOT / "data/context/context_layers_tract.csv"
+    ctx_layer_cols = ["unsheltered_n", "empower_rate", "empower_n", "empower_zip",
+                      "psps_events", "psps_accounts", "psps_mbl", "psps_max_hrs"]
+    if ctx_layer_path.exists():
+        ctx_layers = pd.read_csv(ctx_layer_path, dtype={"GEOID": str, "empower_zip": str})
+        ctx_layers["GEOID"] = ctx_layers["GEOID"].str.zfill(11)
+        tracts = _safe_merge(tracts, ctx_layers, ctx_layer_cols)
+
     # ── Impute & simplify ──
     var_cols = [v[0] for v in VARIABLES]
     loaded = [c for c in var_cols if c in tracts.columns]
@@ -642,8 +652,8 @@ def load_data():
     else:
         extra = []
 
-    # UCLA exploratory display columns (Data Layers only, not PCA variables).
-    extra += [c for c in ucla_cols if c in tracts.columns]
+    # Exploratory display columns (Data Layers only, not PCA variables).
+    extra += [c for c in ucla_cols + ctx_layer_cols if c in tracts.columns]
 
     tracts = tracts.to_crs(epsg=4326)
     tracts["geometry"] = tracts.geometry.simplify(0.0003)
@@ -1926,6 +1936,9 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
         <option value="hosp_day">Heat hospitalizations</option>
         <option value="excess_er">Excess heat ER visits</option>
         <option value="threshold">Heat-risk threshold (°F)</option>
+        <option value="unsheltered">Unsheltered people</option>
+        <option value="empower">Electricity-dependent residents</option>
+        <option value="psps">Power shutoffs</option>
       </select>
       <div id="data-layer-opacity-wrap" style="display:none">
         <span class="opacity-lbl">Opacity</span>
@@ -2738,6 +2751,12 @@ function setDataLayer(id){
     renderDataLayerLegend('threshold');
     return;
   }
+  if(CTX_LAYER[id]){
+    _dataLayerObj = buildContextChoropleth(id);
+    if(_dataLayerObj) _dataLayerObj.addTo(map);
+    renderDataLayerLegend(id);
+    return;
+  }
   var meta = RASTER_META[id], v = rasterVariant(id);
   if(!meta || !v){ if(leg){ leg.style.display='block'; leg.innerHTML='<i style="color:#999">layer unavailable</i>'; } return; }
   var b = meta.bounds;
@@ -2841,9 +2860,77 @@ function setThresholdLevel(lv){
   }
 }
 
+/* Unsheltered count, emPOWER, SDG&E shutoffs — display-only tract layers from
+   build_context_layers.py. Binned rather than ramped because the counts are
+   heavily skewed. A tract with none is gray, not clear: the composite is drawn
+   underneath, and its colors would show through as if they were data. */
+var CTX_NONE = [224,224,224];
+var CTX_LAYER = {
+  unsheltered:{key:'unsheltered_n', title:'Unsheltered people', unit:'counted, January 2026',
+    none:'none', bins:[1,5,20,50,100], labels:['1–4','5–19','20–49','50–99','100+'],
+    ramp:[[254,229,217],[252,174,145],[251,106,74],[222,45,38],[165,15,21]],
+    note:'Regional Task Force on Homelessness point-in-time count, one night in January 2026.'},
+  empower:{key:'empower_rate', title:'Electricity-dependent residents', unit:'per 1,000 residents',
+    none:'masked', bins:[0,4,6,8,10], labels:['&lt;4','4–6','6–8','8–10','10+'],
+    ramp:[[242,240,247],[203,201,226],[158,154,200],[117,107,177],[84,39,143]],
+    note:'HHS emPOWER: Medicare beneficiaries who rely on electricity-dependent medical equipment, per 1,000 residents of their ZIP code, shown per tract. HHS masks ZIPs with 11 or fewer.'},
+  psps:{key:'psps_events', title:'Power shutoffs', unit:'SDG&amp;E shutoff events, 2024–25',
+    none:'none', bins:[1,2,3,4], labels:['1','2','3','4'],
+    ramp:[[254,217,142],[254,153,41],[217,95,14],[153,52,4]],
+    note:'SDG&amp;E Public Safety Power Shutoffs, from its filings with the CPUC. All four events were in November–January.'}
+};
+function _ctxColor(c, v){
+  var none='rgb('+CTX_NONE.join(',')+')';
+  if(v==null) return none;
+  v=+v; if(isNaN(v)||v<c.bins[0]) return none;
+  var i=0; while(i<c.bins.length-1 && v>=c.bins[i+1]) i++;
+  return 'rgb('+c.ramp[i].join(',')+')';
+}
+function _ctxPopup(id, p){
+  function n(x){return (+x).toLocaleString();}
+  var gray='<span style="color:#888">';
+  if(id==='unsheltered'){
+    var u=+p.unsheltered_n;
+    return '<div style="font-size:11px"><b>Unsheltered people</b><br>'+
+      (u>0?'Counted in this tract: <b>'+n(u)+'</b>':'None counted in this tract')+'<br>'+
+      gray+'RTFH point-in-time count, January 2026</span></div>';
+  }
+  if(id==='empower'){
+    var c=+p.empower_n;
+    return '<div style="font-size:11px"><b>Electricity-dependent residents</b><br>'+
+      'ZIP '+p.empower_zip+': <b>'+(c>11?n(c):(c>0?'11 or fewer':'none'))+'</b> Medicare beneficiaries on powered medical equipment<br>'+
+      (p.empower_rate==null?'':'<b>'+(+p.empower_rate).toFixed(1)+'</b> per 1,000 residents<br>')+
+      gray+'HHS emPOWER. ZIP-code resolution, shown per tract.</span></div>';
+  }
+  if(!(+p.psps_events>0)) return '<div style="font-size:11px"><b>Power shutoffs</b><br>No SDG&amp;E shutoffs here in 2024–25</div>';
+  return '<div style="font-size:11px"><b>Power shutoffs</b><br>'+
+    'SDG&amp;E shutoff events, 2024–25: <b>'+p.psps_events+'</b><br>'+
+    'Customer accounts shut off: <b>'+n(p.psps_accounts)+'</b><br>'+
+    'Medical Baseline accounts: <b>'+n(p.psps_mbl)+'</b><br>'+
+    'Longest outage: <b>'+Math.round(+p.psps_max_hrs)+' hours</b><br>'+
+    gray+'Accounts are summed over events. From SDG&amp;E filings with the CPUC.</span></div>';
+}
+function buildContextChoropleth(id){
+  if(typeof GJ==='undefined' || !GJ.features) return null;
+  var c=CTX_LAYER[id];
+  return L.geoJSON(GJ,{pane:'landusePane',
+    style:function(f){return{fillColor:_ctxColor(c, f.properties[c.key]),color:'#fff',weight:0.3,fillOpacity:_dataLayerOpacity};},
+    onEachFeature:function(f,lyr){lyr.bindPopup(_ctxPopup(id,f.properties));}});
+}
+
 function renderDataLayerLegend(id){
   var leg=document.getElementById('data-layer-legend'); if(!leg) return;
   leg.style.display='block';
+  if(CTX_LAYER[id]){
+    var c=CTX_LAYER[id];
+    leg.innerHTML='<div style="font-weight:600;margin-bottom:2px">'+c.title+
+      ' <span style="font-weight:400;color:#888">('+c.unit+')</span></div>'+
+      '<div style="display:flex;gap:2px">'+[CTX_NONE].concat(c.ramp).map(function(rgb,i){
+        return '<div style="flex:1;text-align:center"><div style="height:10px;background:rgb('+rgb.join(',')+')"></div>'+
+          '<div style="font-size:9px;color:#555;white-space:nowrap">'+(i?c.labels[i-1]:c.none)+'</div></div>';}).join('')+'</div>'+
+      '<div style="font-size:9.5px;color:#888;margin-top:3px;line-height:1.3">'+c.note+'</div>';
+    return;
+  }
   if(id==='hosp_day'){
     var d=_hospDomain||[0,1];
     var hstops=HOSP_RAMP.map(function(c){return 'rgb('+c.join(',')+')';}).join(',');

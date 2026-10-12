@@ -18,6 +18,7 @@ ALLOWED_SCRIPT_FILES = {
     "build_data_overlays.py",
     "build_userguide_pdf.sh",
     "build_ucla_heat_tract_xwalk.py",
+    "build_context_layers.py",
     "build_hero_figure.py",
     "build_coolzones.py",
     "build_hospitalizations_viewer.py",

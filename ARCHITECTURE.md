@@ -37,7 +37,7 @@ ship.
 
 **Tracked build scripts** (un-ignored via `!scripts/...`):
 `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`,
-`build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`, `build_hero_figure.py`,
+`build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`, `build_context_layers.py`, `build_hero_figure.py`,
 `build_coolzones.py`, `build_hospitalizations_viewer.py`, `build_landing_page.py`. Everything else in
 `scripts/` is local-only.
 
@@ -343,7 +343,8 @@ data/
 │   │   └── canopy_4326{,_cb}.png + canopy_bounds.json
 │   ├── sandag_landuse.pmtiles               ← [tracked, deployed] SANDAG land-use vector tiles
 │   ├── Land_Use_2023_20260313.csv           ← reference data, not currently merged
-│   └── tract_exploration.csv                ← pct_green
+│   ├── tract_exploration.csv                ← pct_green
+│   └── context_layers_tract.csv             ← unsheltered_n, empower_*, psps_* (display-only Data Layers). Built by build_context_layers.py
 │
 └── cool_zones/
     └── coolzone_sites.csv                   ← County-designated Cool Zone sites (COOLZONES overlay); `source` = provenance, `geocode_source` = where the coordinates came from. Built by build_coolzones.py

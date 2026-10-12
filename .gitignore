@@ -6,6 +6,7 @@ scripts/*
 !scripts/build_userguide_pdf.sh
 !scripts/build_data_overlays.py
 !scripts/build_ucla_heat_tract_xwalk.py
+!scripts/build_context_layers.py
 !scripts/build_hero_figure.py
 !scripts/build_coolzones.py
 # index.html is generated; the page can't be rebuilt without its builder.

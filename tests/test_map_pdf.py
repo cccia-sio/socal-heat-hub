@@ -15,7 +15,10 @@ silent ones:
 * A pillar with more variables than fit must say so rather than truncate silently.
 """
 
+import json
 import re
+
+import pytest
 
 
 def test_map_pdf_draws_the_variable_box(js_code):
@@ -105,3 +108,74 @@ def test_every_exported_layer_gets_a_legend_title(js_fn):
     assert "curLayer==='heatmode'" in js_fn("_captureStudyAreaMap"), (
         "The export legend has no heat-mode-preview branch."
     )
+
+
+# ── Jurisdiction names ──────────────────────────────────────────────────────
+# With several cities on, a legend listing their names next to identical black
+# squares couldn't say which outline was which. The cities and the unincorporated
+# county are named on the map instead, the cities at the live map's label points.
+# The legend keeps the layer's color key; the variable box keeps the inputs.
+
+
+def _juris(viewer_html_text, var):
+    match = re.search(rf"\bvar {var}\s*=\s*", viewer_html_text)
+    return json.JSONDecoder().raw_decode(viewer_html_text, match.end())[0]
+
+
+def test_map_names_the_visible_jurisdictions(js_fn):
+    src = js_fn("_captureStudyAreaMap")
+    assert "drawJurisLabels()" in src, "The map export no longer names the jurisdictions."
+    assert "jurisLabels[k].getLatLng()" in src, (
+        "drawJurisLabels() should place each city's name at the live map's label "
+        "point, so the PDF matches what's on screen."
+    )
+    assert "'Unincorporated county'" in src, (
+        "drawJurisLabels() no longer names the unincorporated county."
+    )
+
+
+def test_city_scoped_export_draws_no_names(js_fn):
+    """The city PDF names its city in the title; a label would cover its tracts."""
+    assert "if(!opts.jurisName)drawJurisLabels();" in js_fn("_captureStudyAreaMap")
+
+
+def test_names_dont_overprint(js_fn):
+    """Coronado's and National City's points are ~36 px apart at county scale."""
+    assert "hits(" in js_fn("_captureStudyAreaMap"), (
+        "drawJurisLabels() no longer moves a name that lands on one already drawn."
+    )
+
+
+def test_legend_does_not_list_the_named_jurisdictions(js_fn):
+    src = js_fn("_captureStudyAreaMap")
+    assert "cityRows" not in src and "text:'Unincorporated'" not in src, (
+        "The export legend lists the cities or the unincorporated county again; "
+        "they're named on the map."
+    )
+
+
+def test_unincorporated_county_is_outlined_not_tinted(js_fn):
+    """An indigo wash over the east county shifts its risk colors off the legend."""
+    assert "drawFeature(f,null,UNINCORP_COLOR," in js_fn("_captureStudyAreaMap"), (
+        "The map export fills the unincorporated county again; the tracts under it "
+        "no longer print in the legend's colors."
+    )
+
+
+def test_map_pdf_still_lists_the_inputs_by_pillar(js_fn):
+    """The box over the lower-left corner, not the legend, carries the pillars."""
+    assert "_pdfVarBox(" in js_fn("_heroPdf")
+
+
+@pytest.mark.parametrize("var,key", [("JURIS", "NAME"), ("UNINCORP", "name")])
+def test_label_points_are_inside_their_shape(viewer_html_text, var, key):
+    """A bounding-box center can miss the shape: Coronado's is in the bay."""
+    shape = pytest.importorskip("shapely.geometry").shape
+    outside = [
+        f["properties"][key]
+        for f in _juris(viewer_html_text, var)["features"]
+        if not shape(f["geometry"]).contains(
+            shape({"type": "Point", "coordinates": [f["properties"]["label_lng"], f["properties"]["label_lat"]]})
+        )
+    ]
+    assert not outside, f"Labels placed outside their shape: {outside}"

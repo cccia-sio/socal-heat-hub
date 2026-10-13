@@ -22,6 +22,8 @@ import pandas as pd
 import xarray as xr
 from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import distance_transform_edt
+from shapely.geometry import shape
+from shapely.ops import polylabel
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -760,6 +762,15 @@ def _round_geojson_coords(text, ndigits=6):
     return json.dumps(obj)
 
 
+def _label_point(geom):
+    """(lat, lng) inside the shape's largest part, where its name goes on the map.
+
+    A bounding-box center can miss the shape: Coronado's is in the bay.
+    """
+    p = polylabel(max(getattr(geom, "geoms", [geom]), key=lambda g: g.area), tolerance=0.0005)
+    return round(p.y, 4), round(p.x, 4)
+
+
 def _script_safe(blob):
     """Escape `<` in data bound for an inline <script>.
 
@@ -885,6 +896,8 @@ def main():
         juris = juris[juris["category"] == "City"][["NAME", "geometry"]].copy()
         juris = juris.to_crs(epsg=4326)
         juris["geometry"] = juris.geometry.simplify(0.0005)
+        # Where the city's name goes, on the map and in the map PDF.
+        juris["label_lat"], juris["label_lng"] = zip(*juris.geometry.map(_label_point))
         juris_str = _round_geojson_coords(juris.to_json())
         logger.info(f"Loaded {len(juris)} city jurisdictions")
     else:
@@ -903,7 +916,10 @@ def main():
     # territory is ~85% of the county by area, so it's drawn as one outlined region.
     unincorp_str = "null"
     if UNINCORP_PATH.exists():
-        unincorp_str = _round_geojson_coords(UNINCORP_PATH.read_text())
+        unincorp = json.loads(UNINCORP_PATH.read_text())
+        for f in unincorp["features"]:  # where the map PDF names it
+            f["properties"]["label_lat"], f["properties"]["label_lng"] = _label_point(shape(f["geometry"]))
+        unincorp_str = _round_geojson_coords(json.dumps(unincorp))
         logger.info(f"Loaded unincorporated boundary from {UNINCORP_PATH.name}")
     else:
         logger.warning("No unincorporated file — unincorporated overlay will not be shown")
@@ -3772,10 +3788,12 @@ if(JURIS){
     if(feats.length===0)return;
     var gj={type:"FeatureCollection",features:feats};
     jurisLayers[name]=L.geoJSON(gj,{style:makeJurisStyle(),onEachFeature:makeJurisHL(name)});
-    // Permanent center label so the city name is visible without hovering.
+    // Permanent label so the city name is visible without hovering. The map PDF
+    // puts its label at the same point.
+    var lp=feats[0].properties;
     jurisLabels[name]=L.tooltip({permanent:true,direction:"center",className:"juris-label",interactive:false})
       .setContent(name)
-      .setLatLng(jurisLayers[name].getBounds().getCenter());
+      .setLatLng([lp.label_lat,lp.label_lng]);
   });
   // Build per-city checkbox list
   var itemsEl=document.getElementById("juris-items");
@@ -6358,14 +6376,8 @@ function _captureStudyAreaMap(opts){
       }
       if(!title)return;
 
-      // City-scoped exports omit the jurisdiction/tribal checklist entirely.
-      var cityRows=[];
-      if(!opts.jurisName&&typeof JURIS!=='undefined'&&JURIS&&typeof jurisLayers!=='undefined'){
-        Object.keys(jurisLayers).sort(function(a,b){return a.localeCompare(b);}).forEach(function(k){
-          if(!map.hasLayer(jurisLayers[k]))return;
-          cityRows.push({label:k, color:JURIS_COLOR});
-        });
-      }
+      // City-scoped exports omit the tribal checklist entirely. Cities and the
+      // unincorporated county are named on the map instead (drawJurisLabels).
       var tribalRows=[];
       if(!opts.jurisName&&typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalGroups!=='undefined'){
         Object.keys(tribalGroups).sort(function(a,b){return a.localeCompare(b);}).forEach(function(gk){
@@ -6374,7 +6386,6 @@ function _captureStudyAreaMap(opts){
           tribalRows.push({label:gk,color:TRIBAL_COLORS.reservation,dashed:false});
         });
       }
-      var unincorpOn=(!opts.jurisName&&typeof unincorpLayer!=='undefined'&&unincorpLayer&&map.hasLayer(unincorpLayer));
 
       var pad=14, gradW=200, gradH=14, swW=22, swH=14, rowH=22;
       var titleSize=18, subSize=12, bodySize=14, sectionGap=10;
@@ -6389,9 +6400,7 @@ function _captureStudyAreaMap(opts){
       function tw(text,font){ctx.font=font;return ctx.measureText(text).width/SCALE;}
       var maxLabelW=0;
       if(driverRows)driverRows.forEach(function(r){var w=tw(r.label,fonts.body);if(w>maxLabelW)maxLabelW=w;});
-      cityRows.forEach(function(r){var w=tw(r.label,fonts.body);if(w>maxLabelW)maxLabelW=w;});
       tribalRows.forEach(function(r){var w=tw(r.label,fonts.body);if(w>maxLabelW)maxLabelW=w;});
-      if(unincorpOn){var uw=tw('Unincorporated county',fonts.body);if(uw>maxLabelW)maxLabelW=uw;}
       var titleW=tw(title,fonts.title);
       var subW=subtitle?tw(subtitle,fonts.sub):0;
       var showSspLink=!!(subtitle && curScenario && curScenario!=='present');
@@ -6420,24 +6429,11 @@ function _captureStudyAreaMap(opts){
         plan.push({op:'note',y:y,text:'Lighter = lower risk'});
         y+=subSize+8;
       }
-      if(cityRows.length){
-        y+=sectionGap;
-        plan.push({op:'sect',y:y,text:'Jurisdictions'});
-        y+=bodySize+8;
-        cityRows.forEach(function(r){plan.push({op:'crow',y:y,label:r.label,color:r.color});y+=rowH;});
-      }
       if(tribalRows.length){
         y+=sectionGap;
         plan.push({op:'sect',y:y,text:'Tribal Lands'});
         y+=bodySize+8;
         tribalRows.forEach(function(r){plan.push({op:'crow',y:y,label:r.label,color:r.color,dashed:r.dashed});y+=rowH;});
-      }
-      if(unincorpOn){
-        y+=sectionGap;
-        plan.push({op:'sect',y:y,text:'Unincorporated'});
-        y+=bodySize+8;
-        plan.push({op:'crow',y:y,label:'Unincorporated county',color:UNINCORP_COLOR});
-        y+=rowH;
       }
       var boxH=y+pad-4;
       if(measureOnly)return {w:boxW,h:boxH};
@@ -6517,6 +6513,42 @@ function _captureStudyAreaMap(opts){
       ctx.restore();
     }
 
+    // Each visible city's name on its outline, at the live map's label point,
+    // and the unincorporated county's on its region, in place of a legend list
+    // that couldn't say which outline was which. A name that would overprint one
+    // already drawn moves up, down, left or right by its own size: at county scale
+    // Coronado's and National City's points are ~36 px apart.
+    function drawJurisLabels(){
+      var names=[];
+      Object.keys(jurisLabels).forEach(function(k){
+        if(map.hasLayer(jurisLayers[k]))names.push({text:k,at:jurisLabels[k].getLatLng(),color:'#1a1a1a'});
+      });
+      if(typeof UNINCORP!=='undefined'&&UNINCORP&&unincorpLayer&&map.hasLayer(unincorpLayer)){
+        var up=UNINCORP.features[0].properties;
+        names.push({text:'Unincorporated county',at:{lat:up.label_lat,lng:up.label_lng},color:UNINCORP_COLOR});
+      }
+      var fs=15, halo=4, placed=[];
+      ctx.save();
+      ctx.font='700 '+(fs*SCALE)+'px -apple-system,Segoe UI,Roboto,sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.lineJoin='round'; ctx.lineWidth=halo*SCALE; ctx.strokeStyle='rgba(255,255,255,0.9)';
+      function hits(b){
+        return placed.some(function(p){return b.x<p.x+p.w&&p.x<b.x+b.w&&b.y<p.y+p.h&&p.y<b.y+b.h;});
+      }
+      names.forEach(function(n){
+        var pt=project(n.at.lat,n.at.lng);
+        var w=ctx.measureText(n.text).width+halo*SCALE, h=(fs+halo)*SCALE;
+        function box(d){return {x:pt[0]+d[0]-w/2, y:pt[1]+d[1]-h/2, w:w, h:h};}
+        var b=[[0,0],[0,-h],[0,h],[-w/2,0],[w/2,0]].map(box)
+          .filter(function(c){return !hits(c);})[0]||box([0,0]);
+        placed.push(b);
+        ctx.fillStyle=n.color;
+        ctx.strokeText(n.text,b.x+w/2,b.y+h/2);
+        ctx.fillText(n.text,b.x+w/2,b.y+h/2);
+      });
+      ctx.restore();
+    }
+
     function drawAttribution(){
       var text='Esri, HERE, Garmin  © OpenStreetMap contributors';
       ctx.font=(10*SCALE)+'px -apple-system,Segoe UI,Roboto,sans-serif';
@@ -6559,9 +6591,10 @@ function _captureStudyAreaMap(opts){
         });
         if(clipFeats&&clipFeats.length)ctx.restore();
       }
-      // Unincorporated region — above tracts, below city/tribal outlines (skipped on city-scoped exports)
+      // Unincorporated region — above tracts, below city/tribal outlines (skipped on city-scoped exports).
+      // Outline only: the live map's tint would print the tracts under it off the legend's colors.
       if(!opts.jurisName&&typeof UNINCORP!=='undefined'&&UNINCORP&&typeof unincorpLayer!=='undefined'&&unincorpLayer&&map.hasLayer(unincorpLayer)){
-        UNINCORP.features.forEach(function(f){drawFeature(f,UNINCORP_COLOR,UNINCORP_COLOR,2*SCALE,0.08);});
+        UNINCORP.features.forEach(function(f){drawFeature(f,null,UNINCORP_COLOR,2*SCALE,0);});
       }
       // Jurisdiction outlines: just the focused city when scoped, else all visible
       if(typeof JURIS!=='undefined'&&JURIS){
@@ -6586,6 +6619,7 @@ function _captureStudyAreaMap(opts){
           if(dashed)ctx.restore();
         });
       }
+      if(!opts.jurisName)drawJurisLabels();
       if(!opts.minimal){drawLegend();drawScaleBar();}
       drawAttribution();
       cleanup();

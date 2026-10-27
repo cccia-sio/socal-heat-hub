@@ -124,6 +124,13 @@ Effect on the published values: daytime `mean_tmax` rose 0.48 °C on average
 old field was a station maximum passed straight through, which the blend now
 smooths). Nighttime shifted by −0.03 to +0.05 °C on average.
 
+**Update 2026-10-27.** The station audit that builds the QC blacklist read the
+metadata elevations, which are in feet, as metres, and it also rejected valley
+stations for cold nights. With both fixed, the blacklist went from 109 stations
+to 11, and sun-heated sensors are dropped from the daytime columns only. Daytime
+interpolation now runs from 560 stations (was 503). Re-verified after the
+rebuild: 0 of 737 tracts exceed the 40% cap on the daytime path.
+
 Because HPI is non-commercial and CC BY permits commercial use, HPI-derived
 columns are **omitted from the bulk data download** to keep the downloadable
 dataset CC BY-clean. They remain visible on the map, used under HPI's own terms

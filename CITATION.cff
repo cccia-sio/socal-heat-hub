@@ -4,12 +4,20 @@ message: >-
   If you use this tool, its methodology, or its derived data, please cite it.
 type: software
 authors:
-  # TODO: add co-authors (PI, SDRCC collaborators) and ORCIDs before minting the DOI.
+  # TODO: add affiliations and ORCIDs for the co-authors before minting the DOI.
   - given-names: Connor
     family-names: Mack
     email: cjmack@ucsd.edu
     affiliation: Scripps Institution of Oceanography, UC San Diego
     # orcid: 'https://orcid.org/0000-0000-0000-0000'
+  - given-names: Maren
+    family-names: Hale
+  - given-names: A-bel
+    family-names: Gong
+  - given-names: Darbi
+    family-names: Berry
+  - given-names: Mark
+    family-names: Merrifield
 repository-code: 'https://github.com/cccia-sio/socal-heat-hub'
 url: 'https://cccia-sio.github.io/socal-heat-hub/'
 abstract: >-

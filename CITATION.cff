@@ -22,6 +22,8 @@ authors:
   - given-names: Mark
     family-names: Merrifield
     affiliation: Scripps Institution of Oceanography, UC San Diego
+version: 1.0.0
+date-released: '2026-11-04'
 repository-code: 'https://github.com/cccia-sio/socal-heat-hub'
 url: 'https://cccia-sio.github.io/socal-heat-hub/'
 abstract: >-

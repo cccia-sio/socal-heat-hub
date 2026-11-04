@@ -49,8 +49,29 @@ Issues and feedback welcome via GitHub issues.
 
 ## Citation
 
-If you use this tool, its methodology, or its derived data, please cite it —
-see [CITATION.cff](CITATION.cff).
+If you use this tool, its methodology, or its derived data, please cite it:
+
+<!-- TODO: after the v1.0.0 release, replace XXXXXXX (here and in CITATION.cff)
+     with the Zenodo concept DOI, which always resolves to the latest version. -->
+
+```text
+Mack, C., Hale, M., Gong, A., Berry, D., & Merrifield, M. (2026). San Diego Heat Risk Explorer (Version 1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.XXXXXXX
+```
+
+```bibtex
+@software{mack2026sdheatrisk,
+  author    = {Mack, Connor and Hale, Maren and Gong, A-bel and Berry, Darbi and Merrifield, Mark},
+  title     = {San Diego Heat Risk Explorer},
+  year      = {2026},
+  version   = {1.0.0},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.XXXXXXX},
+  url       = {https://doi.org/10.5281/zenodo.XXXXXXX}
+}
+```
+
+GitHub's "Cite this repository" button gives the same citation in other
+formats, from [CITATION.cff](CITATION.cff).
 
 ## License
 

@@ -379,13 +379,15 @@ FEEDBACK_SUBJECT = "San Diego Heat Risk Explorer - feedback"
 # this site still carries its license and a link to the per-variable source
 # table. Keep ASCII-only: the CSV ships without a BOM, and non-ASCII would
 # mojibake when opened in Excel.
+#
+# The citation is the sidebar's Cite text verbatim (tests/test_generated_html.py)
+# and is also printed in every PDF footer. The data dictionary, not this field,
+# says which Healthy Places Index variables are withheld.
 EXPORT_META = {
     "citation": (
-        "San Diego Heat Risk Explorer - Southern California Extreme Heat "
-        "Research Hub & San Diego Regional Climate Collaborative. Variables "
-        "whose source terms bar redistribution (Healthy Places Index) are "
-        "shown on the map but omitted from this export - see the data "
-        "dictionary."
+        "Mack, C., Hale, M., Gong, A., Berry, D., & Merrifield, M. (2026). "
+        "San Diego Heat Risk Explorer (Version 1.0.0) [Computer software]. "
+        "Zenodo. https://doi.org/10.5281/zenodo.23960750"
     ),
     "license": "CC BY 4.0",
     "sources_url": "https://cccia-sio.github.io/socal-heat-hub/userguide/#data",
@@ -6630,8 +6632,8 @@ function _heroPdf(canvas,opts){
   var dt=new Date();
   var dStr=dt.toLocaleString(undefined,{year:'numeric',month:'short',day:'2-digit',
                                          hour:'2-digit',minute:'2-digit'});
-  pdf.text('Generated '+dStr,M,ph-30);
-  pdf.text('Sources: LOCA2 downscaled CMIP6 \\u00b7 USGS Landsat \\u00b7 NOAA HRRR \\u00b7 CDC PLACES & SVI \\u00b7 Healthy Places Index',
+  pdf.text('Cite as: '+EXPORT_META.citation,M,ph-30);
+  pdf.text('Generated '+dStr+'  \\u00b7  Sources: LOCA2 downscaled CMIP6 \\u00b7 USGS Landsat \\u00b7 NOAA HRRR \\u00b7 CDC PLACES & SVI \\u00b7 Healthy Places Index',
     M,ph-18);
 
   var url='cccia-sio.github.io/socal-heat-hub';
@@ -6869,8 +6871,8 @@ function _heroPdfTwoPanel(cL,cR,opts){
   pdf.setFontSize(8);pdf.setTextColor(100,116,139);
   var dt=new Date();
   var dStr=dt.toLocaleString(undefined,{year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'});
-  pdf.text('Generated '+dStr,M,ph-30);
-  pdf.text('Sources: LOCA2 downscaled CMIP6 \\u00b7 USGS Landsat \\u00b7 NOAA HRRR \\u00b7 CDC PLACES & SVI \\u00b7 Healthy Places Index',M,ph-18);
+  pdf.text('Cite as: '+EXPORT_META.citation,M,ph-30);
+  pdf.text('Generated '+dStr+'  \\u00b7  Sources: LOCA2 downscaled CMIP6 \\u00b7 USGS Landsat \\u00b7 NOAA HRRR \\u00b7 CDC PLACES & SVI \\u00b7 Healthy Places Index',M,ph-18);
   var url='cccia-sio.github.io/socal-heat-hub';
   pdf.setFont('helvetica','bold');pdf.setTextColor(37,99,235);
   var urlW=pdf.getTextWidth(url);pdf.text(url,pw-M-urlW,ph-18);
@@ -7349,10 +7351,12 @@ function _tractPdfBuild(idx,feat,radarC,mapC,luC){
   var dStr=dt.toLocaleString(undefined,{year:'numeric',month:'short',day:'2-digit',
     hour:'2-digit',minute:'2-digit'});
   pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(100,116,139);
-  pdf.text('Generated '+dStr+'  \\u00b7  '+EXPORT_META.license+
-           '  \\u00b7  Percentiles are ranked within San Diego County.',M,footTop+12);
-  pdf.text('San Diego Heat Risk Explorer \\u2014 Southern California Extreme Heat Research Hub '+
-           '& San Diego Regional Climate Collaborative.',M,footTop+21);
+  // The citation shares two wrapped lines with the date and license rather than
+  // growing the footer, which would squeeze the variable rows above it.
+  var fy=footTop+12;
+  pdf.splitTextToSize('Cite as: '+EXPORT_META.citation+'  \\u00b7  Generated '+dStr+
+    '  \\u00b7  '+EXPORT_META.license+'  \\u00b7  Percentiles are ranked within San Diego County.',CW)
+    .forEach(function(line){pdf.text(line,M,fy);fy+=9;});
   // Wrap rather than assume: the source list plus the URL overruns the right
   // margin at this size if written as one line.
   pdf.setTextColor(130,140,155);
@@ -7361,7 +7365,6 @@ function _tractPdfBuild(idx,feat,radarC,mapC,luC){
              (mapC?' Imagery \\u00a9 Esri, Maxar, Earthstar Geographics.':'')+
              (luC?' Land use \\u00a9 SANDAG; basemap Esri, HERE, Garmin, \\u00a9 OpenStreetMap contributors.':'')+
              ' Full list: '+EXPORT_META.sources_url;
-  var fy=footTop+30;
   pdf.splitTextToSize(srcTxt,CW).forEach(function(line){
     pdf.text(line,M,fy);fy+=8;
   });
@@ -7896,6 +7899,7 @@ function _dictionaryToCSV(cols,nRows){
     '# heat mode: '+man.heat_mode+'  [layers: '+man.heat_mode_layers+']',
     '# scenario: '+man.scenario+(man.period?'  period: '+man.period:''),
     '# variables in the composite: '+(man.composite_variables||'(none)'),
+    '# cite as: '+man.citation,
     '# license: '+man.license,
     '# full source table: '+man.sources_url,
     '#'

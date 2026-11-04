@@ -5,6 +5,7 @@ These tests guard against the most common ways a build can silently regress:
 unreplaced placeholder tokens, missing DOM hooks, or malformed inlined JSON.
 """
 
+import html
 import json
 import re
 
@@ -141,3 +142,16 @@ def test_copy_citation_copies_the_citation_shown(viewer_html_text, js_fn):
     assert 'id="cite-text"' in viewer_html_text
     assert 'id="cite-copy-btn"' in viewer_html_text
     assert "getElementById('cite-text')" in js_fn("copyCitation")
+
+
+def test_one_citation_everywhere(viewer_html_text, js_fn):
+    """The sidebar, every exported row, the data dictionary, and all three PDFs cite the same thing."""
+    m = re.search(r'<p id="cite-text">(.*?)</p>', viewer_html_text, re.S)
+    assert m, "sidebar #cite-text missing"
+    shown = " ".join(html.unescape(re.sub(r"<[^>]+>", "", m.group(1))).split())
+    m = re.search(r"\bvar EXPORT_META\s*=\s*", viewer_html_text)
+    meta, _ = json.JSONDecoder().raw_decode(viewer_html_text, m.end())
+    assert meta["citation"] == shown, "Download Data rows cite something other than the sidebar"
+    for fn in ("_heroPdf", "_heroPdfTwoPanel", "_tractPdfBuild"):
+        assert "EXPORT_META.citation" in js_fn(fn), f"{fn}() PDF footer carries no citation"
+    assert "man.citation" in js_fn("_dictionaryToCSV"), "data dictionary header carries no citation"

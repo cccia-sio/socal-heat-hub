@@ -405,7 +405,7 @@
       <h3>Population Sensitivity</h3>
 
       <h4>Health</h4>
-      <p>High Blood Pressure, Current Asthma, Coronary Heart Disease, Cognitive Difficulty, Chronic Obstructive Pulmonary Disease (COPD), Depression, Diabetes, Stroke, Obesity, Frequent Mental Distress, Life Expectancy, Loneliness, Lacks Social/Emotional Support, Heat-Day Hospitalization Rate Ratio, and Warm-Night Hospitalization Rate Ratio. Chronic-disease and social-support prevalence is from <a href="https://www.cdc.gov/places/index.html" target="_blank" rel="noopener">CDC PLACES</a>; Life Expectancy is from the <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy Places Index</a>; the hospitalization rate ratios are from <a href="https://calheatscore.calepa.ca.gov/" target="_blank" rel="noopener">CalHeatScore</a>.</p>
+      <p>High Blood Pressure, Current Asthma, Coronary Heart Disease, Cognitive Difficulty, Chronic Obstructive Pulmonary Disease (COPD), Depression, Diabetes, Stroke, Obesity, Frequent Mental Distress, Life Expectancy, Loneliness, Loneliness, and Lacks Social/Emotional Support. Chronic-disease and social-support prevalence is from <a href="https://www.cdc.gov/places/index.html" target="_blank" rel="noopener">CDC PLACES</a>; Life Expectancy is from the <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy Places Index</a>.</p>
 
       <h4>Sociodemographics</h4>
       <p>Age 65+, Seniors Living Alone (%), Age 17 &amp; Under, Disability, Limited English, Single-Parent Household, Below 150% Poverty, Unemployed, Housing Cost Burden, No High School Diploma, Uninsured, Minority, Multi-Unit Structures, Mobile Homes, Crowding, No Vehicle, Group Quarters, No Internet, Outdoor Workers (Ag+Const, %), Agricultural Workers (%), Food Insecurity, Food Stamp / SNAP Receipt, Housing Insecurity, Lacks Reliable Transportation, Utility Shut-Off Threat, and Energy Burden (% income). Sources: <a href="https://www.atsdr.cdc.gov/place-health/php/svi/index.html" target="_blank" rel="noopener">CDC SVI 2022</a>, <a href="https://censusreporter.org/tables/B11007/" target="_blank" rel="noopener">ACS B11007</a>, <a href="https://censusreporter.org/tables/C24030/" target="_blank" rel="noopener">ACS C24030</a>, <a href="https://www.cdc.gov/places/index.html" target="_blank" rel="noopener">CDC PLACES</a>, and the <a href="https://data.openei.org/submissions/6219" target="_blank" rel="noopener">DOE LEAD Tool</a>.</p>
@@ -484,7 +484,7 @@
       <li><code>adaptive_score</code> runs in the capacity direction, where 100 means the most capacity and the <em>least</em> risk. That is the opposite of <code>exposure_score</code> and <code>sensitivity_score</code>.</li>
       <li><code>_sd_pctile</code> columns always rank against all San Diego County tracts, even when you export a single city.</li>
     </ul>
-    <p>The download leaves out a few variables that appear on the map, because their sources' terms don't allow us to redistribute them. These are the <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy Places Index</a> variables (non-commercial license) and the CalHeatScore heat-hospitalization variables (no published license). The dictionary lists each one with <code>in_download&nbsp;=&nbsp;no</code> and a note on where to request the data. Everything in the download is public domain or openly licensed. <a href="../DATA_LICENSE.md" target="_blank" rel="noopener">DATA_LICENSE.md</a> has the full provenance audit.</p>
+    <p>The download leaves out a few variables that appear on the map, because their sources' terms don't allow us to redistribute them. These are the <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy Places Index</a> variables (non-commercial license). The dictionary lists each one with <code>in_download&nbsp;=&nbsp;no</code> and a note on where to request the data. Everything in the download is public domain or openly licensed. <a href="../DATA_LICENSE.md" target="_blank" rel="noopener">DATA_LICENSE.md</a> has the full provenance audit.</p>
 
     <h3>Future scenarios</h3>
     <p>Three buttons at the top of the Climate Scenario panel switch the temperature variables between time periods:</p>
@@ -516,7 +516,7 @@
     <p>Each example narrows one pillar to a single question and leaves the other two at their defaults, so the Heat Risk Index still reflects who is hot, who is vulnerable, and who can cope.</p>
 
     <div class="aside">
-      <p><strong>Start from the defaults, not from everything.</strong> The tool opens with a small selection: <em>Overall SVI</em>, <em>Age 65+</em>, and <em>Heat-Day Hospitalization Rate Ratio</em> for Population Sensitivity; <em>AC Prevalence (LACE)</em>, <em>Tree Canopy</em>, and <em>Income</em> for Adaptive Capacity; and the <em>Daytime heat</em> mode for Heat Exposure. Avoid turning on all 73 Population Sensitivity and Adaptive Capacity variables. With that many, each pillar's PCA settles on a generic pattern in which everything correlates, and the map loses its spatial contrast. Unless an example says otherwise, leave the other pillars as they are.</p>
+      <p><strong>Start from the defaults, not from everything.</strong> The tool opens with a small selection: <em>Overall SVI</em> and <em>Age 65+</em> for Population Sensitivity; <em>AC Prevalence (LACE)</em>, <em>Tree Canopy</em>, and <em>Income</em> for Adaptive Capacity; and the <em>Daytime heat</em> mode for Heat Exposure. Avoid turning on all 71 Population Sensitivity and Adaptive Capacity variables. With that many, each pillar's PCA settles on a generic pattern in which everything correlates, and the map loses its spatial contrast. Unless an example says otherwise, leave the other pillars as they are.</p>
     </div>
 
     <p>The viewer can also run Example 1 for you. The last step of the welcome tour has a <strong>See worked example</strong> button that performs each step automatically.</p>
@@ -574,7 +574,6 @@
         <tr><td class="grp" colspan="2">Population sensitivity</td></tr>
         <tr><td>Chronic disease &amp; social needs</td><td><a href="https://www.cdc.gov/places/index.html" target="_blank" rel="noopener">CDC PLACES</a></td></tr>
         <tr><td>Social vulnerability</td><td><a href="https://www.atsdr.cdc.gov/place-health/php/svi/index.html" target="_blank" rel="noopener">CDC SVI 2022</a></td></tr>
-        <tr><td>Heat-related hospitalizations</td><td><a href="https://calheatscore.calepa.ca.gov/" target="_blank" rel="noopener">CalHeatScore (CalEPA / OEHHA)</a></td></tr>
         <tr><td>Energy burden</td><td><a href="https://data.openei.org/submissions/6219" target="_blank" rel="noopener">DOE LEAD Tool (2022)</a></td></tr>
         <tr><td>Demographics, housing &amp; occupation</td><td><a href="https://www.census.gov/programs-surveys/acs" target="_blank" rel="noopener">ACS 5-year estimates</a></td></tr>
 

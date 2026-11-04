@@ -153,13 +153,6 @@ VARIABLES = [
     ("RPL_THEME2", "Household Disability/Language", "sensitivity", "Social Vulnerability Index (SVI)"),
     ("RPL_THEME3", "Racial/Ethnic Minority", "sensitivity", "Social Vulnerability Index (SVI)"),
     ("RPL_THEME4", "Housing/Transportation", "sensitivity", "Social Vulnerability Index (SVI)"),
-    # Heat-attributable hospitalization rate ratios (CalHeatScore-style
-    # relative-scale estimates). Per-ZCTA, crosswalked to tract by
-    # centroid-in-polygon (see scripts/build_hosp_tract_xwalk.py). Higher
-    # value → more hospitalizations on heat days vs typical days → higher
-    # sensitivity, matching the sensitivity-pillar polarity default.
-    ("heat_hosp_day", "Heat-Day Hospitalization Rate Ratio", "sensitivity", "Health"),
-    ("heat_hosp_night", "Warm-Night Hospitalization Rate Ratio", "sensitivity", "Health"),
     # ── Adaptive Capacity ────────────────────────────────────────────────
     # Air Conditioning
     ("ac_prob", "AC Prevalence (LACE)", "adaptive", "Air Conditioning (AC)"),
@@ -234,7 +227,6 @@ _SRC_ACS_B11007 = "https://censusreporter.org/tables/B11007/"
 _SRC_SANGIS = "https://sdgis-sandag.opendata.arcgis.com/"
 _SRC_LANDSAT = "https://www.usgs.gov/landsat-missions"
 _SRC_HRRR = "https://rapidrefresh.noaa.gov/hrrr/"
-_SRC_CALHEATSCORE = "https://calheatscore.calepa.ca.gov/"
 _SRC_LEAD = "https://data.openei.org/submissions/6219"
 _SRC_NLCD = "https://www.mrlc.gov/data"
 
@@ -273,9 +265,6 @@ VAR_SOURCES = {
     "EP_GROUPQ": _SRC_SVI, "EP_NOINT": _SRC_SVI,
     "RPL_THEMES": _SRC_SVI, "RPL_THEME1": _SRC_SVI, "RPL_THEME2": _SRC_SVI,
     "RPL_THEME3": _SRC_SVI, "RPL_THEME4": _SRC_SVI,
-    # Sensitivity — Heat-attributable hospitalization (CalHeatScore-style,
-    # per-ZCTA, centroid-crosswalked to tract).
-    "heat_hosp_day": _SRC_CALHEATSCORE, "heat_hosp_night": _SRC_CALHEATSCORE,
     # Adaptive — Census LACE 2023 (Local Air Conditioning Estimates)
     "ac_prob": _SRC_LACE,
     # Adaptive — Romitti et al. (2022)
@@ -323,7 +312,6 @@ SOURCE_NAMES = {
     _SRC_SANGIS: "SANDAG / SanGIS regional land use",
     _SRC_LANDSAT: "USGS Landsat (Collection 2 surface temperature)",
     _SRC_HRRR: "NOAA HRRR 3 km analysis, WBGT via Liljegren/Dimiceli",
-    _SRC_CALHEATSCORE: "CalHeatScore (CalEPA / OEHHA), per-ZCTA, crosswalked to tract",
     _SRC_LEAD: "DOE LEAD Tool (2022)",
     _SRC_NLCD: "NLCD / MRLC land cover",
 }
@@ -343,14 +331,6 @@ _UNITS_EXPLICIT = {
     "ac_prob": "share of homes with air conditioning (0-1)",
     "ac_prob_romitti": "share of homes with air conditioning (0-1)",
     "energy_burden": "percent of household income spent on energy",
-    "heat_hosp_day": (
-        "relative-scale effect estimate, centered near 0 "
-        "(higher = more excess hospitalizations on extreme-heat days)"
-    ),
-    "heat_hosp_night": (
-        "relative-scale effect estimate, centered near 0 "
-        "(higher = more excess hospitalizations after extreme-warm nights)"
-    ),
     "extreme_day_fraction": "fraction of days (0-1)",
 }
 
@@ -375,7 +355,7 @@ def _var_units(key: str) -> str:
 # they still render on the map, used under each source's own terms with
 # attribution. Adding a source here is the ONLY switch needed — NO_EXPORT, the
 # data dictionary and tests/test_export_licensing.py all derive from it.
-RESTRICTED_EXPORT_SOURCES = {_SRC_HPI, _SRC_CALHEATSCORE}
+RESTRICTED_EXPORT_SOURCES = {_SRC_HPI}
 
 # Why each restricted source is withheld. Surfaced verbatim in the exported data
 # dictionary so an absent column is explained rather than mysterious.
@@ -384,14 +364,6 @@ RESTRICTED_REASONS = {
         "Shown on the map but omitted from this download: the Healthy Places "
         "Index is licensed for non-commercial use, which conflicts with the "
         "CC BY 4.0 terms of this file. Get it from HPI directly."
-    ),
-    _SRC_CALHEATSCORE: (
-        "Shown on the map but omitted from this download: these estimates come "
-        "from a collaborator-supplied file with no published license or public "
-        "download, so we cannot establish a right to redistribute them. "
-        "CalHeatScore publishes daily scores and a REST API; per-ZCTA effect "
-        "estimates are not part of that public release. Request them from "
-        "CalHeatScore@oehha.ca.gov."
     ),
 }
 
@@ -411,9 +383,9 @@ EXPORT_META = {
     "citation": (
         "San Diego Heat Risk Explorer - Southern California Extreme Heat "
         "Research Hub & San Diego Regional Climate Collaborative. Variables "
-        "whose source terms bar redistribution (Healthy Places Index; "
-        "CalHeatScore heat-hospitalization estimates) are shown on the map "
-        "but omitted from this export - see the data dictionary."
+        "whose source terms bar redistribution (Healthy Places Index) are "
+        "shown on the map but omitted from this export - see the data "
+        "dictionary."
     ),
     "license": "CC BY 4.0",
     "sources_url": "https://cccia-sio.github.io/socal-heat-hub/userguide/#data",
@@ -602,16 +574,6 @@ def load_data():
         energy = pd.read_csv(energy_path, dtype={"GEOID": str})
         energy["GEOID"] = energy["GEOID"].str.zfill(11)
         tracts = _safe_merge(tracts, energy, ["energy_burden"])
-
-    # ── Sensitivity — Heat-attributable hospitalization (ZCTA → tract centroid xwalk) ──
-    # Generated by scripts/build_hosp_tract_xwalk.py from joined_rel.csv. Two
-    # CalHeatScore-style relative-scale rate ratios (extreme daytime / nighttime
-    # heat, 1-day lag) assigned per tract from the containing ZCTA.
-    hosp_path = ROOT / "data/hospitalizations/tract_heat_hosp.csv"
-    if hosp_path.exists():
-        hosp = pd.read_csv(hosp_path, dtype={"GEOID": str})
-        hosp["GEOID"] = hosp["GEOID"].str.zfill(11)
-        tracts = _safe_merge(tracts, hosp, ["heat_hosp_day", "heat_hosp_night"])
 
     # ── Context — Land use (tract_exploration.csv) ──
     ctx_path = ROOT / "data/context/tract_exploration.csv"
@@ -1949,7 +1911,6 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
         <option value="canopy">Tree canopy</option>
         <option value="landuse">Land use (SANDAG)</option>
         <option value="lst">Land surface temp (LST)</option>
-        <option value="hosp_day">Heat hospitalizations</option>
         <option value="excess_er">Excess heat ER visits</option>
         <option value="threshold">Heat-risk threshold (°F)</option>
         <option value="unsheltered">Unsheltered people</option>
@@ -2054,7 +2015,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
         <label class="exp-radio" style="cursor:pointer"><input type="checkbox" id="exp-incl-pctile" checked>Include within-county percentile ranks<span class="exp-radio-desc">adds <code>&lt;var&gt;_sd_pctile</code></span></label>
         <label class="exp-radio" style="cursor:pointer;margin-top:6px"><input type="checkbox" id="exp-incl-dict" checked>Include the data dictionary<span class="exp-radio-desc">second file: label, units, direction &amp; source for every column</span></label>
         <div class="exp-note"><b>Read the dictionary first.</b> Column headers in the data file are raw variable keys (<code>EP_NOINT</code>, <code>shututility_prev</code>); <code>&lt;stem&gt;_data_dictionary.csv</code> gives each one a plain-English label, its units, whether a higher value means more or less risk, and a link to the original source. It also records the heat mode, scenario and switched-on variables the index columns were built from. GeoJSON downloads carry the same information at <code>metadata</code>. <b>Watch the direction:</b> <code>adaptive_score</code> is stored capacity-side (100&nbsp;=&nbsp;most capacity, least risk), the opposite of <code>exposure_score</code> and <code>sensitivity_score</code>.</div>
-        <div class="exp-note">Raw source values are included, except where a source's terms bar redistribution: <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy&nbsp;Places&nbsp;Index</a> variables (tree canopy, park access, income, education, life expectancy, pollution, &amp;c.) are non-commercial, and the CalHeatScore heat-hospitalization variables have no published license. Both stay on the map and are listed in the dictionary with <code>in_download&nbsp;=&nbsp;no</code> and a note on where to request them. Percentile ranks (0&ndash;100) are always computed against all San Diego County tracts, even when you export a single jurisdiction. Every row carries <code>citation</code>, <code>license</code> (CC&nbsp;BY&nbsp;4.0) and <code>sources_url</code> columns; the full source table is in the <a href="../userguide/index.html#data" target="_blank" rel="noopener">User&nbsp;Guide</a>.</div>
+        <div class="exp-note">Raw source values are included, except where a source's terms bar redistribution: <a href="https://www.healthyplacesindex.org/" target="_blank" rel="noopener">Healthy&nbsp;Places&nbsp;Index</a> variables (tree canopy, park access, income, education, life expectancy, pollution, &amp;c.) are non-commercial. They stay on the map and are listed in the dictionary with <code>in_download&nbsp;=&nbsp;no</code> and a note on where to request them. Percentile ranks (0&ndash;100) are always computed against all San Diego County tracts, even when you export a single jurisdiction. Every row carries <code>citation</code>, <code>license</code> (CC&nbsp;BY&nbsp;4.0) and <code>sources_url</code> columns; the full source table is in the <a href="../userguide/index.html#data" target="_blank" rel="noopener">User&nbsp;Guide</a>.</div>
       </div>
       <div class="exp-section">
         <div class="exp-section-label">Scope</div>
@@ -2304,7 +2265,7 @@ var cbMode = (function(){try{return localStorage.getItem('hrv-cb-mode')==='1';}c
 // Exposure is a single-select heat mode, so its raw variables are excluded from
 // the `enabled` toggle set — only Sensitivity and Adaptive Capacity use toggles.
 // Open with a curated, high-contrast default rather than every variable: turning
-// on all 73 makes each pillar's PCA collapse toward a generic "everything
+// on all 71 makes each pillar's PCA collapse toward a generic "everything
 // correlates" axis and washes out spatial contrast. Defaults below are one
 // composite signal + a couple of focused drivers per pillar (exposure stays on
 // the daytime heat mode). Every other variable stays in the panel, unchecked.
@@ -2312,7 +2273,6 @@ var DEFAULT_ON = {
   // Sensitivity
   RPL_THEMES:1,        // Overall SVI
   EP_AGE65:1,          // Age 65+
-  heat_hosp_day:1,     // Heat-Day Hospitalization Rate Ratio
   // Adaptive Capacity
   ac_prob:1,           // AC Prevalence (LACE)
   treecanopy_pctile:1, // Tree Canopy
@@ -2710,14 +2670,12 @@ function setTractOpacity(pct){
 /* ===== Data Layers (informational reference overlays) =====================
    Single-select dropdown of context layers drawn over the basemap, separate
    from the PCA risk analysis. Rasters (population/impervious/canopy/LST) are
-   PNG imageOverlays; land use reuses the SANDAG PMTiles machinery; heat
-   hospitalizations is a tract choropleth. All sit in landusePane (z 450). */
+   PNG imageOverlays; land use reuses the SANDAG PMTiles machinery. All sit in
+   landusePane (z 450). */
 var RASTER_META = {population:POP, impervious:IMPERVIOUS, canopy:CANOPY, lst:LST};
 var _dataLayer = "";           // current selection id ("" = none)
 var _dataLayerObj = null;      // current non-landuse Leaflet layer (imageOverlay/geojson)
 var _dataLayerOpacity = 0.80;
-var HOSP_RAMP = [[255,247,236],[254,196,79],[217,95,14],[153,52,4]];  // sequential YlOrBr-ish
-var _hospDomain = null;
 
 function _ensureDataPane(){
   if(!map.getPane('landusePane')){ map.createPane('landusePane'); map.getPane('landusePane').style.zIndex=450; }
@@ -2748,12 +2706,6 @@ function setDataLayer(id){
   }
   if(opw) opw.style.display='';
 
-  if(id==='hosp_day'){
-    _dataLayerObj = buildHospChoropleth();
-    if(_dataLayerObj) _dataLayerObj.addTo(map);
-    renderDataLayerLegend('hosp_day');
-    return;
-  }
   if(id==='excess_er'){
     _dataLayerObj = buildExcessErChoropleth();
     if(_dataLayerObj) _dataLayerObj.addTo(map);
@@ -2790,26 +2742,6 @@ function setDataLayerOpacity(pct){
   }
 }
 
-function _hospColor(v){
-  if(v==null||isNaN(v)) return '#cccccc';
-  var d=_hospDomain||[0,1], span=(d[1]-d[0])||1, t=Math.max(0,Math.min(1,(v-d[0])/span));
-  return toHex(interpC(HOSP_RAMP, t));
-}
-function buildHospChoropleth(){
-  if(typeof GJ==='undefined' || !GJ.features) return null;
-  var vals = GJ.features.map(function(f){return +f.properties.heat_hosp_day;}).filter(function(v){return !isNaN(v);});
-  if(!vals.length) return null;
-  vals.sort(function(a,b){return a-b;});
-  _hospDomain = [vals[0], vals[vals.length-1]];
-  return L.geoJSON(GJ,{pane:'landusePane',
-    style:function(f){return{fillColor:_hospColor(+f.properties.heat_hosp_day),color:'#fff',weight:0.3,fillOpacity:_dataLayerOpacity};},
-    onEachFeature:function(f,lyr){var v=+f.properties.heat_hosp_day;
-      lyr.bindPopup('<div style="font-size:11px"><b>Heat hospitalizations</b><br>'+
-        'Standardized heat-day score: <b>'+(isNaN(v)?'n/a':v.toFixed(2))+'</b><br>'+
-        '<span style="color:#888">0 = county-area average; higher = more heat-day hospitalizations than typical</span><br>'+
-        '<span style="color:#888">ZIP-code resolution (CalHeatScore), shown per tract</span></div>');}
-  });
-}
 
 /* UCLA Heat Maps — excess-ER + CalHeatScore thresholds, ZIP→tract centroid xwalk */
 var EXR_RAMP = [[255,255,178],[254,204,92],[253,141,60],[240,59,32],[189,0,38]];   // YlOrRd
@@ -2945,15 +2877,6 @@ function renderDataLayerLegend(id){
         return '<div style="flex:1;text-align:center"><div style="height:10px;background:rgb('+rgb.join(',')+')"></div>'+
           '<div style="font-size:9px;color:#555;white-space:nowrap">'+(i?c.labels[i-1]:c.none)+'</div></div>';}).join('')+'</div>'+
       '<div style="font-size:9.5px;color:#888;margin-top:3px;line-height:1.3">'+c.note+'</div>';
-    return;
-  }
-  if(id==='hosp_day'){
-    var d=_hospDomain||[0,1];
-    var hstops=HOSP_RAMP.map(function(c){return 'rgb('+c.join(',')+')';}).join(',');
-    leg.innerHTML='<div style="font-weight:600;margin-bottom:2px">Heat hospitalizations</div>'+
-      '<div class="dt-lst-bar" style="background:linear-gradient(to right,'+hstops+')"></div>'+
-      '<div class="dt-lst-ticks"><span>'+d[0].toFixed(1)+'</span><span>standardized score</span><span>'+d[1].toFixed(1)+'</span></div>'+
-      '<div style="font-size:9.5px;color:#888;margin-top:3px;line-height:1.3">0 = county-area average. ZIP-code resolution (CalHeatScore), shown per tract.</div>';
     return;
   }
   if(id==='excess_er'){
@@ -4392,7 +4315,7 @@ var RADAR_SHORT={
   cognition_prev:'Cognitive', copd_prev:'COPD', depression_prev:'Depression',
   diabetes_prev:'Diabetes', stroke_prev:'Stroke', obesity_prev:'Obesity',
   mhlth_prev:'Mental Dist.', leb_pctile:'Life Exp.', loneliness_prev:'Loneliness',
-  emotionspt_prev:'No Support', heat_hosp_day:'Heat Hosp.', heat_hosp_night:'Night Hosp.',
+  emotionspt_prev:'No Support',
   EP_AGE65:'Seniors', pct_senior_alone:'Sr. Alone', EP_AGE17:'Children',
   EP_DISABL:'Disability', EP_LIMENG:'Ltd English', EP_SNGPNT:'Single Par.',
   EP_POV150:'Poverty', EP_UNEMP:'Unemployed', EP_HBURD:'Housing Cost',

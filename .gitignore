@@ -11,9 +11,6 @@ scripts/*
 !scripts/build_coolzones.py
 # index.html is generated; the page can't be rebuilt without its builder.
 !scripts/build_landing_page.py
-# The builder is tracked; the page it writes (main/hospitalizations.html) is
-# not — see the ignore entry below.
-!scripts/build_hospitalizations_viewer.py
 data/*
 !data/exposure
 data/exposure/*

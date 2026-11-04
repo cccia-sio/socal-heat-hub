@@ -53,7 +53,7 @@ but several have their own conditions:
 | Source | Terms | Handling |
 |---|---|---|
 | [Healthy Places Index (HPI)](https://www.healthyplacesindex.org/terms-and-conditions) | **Non-commercial** + attribution; mark if modified | **Excluded from the "Download Data" export.** Shown on the map under HPI's terms with attribution; obtain the data from HPI directly. |
-| [CalHeatScore (CalEPA / OEHHA)](https://calheatscore.calepa.ca.gov/) | **No published license for the per-ZCTA effect estimates** | **Excluded from the export** (2026-07-27 audit). See below. |
+| [CalHeatScore (CalEPA / OEHHA)](https://calheatscore.calepa.ca.gov/) | **No published license for the per-ZCTA effect estimates** | **Not used.** Removed from the map and the repository on 2026-11-04. See below. |
 | [SANDAG / SanGIS](https://www.sangis.org/) | Raw parcel/land-base layers need a SanGIS sublicense | Only a derived per-tract green-space percentage is used; raw parcels are not redistributed. The land-use input came from the open [SANDAG Open Data portal](https://opendata.sandag.org/). |
 | [MesoWest / Synoptic](https://synopticdata.com/tcs/) | Non-commercial; summary statistics may be published only if the underlying data "cannot be decompiled, reverse engineered, or otherwise extracted" | Derived per-tract temperature statistics only, each a blend of six stations with no station exceeding 40% of the value. See below. |
 | [Romitti et&nbsp;al. 2022](https://doi.org/10.7910/DVN/HWFVP6) | CC BY article; data deposited on Harvard Dataverse | Open. Cited to the Dataverse DOI (the redistributable artifact), not the article page. |
@@ -71,14 +71,14 @@ B11007), Census LACE 2023, USGS Landsat, NOAA HRRR, NLCD/MRLC, DOE LEAD,
 TIGER/Line, LOCA2, SANDAG Open Data, and Romitti et al. via Harvard Dataverse.
 All are U.S. federal public-domain works, state open-data releases, or CC BY.
 
-**Withdrawn from the export** — `heat_hosp_day` and `heat_hosp_night`. Their
-input (`data/hospitalizations/joined_rel.csv`) arrived as an emailed
-attachment; it carries no license, has no public download URL, and its column
-schema (`max99_2`, `hi95_SNR`, …) is analyst-internal rather than a published
-product. CalHeatScore's public release is daily scores plus a REST API — the
-per-ZCTA effect estimates are not part of it. Absent a demonstrable right to
-redistribute, they are now treated like HPI: on the map, out of the download.
-Request them from `CalHeatScore@oehha.ca.gov`.
+**Removed** — `heat_hosp_day` and `heat_hosp_night`. Their input arrived as an
+emailed attachment; it carries no license, has no public download URL, and its
+column schema is analyst-internal rather than a published product.
+CalHeatScore's public release is daily scores plus a REST API — the per-ZCTA
+effect estimates are not part of it. Absent a demonstrable right to
+redistribute, they were first withdrawn from the export (2026-07-27), then on
+2026-11-04 removed from the map, the default selection, the build, and the
+repository history. Request them from `CalHeatScore@oehha.ca.gov`.
 
 ### Resolved: single-station recoverability in the MesoWest columns
 
@@ -158,7 +158,7 @@ An earlier version of this file claimed the observations "cannot be recovered
 from the aggregates," and extended the reasoning to the CalHeatScore variables.
 The 2026-07-27 audit found both claims wrong as written: the aggregates *were*
 invertible in ~166 single-station tracts, and the CalHeatScore input has no
-license at all. The CalHeatScore variables have been withdrawn from the export,
+license at all. The CalHeatScore variables have been removed from the tool,
 and the interpolation was rebuilt so the claim now holds — every tract value is
 a six-station blend with a 40% per-station ceiling.
 

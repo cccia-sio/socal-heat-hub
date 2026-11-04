@@ -12,14 +12,11 @@ The public artifact is a static GitHub Pages site at
 - `/main/heat_risk_map.html` — the interactive heat-risk viewer (single self-contained HTML).
 - `/userguide/` — plain-language user guide (`userguide/index.html`).
 
-Those three pages are the entire public site. `main/hospitalizations.html` — a
-standalone "Heat-attributable hospitalizations by ZIP" viewer, distinct from the
-tract-level "Heat hospitalizations" Data Layer inside the main viewer — is
-**gitignored and not deployed**. It inlines per-ZCTA effect estimates that
-arrived by email with no license or right to redistribute (see
-`DATA_LICENSE.md`), so only its builder is tracked; run
-`scripts/build_hospitalizations_viewer.py` to produce it locally. It used to
-ship (unlinked but publicly reachable) purely because it lived under `main/`.
+Those three pages are the entire public site. The heat-hospitalization
+estimates (per-ZCTA, emailed, no license or right to redistribute — see
+`DATA_LICENSE.md`) are not in the repo or on the site in any form: not as a
+viewer variable, not as a Data Layer, and not as the standalone
+`main/hospitalizations.html` page, whose builder is local-only and gitignored.
 
 The viewers run entirely in the browser. There is no backend and no API. At
 runtime the viewer fetches only the Esri basemap tiles, the deployed PNG /
@@ -38,7 +35,7 @@ ship.
 **Tracked build scripts** (un-ignored via `!scripts/...`):
 `build_diy_pca_viewer.py`, `build_lst_overlay.py`, `build_data_overlays.py`,
 `build_userguide_pdf.sh`, `build_ucla_heat_tract_xwalk.py`, `build_context_layers.py`, `build_hero_figure.py`,
-`build_coolzones.py`, `build_hospitalizations_viewer.py`, `build_landing_page.py`. Everything else in
+`build_coolzones.py`, `build_landing_page.py`. Everything else in
 `scripts/` is local-only.
 
 Tracking a script takes **three** agreeing edits, and the tests only compare two
@@ -80,8 +77,7 @@ socal-heat-hub/
 ├── .gitignore
 │
 ├── main/
-│   ├── heat_risk_map.html         ← the viewer (built; single-file HTML)
-│   └── hospitalizations.html      ← standalone hospitalizations-by-ZIP viewer (built; gitignored)
+│   └── heat_risk_map.html         ← the viewer (built; single-file HTML)
 │
 ├── userguide/
 │   ├── index.html            ← user guide page

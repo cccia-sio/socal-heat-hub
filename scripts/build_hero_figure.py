@@ -63,7 +63,7 @@ OUTPUT_PATH = ROOT / "userguide" / "figure_hero_composite.png"
 # Mirrors DEFAULT_ON in the viewer template. Exposure is absent by design: it is
 # a single-select heat mode, not a variable toggle set.
 DEFAULT_ON = {
-    "sensitivity": ["RPL_THEMES", "EP_AGE65", "heat_hosp_day"],
+    "sensitivity": ["RPL_THEMES", "EP_AGE65"],
     "adaptive": ["ac_prob", "treecanopy_pctile", "income_pctile"],
 }
 DEFAULT_MODE = "daytime"

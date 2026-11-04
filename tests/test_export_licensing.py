@@ -4,11 +4,11 @@ Two invariants, both of which are easy to break by accident when adding a
 variable:
 
 1. Variables from a source whose terms bar unrestricted redistribution — today
-   Healthy Places Index (non-commercial) and the CalHeatScore heat-
-   hospitalisation estimates (no published licence) — must never reach the
-   export: not as raw values, not as `_sd_pctile` ranks, not as `_adj`
-   climate-adjusted variants. They stay on the map, used under the source's
-   own terms.
+   Healthy Places Index (non-commercial) — must never reach the export: not as
+   raw values, not as `_sd_pctile` ranks, not as `_adj` climate-adjusted
+   variants. They stay on the map, used under the source's own terms. Data we
+   have no right to publish at all (the emailed heat-hospitalisation
+   estimates) must not be in the build.
 2. Every exported file must carry its own attribution, so a CSV that travels
    away from the site still states its license and links to the source table.
 
@@ -73,24 +73,31 @@ def restricted_keys(consts):
 
 
 def test_known_gated_sources_stay_restricted(consts):
-    """Sources audited 2026-07-27 as not redistributable must stay excluded.
+    """Healthy Places Index (non-commercial, audited 2026-07-27) stays out of
+    the download; its terms conflict with CC BY 4.0."""
+    url = "https://www.healthyplacesindex.org/"
+    assert url in consts["RESTRICTED_EXPORT_SOURCES"], (
+        f"{url} was audited as not redistributable but is no longer in "
+        "RESTRICTED_EXPORT_SOURCES. Its variables would ship in the download."
+    )
 
-    Both were verified by hand; neither can be re-included without a licence
-    change at the source:
 
-    - Healthy Places Index: non-commercial terms, conflicts with CC BY 4.0.
-    - CalHeatScore heat-hospitalisation estimates: the input file arrived as an
-      emailed attachment with no published licence and no public download.
-      CalHeatScore's public release is daily scores plus a REST API; the
-      per-ZCTA effect estimates are not part of it.
+def test_emailed_hospitalization_estimates_never_ship(consts, build_script_text,
+                                                      viewer_html_text):
+    """The per-ZCTA heat-hospitalisation estimates must not be built in at all.
+
+    They arrived as an emailed attachment with no licence and no public
+    download. Withholding them from the export was not enough, because the map
+    itself published the tract values. Removed from the viewer 2026-11-04.
     """
-    restricted = consts["RESTRICTED_EXPORT_SOURCES"]
-    for url in ("https://www.healthyplacesindex.org/",
-                "https://calheatscore.calepa.ca.gov/"):
-        assert url in restricted, (
-            f"{url} was audited as not redistributable but is no longer in "
-            "RESTRICTED_EXPORT_SOURCES. Its variables would ship in the download."
-        )
+    keys = [k for k, *_ in consts["VARIABLES"] if k.startswith("heat_hosp")]
+    assert not keys, f"Hospitalization variables are back in VARIABLES: {keys}"
+    assert "data/hospitalizations" not in build_script_text, (
+        "build_diy_pca_viewer.py reads data/hospitalizations/ again."
+    )
+    assert "heat_hosp" not in viewer_html_text, (
+        "The built viewer contains heat_hosp_* fields."
+    )
 
 
 def test_restricted_sources_explain_themselves(consts):

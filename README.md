@@ -67,7 +67,5 @@ generated HTML is not an MIT-covered act. See
 
 Incorporated third-party data keeps its own terms. In particular, **Healthy
 Places Index** data is non-commercial, so HPI-derived columns are shown on the
-map but **excluded from the "Download Data" export**. The CalHeatScore
-heat-hospitalization columns are excluded too, because that source has no
-published license. See
+map but **excluded from the "Download Data" export**. See
 [DATA_LICENSE.md](DATA_LICENSE.md) for the full breakdown.

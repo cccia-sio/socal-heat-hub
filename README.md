@@ -1,5 +1,7 @@
 # San Diego Heat Risk Explorer
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23960750.svg)](https://doi.org/10.5281/zenodo.23960750)
+
 ### [**Landing Page &rarr;**](https://cccia-sio.github.io/socal-heat-hub/)
 
 Custom composite heat-risk map for every census tract in San Diego County.
@@ -51,11 +53,8 @@ Issues and feedback welcome via GitHub issues.
 
 If you use this tool, its methodology, or its derived data, please cite it:
 
-<!-- TODO: after the v1.0.0 release, replace XXXXXXX (here and in CITATION.cff)
-     with the Zenodo concept DOI, which always resolves to the latest version. -->
-
 ```text
-Mack, C., Hale, M., Gong, A., Berry, D., & Merrifield, M. (2026). San Diego Heat Risk Explorer (Version 1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.XXXXXXX
+Mack, C., Hale, M., Gong, A., Berry, D., & Merrifield, M. (2026). San Diego Heat Risk Explorer (Version 1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23960750
 ```
 
 ```bibtex
@@ -65,13 +64,16 @@ Mack, C., Hale, M., Gong, A., Berry, D., & Merrifield, M. (2026). San Diego Heat
   year      = {2026},
   version   = {1.0.0},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.XXXXXXX},
-  url       = {https://doi.org/10.5281/zenodo.XXXXXXX}
+  doi       = {10.5281/zenodo.23960750},
+  url       = {https://doi.org/10.5281/zenodo.23960750}
 }
 ```
 
-GitHub's "Cite this repository" button gives the same citation in other
-formats, from [CITATION.cff](CITATION.cff).
+The DOI above covers all versions and always resolves to the latest release.
+To cite a specific version, use that version's DOI from the
+[Zenodo record](https://doi.org/10.5281/zenodo.23960750). GitHub's "Cite this
+repository" button gives the same citation in other formats, from
+[CITATION.cff](CITATION.cff).
 
 ## License
 

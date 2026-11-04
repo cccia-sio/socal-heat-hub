@@ -4,7 +4,7 @@ message: >-
   If you use this tool, its methodology, or its derived data, please cite it.
 type: software
 authors:
-  # TODO: add ORCIDs before minting the DOI.
+  # TODO: add ORCIDs (also editable on the Zenodo record).
   - given-names: Connor
     family-names: Mack
     email: cjmack@ucsd.edu
@@ -47,13 +47,9 @@ license-url: 'https://github.com/cccia-sio/socal-heat-hub/blob/main/LICENSE'
 # 4.0, and embedded third-party data (HPI, UCLA Heat Maps) keeps its own terms.
 # See DATA_LICENSE.md, which spells out what the MIT grant does not cover.
 
-# TODO: mint a DOI (Zenodo -> "New version" on each release) and add it here.
-# A DOI is what makes reuse citable and makes being scooped provable — it
-# timestamps the work and gives reusers something concrete to point at.
-# identifiers:
-#   - type: doi
-#     value: 10.5281/zenodo.XXXXXXX
-#     description: Archived release
+# Zenodo concept DOI: covers all versions and resolves to the latest release.
+# Zenodo archives each GitHub release automatically and mints a version DOI.
+doi: 10.5281/zenodo.23960750
 
 # TODO: once the methods paper is out, add it as the preferred citation so
 # `cite this repository` resolves to the paper rather than the software.

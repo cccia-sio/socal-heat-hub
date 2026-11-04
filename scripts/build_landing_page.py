@@ -238,6 +238,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       color:var(--muted);
     }
     footer a{color:var(--muted)}
+    .cite{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:6px;
+      padding:12px 16px;
+      font-size:14px;
+      overflow-wrap:anywhere;
+    }
+    .cite-formats{font-size:13px;color:var(--muted)}
+    .cite-formats a{color:var(--muted)}
     code{
       background:#f0efea;
       padding:1px 5px;
@@ -318,6 +328,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       .partners{break-inside:avoid;margin-top:24px;padding-top:14px}
       .partners img{height:32px;opacity:1}
 
+      .cite{break-inside:avoid}
+
       footer{font-size:9pt;margin-top:18px}
     }
   </style>
@@ -368,6 +380,18 @@ __SOURCES_PLACEHOLDER__
         </a>
       </div>
     </div>
+
+    <h2>Citation</h2>
+    <p>If you use this tool, its methodology, or its derived data, please cite it:</p>
+    <p class="cite">
+      Mack, C., Hale, M., Gong, A., Berry, D., &amp; Merrifield, M. (2026).
+      <i>San Diego Heat Risk Explorer</i> (Version 1.0.0) [Computer software]. Zenodo.
+      <a href="https://doi.org/10.5281/zenodo.23960750">https://doi.org/10.5281/zenodo.23960750</a>
+    </p>
+    <p class="cite-formats">
+      BibTeX and other formats are on the <a href="https://doi.org/10.5281/zenodo.23960750">Zenodo record</a>
+      and under &ldquo;Cite this repository&rdquo; on <a href="https://github.com/cccia-sio/socal-heat-hub">GitHub</a>.
+    </p>
 
     <h2>Feedback</h2>
     <p>

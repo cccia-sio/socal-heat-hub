@@ -11,6 +11,7 @@ so this skips on the CI deploy gate (pytest + stdlib only) and runs in the
 socal-heat env.
 """
 
+import re
 import sys
 
 import pytest
@@ -39,3 +40,18 @@ def test_every_viewer_variable_is_counted_once(landing):
     """A variable under a pillar key the page doesn't list would silently drop off."""
     listed = sum(n for _, rows in landing.source_groups() for _, _, n in rows)
     assert listed == len(landing.VARIABLES)
+
+
+def _cff_field(project_root, key):
+    text = (project_root / "CITATION.cff").read_text(encoding="utf-8")
+    m = re.search(rf"^{key}:\s*'?([^'\n]+?)'?\s*$", text, re.MULTILINE)
+    assert m, f"CITATION.cff has no top-level {key}:"
+    return m.group(1)
+
+
+@pytest.mark.parametrize("page", ["index.html", "README.md"])
+def test_citation_matches_citation_cff(project_root, page):
+    """The copy-paste citations hand-repeat CITATION.cff's DOI and version; a release bump must update them."""
+    text = (project_root / page).read_text(encoding="utf-8")
+    assert f"https://doi.org/{_cff_field(project_root, 'doi')}" in text
+    assert f"Version {_cff_field(project_root, 'version')}" in text

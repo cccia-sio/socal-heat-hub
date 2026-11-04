@@ -51,7 +51,7 @@ Issues and feedback welcome via GitHub issues.
 
 ## Citation
 
-If you use this tool, its methodology, or its derived data, please cite it:
+If you use this tool, its methodology, or its derived data, please cite it as:
 
 ```text
 Mack, C., Hale, M., Gong, A., Berry, D., & Merrifield, M. (2026). San Diego Heat Risk Explorer (Version 1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23960750

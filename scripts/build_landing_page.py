@@ -382,7 +382,7 @@ __SOURCES_PLACEHOLDER__
     </div>
 
     <h2>Citation</h2>
-    <p>If you use this tool, its methodology, or its derived data, please cite it:</p>
+    <p>If you use this tool, its methodology, or its derived data, please cite it as:</p>
     <p class="cite">
       Mack, C., Hale, M., Gong, A., Berry, D., &amp; Merrifield, M. (2026).
       <i>San Diego Heat Risk Explorer</i> (Version 1.0.0) [Computer software]. Zenodo.

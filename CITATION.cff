@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 title: San Diego Heat Risk Explorer
 message: >-
-  If you use this tool, its methodology, or its derived data, please cite it.
+  If you use this tool, its methodology, or its derived data, please cite it as below.
 type: software
 authors:
   # TODO: add ORCIDs (also editable on the Zenodo record).

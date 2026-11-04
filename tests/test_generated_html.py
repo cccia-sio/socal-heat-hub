@@ -134,3 +134,10 @@ def test_welcome_modal_shows_every_load(viewer_html_text):
         "Stale welcome-modal storage key found — the popup is now per-session "
         "(shows every load); don't reintroduce localStorage gating."
     )
+
+
+def test_copy_citation_copies_the_citation_shown(viewer_html_text, js_fn):
+    """The sidebar's Copy button must copy the citation on screen, not a second hand-kept copy."""
+    assert 'id="cite-text"' in viewer_html_text
+    assert 'id="cite-copy-btn"' in viewer_html_text
+    assert "getElementById('cite-text')" in js_fn("copyCitation")

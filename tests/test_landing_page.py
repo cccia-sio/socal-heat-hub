@@ -49,7 +49,7 @@ def _cff_field(project_root, key):
     return m.group(1)
 
 
-@pytest.mark.parametrize("page", ["index.html", "README.md"])
+@pytest.mark.parametrize("page", ["index.html", "README.md", "main/heat_risk_map.html"])
 def test_citation_matches_citation_cff(project_root, page):
     """The copy-paste citations hand-repeat CITATION.cff's DOI and version; a release bump must update them."""
     text = (project_root / page).read_text(encoding="utf-8")

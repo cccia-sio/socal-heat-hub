@@ -1183,6 +1183,10 @@ details.pc-group[open]>summary::before{transform:rotate(90deg)}
 /* --- export-data feature --- */
 #dl-data-btn{margin-top:8px}
 #dl-data-btn:hover{background:#f3f4f6;border-color:#9ca3af}
+#cite-text{margin:0 0 8px;padding:8px 10px;background:#f9fafb;border:1px solid #e5e7eb;
+  border-radius:8px;font-size:11px;line-height:1.45;color:#374151;overflow-wrap:anywhere}
+#cite-text a{color:#2563eb}
+#cite-copy-btn:hover{background:#f3f4f6;border-color:#9ca3af}
 #export-modal{position:fixed;inset:0;z-index:2200;background:rgba(20,25,40,0.55);
   display:none;align-items:center;justify-content:center;
   backdrop-filter:blur(2px);font-family:inherit}
@@ -1887,6 +1891,13 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
     <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;color:#666">Export</h3>
     <button id="dl-pdf-btn" onclick="downloadMapPdf()" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s">Download Map as PDF</button>
     <button id="dl-data-btn" onclick="openExportModal()" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s">Download Data</button>
+  </div>
+  <!-- DOI and version must match CITATION.cff (tests/test_landing_page.py). -->
+  <div id="cite-section" style="border-top:1px solid #e0e0e0;padding-top:10px;margin-top:14px">
+    <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;color:#666">Cite</h3>
+    <div style="font-size:10px;color:#666;margin-bottom:6px;line-height:1.4">If you use this tool, its methodology, or its derived data, please cite it as:</div>
+    <p id="cite-text">Mack, C., Hale, M., Gong, A., Berry, D., &amp; Merrifield, M. (2026). <i>San Diego Heat Risk Explorer</i> (Version 1.0.0) [Computer software]. Zenodo. <a href="https://doi.org/10.5281/zenodo.23960750" target="_blank" rel="noopener">https://doi.org/10.5281/zenodo.23960750</a></p>
+    <button id="cite-copy-btn" onclick="copyCitation()" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s">Copy Citation</button>
   </div>
   <!-- Plain mailto, not a form: no third-party service, so the no-tracking
        promise in the README and user guide stays literally true. -->
@@ -7525,6 +7536,34 @@ function _expRenderJurisList(){
     return '<div class="exp-juris-row"><label><input type="checkbox" id="'+id+'" value="'+n.replace(/"/g,'&quot;')+'">'+n+'</label></div>';
   }).join('');
   list.innerHTML=html;
+}
+
+// Copies the citation shown in the sidebar, so #cite-text is the only copy to
+// keep in sync with CITATION.cff. navigator.clipboard needs a secure context;
+// the execCommand fallback covers file:// previews and older browsers.
+function copyCitation(){
+  var text=document.getElementById('cite-text').textContent.replace(/\\s+/g,' ').trim();
+  var btn=document.getElementById('cite-copy-btn');
+  function done(ok){
+    btn.textContent=ok?'Copied!':'Copy failed: select the text above';
+    setTimeout(function(){btn.textContent='Copy Citation';},2000);
+  }
+  if(navigator.clipboard&&window.isSecureContext){
+    navigator.clipboard.writeText(text).then(function(){done(true);},
+      function(){done(_copyViaTextarea(text));});
+  }else{
+    done(_copyViaTextarea(text));
+  }
+}
+function _copyViaTextarea(text){
+  var ta=document.createElement('textarea');
+  ta.value=text;ta.setAttribute('readonly','');
+  ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();
+  var ok=false;
+  try{ok=document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+  return ok;
 }
 
 function openExportModal(){

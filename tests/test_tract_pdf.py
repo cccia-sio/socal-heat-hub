@@ -148,7 +148,7 @@ def test_landuse_inset_is_a_mode_of_the_shared_capture(js_code):
         "_captureTractInset() no longer takes a mode — the land-use and satellite "
         "insets must share one capture path or they can drift out of alignment."
     )
-    assert "_paintLightBasemap(" in src, (
+    assert "_paintBasemap(ctx,z,pb,S,'light')" in src, (
         "the land-use inset no longer draws the light basemap under the parcels"
     )
 

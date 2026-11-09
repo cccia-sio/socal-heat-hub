@@ -1189,10 +1189,10 @@ details.pc-group[open]>summary::before{transform:rotate(90deg)}
   border-radius:8px;font-size:11px;line-height:1.45;color:#374151;overflow-wrap:anywhere}
 #cite-text a{color:#2563eb}
 #cite-copy-btn:hover{background:#f3f4f6;border-color:#9ca3af}
-#export-modal{position:fixed;inset:0;z-index:2200;background:rgba(20,25,40,0.55);
+#export-modal,#pdf-modal{position:fixed;inset:0;z-index:2200;background:rgba(20,25,40,0.55);
   display:none;align-items:center;justify-content:center;
   backdrop-filter:blur(2px);font-family:inherit}
-#export-modal.open{display:flex}
+#export-modal.open,#pdf-modal.open{display:flex}
 .exp-panel{background:#fff;width:min(460px,94vw);max-height:90vh;
   border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.30);
   display:flex;flex-direction:column;overflow:hidden}
@@ -1223,6 +1223,10 @@ details.pc-group[open]>summary::before{transform:rotate(90deg)}
 .exp-juris-row label{display:flex;align-items:center;gap:6px;font-size:12px;
   color:#444;cursor:pointer;user-select:none;flex:1}
 .exp-juris-row input{cursor:pointer;flex-shrink:0}
+.exp-juris-group{font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.4px;color:#888;margin:8px 0 2px}
+.exp-juris-group:first-child{margin-top:0}
+#pdf-juris-list{max-height:240px}
 .exp-note{font-size:11px;color:#888;margin-top:8px;line-height:1.4}
 .exp-footer{padding:12px 18px;border-top:1px solid #e5e7eb;
   display:flex;gap:8px;justify-content:flex-end;flex-shrink:0;background:#fafafa}
@@ -1891,7 +1895,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
   </details>
   <div id="export-section" style="border-top:1px solid #e0e0e0;padding-top:10px;margin-top:14px">
     <h3 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;color:#666">Export</h3>
-    <button id="dl-pdf-btn" onclick="downloadMapPdf()" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s">Download Map as PDF</button>
+    <button id="dl-pdf-btn" onclick="openPdfModal()" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s">Download Map as PDF</button>
     <button id="dl-data-btn" onclick="openExportModal()" style="width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;background:#fff;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;color:#374151;transition:all 0.15s">Download Data</button>
   </div>
   <!-- DOI and version must match CITATION.cff (tests/test_landing_page.py). -->
@@ -2007,6 +2011,42 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
 
 <div id="pdf-overlay">
   <div class="box"><div class="spinner"></div><span id="pdf-overlay-msg">Generating PDF\\u2026</span></div>
+</div>
+
+<div id="pdf-modal" role="dialog" aria-modal="true" aria-labelledby="pdf-modal-title" onclick="if(event.target===this)closePdfModal()">
+  <div class="exp-panel">
+    <div class="exp-hdr">
+      <h2 id="pdf-modal-title">Download Map as PDF</h2>
+      <button aria-label="Close" class="exp-close" onclick="closePdfModal()" title="Close (ESC)">&times;</button>
+    </div>
+    <div class="exp-body">
+      <div class="exp-section">
+        <div class="exp-section-label">Map Area</div>
+        <div class="exp-radios">
+          <label class="exp-radio"><input type="radio" name="pdf-scope" value="all" checked onchange="_pdfSyncScope()">Entire county</label>
+          <label class="exp-radio"><input type="radio" name="pdf-scope" value="juris" onchange="_pdfSyncScope()">Clip to selected jurisdictions</label>
+        </div>
+        <div class="exp-juris-actions">
+          <button type="button" id="pdf-juris-all" onclick="_pdfJurisSelectAll(true)">Select all</button>
+          <button type="button" id="pdf-juris-none" onclick="_pdfJurisSelectAll(false)">Clear</button>
+        </div>
+        <div class="exp-juris-list" id="pdf-juris-list" onchange="_pdfSyncScope()"></div>
+        <div class="exp-note">The PDF shows the layer currently on the map. A clipped map is framed on the selected jurisdictions and cut at their boundaries, so a tract that crosses one shows only the part inside. Colors keep the county-wide scale; they are not re-ranked within the selection.</div>
+      </div>
+      <div class="exp-section">
+        <div class="exp-section-label">Basemap</div>
+        <div class="exp-radios">
+          <label class="exp-radio"><input type="radio" name="pdf-basemap" value="light" checked>Light<span class="exp-radio-desc">streets and place names</span></label>
+          <label class="exp-radio"><input type="radio" name="pdf-basemap" value="satellite">Satellite<span class="exp-radio-desc">aerial imagery</span></label>
+          <label class="exp-radio"><input type="radio" name="pdf-basemap" value="none">None<span class="exp-radio-desc">white background</span></label>
+        </div>
+      </div>
+    </div>
+    <div class="exp-footer">
+      <button class="exp-btn" onclick="closePdfModal()">Cancel</button>
+      <button class="exp-btn exp-btn-primary" id="pdf-download-btn" onclick="doPdfDownload()">Download PDF</button>
+    </div>
+  </div>
 </div>
 
 <div id="export-modal" role="dialog" aria-modal="true" aria-labelledby="export-modal-title" onclick="if(event.target===this)closeExportModal()">
@@ -2165,7 +2205,7 @@ body.cb-mode .cmp-row.cmp-lower  .cmp-val-raw{color:#0072b2}
         <li><b>Map Layer</b> &mdash; switch between the combined risk score, each group on its own, or any single factor.</li>
         <li><b>Jurisdictions</b> &mdash; show city, unincorporated-county, or tribal-land boundaries on the map.</li>
         <li><b>Climate Scenario</b> &mdash; see how risk shifts under future warming, for the year 2050 or 2080.</li>
-        <li><b>Export</b> &mdash; save the current map as a PDF or download the data.</li>
+        <li><b>Export</b> &mdash; save the current map as a PDF (the whole county or clipped to jurisdictions you choose, with a choice of basemap), or download the data.</li>
         <li><b>Feedback</b> &mdash; <a href="__FEEDBACK_MAILTO_PLACEHOLDER__" style="color:#2563eb">email us</a> about anything that looks wrong or missing. Also at the bottom of the sidebar.</li>
       </ul>
       <p style="margin-top:14px;font-size:11.5px;color:#6b7280;line-height:1.5">
@@ -6027,19 +6067,21 @@ function _scenarioLabel(){
   return sl[curScenario]+' \\u2022 '+(pl[curPeriod]||'');
 }
 
-// Paint the light basemap onto a 2D context for the PDF blitters, which draw
-// raster tiles by hand rather than screenshotting Leaflet (see
-// _captureStudyAreaMap). `pb` is a Leaflet pixel-bounds at zoom `zoom`; `S` is
-// the retina scale of the target canvas. Resolves with the number of base
-// tiles that actually loaded, so a caller can tell "blocked" from "drawn".
+// Paint a BASEMAPS entry (`name`: 'light' or 'satellite') onto a 2D context for
+// the PDF blitters, which draw raster tiles by hand rather than screenshotting
+// Leaflet (see _captureStudyAreaMap). `pb` is a Leaflet pixel-bounds at zoom
+// `zoom`; `S` is the retina scale of the target canvas. Resolves with the
+// number of base tiles that actually loaded, so a caller can tell "blocked"
+// from "drawn".
 //
 // Two Esri quirks are handled here. It serves no @2x tiles, so print density
 // comes from fetching one zoom level deeper and drawing each tile at half its
-// map size — 256 source pixels land on 256 canvas pixels at S=2. And it has no
-// tiles at all past LIGHT_MAX_NATIVE_ZOOM, so beyond that we sample the
-// sub-rectangle of the deepest real ancestor tile and let drawImage upscale
-// it, which is what maxNativeZoom does on the live map.
-function _paintLightBasemap(ctx,zoom,pb,S){
+// map size — 256 source pixels land on 256 canvas pixels at S=2. And the light
+// map has no tiles at all past LIGHT_MAX_NATIVE_ZOOM, so beyond a basemap's
+// native ceiling we sample the sub-rectangle of the deepest real ancestor tile
+// and let drawImage upscale it, which is what maxNativeZoom does on the live map.
+function _paintBasemap(ctx,zoom,pb,S,name){
+  var bm=BASEMAPS[name], maxNative=bm.opts.maxNativeZoom||bm.opts.maxZoom;
   var TILE=256;
   // One level deeper == retina density. `zoom` may be fractional (the map PDF
   // fits the county exactly), so fetch the nearest whole level and scale its
@@ -6051,11 +6093,12 @@ function _paintLightBasemap(ctx,zoom,pb,S){
   var nWorld=Math.pow(2,rz);
   // Source tile + sub-rectangle for one tile of the rz grid.
   function src(x,y){
-    var d=Math.max(0,rz-LIGHT_MAX_NATIVE_ZOOM), n=1<<d, sub=TILE/n;
+    var d=Math.max(0,rz-maxNative), n=1<<d, sub=TILE/n;
     var sx=Math.floor(x/n), sy=Math.floor(y/n);
     var q={z:rz-d,x:sx,y:sy,sx:(x%n)*sub,sy:(y%n)*sub,sw:sub,sh:sub};
-    q.base=LIGHT_BASE_URL.replace('{z}',q.z).replace('{y}',q.y).replace('{x}',q.x);
-    q.ref =LIGHT_REF_URL .replace('{z}',q.z).replace('{y}',q.y).replace('{x}',q.x);
+    function fill(u){return u.replace('{z}',q.z).replace('{y}',q.y).replace('{x}',q.x);}
+    q.base=fill(bm.url);
+    q.ref =bm.labels?fill(bm.labels):null;   // satellite has no label raster
     return q;
   }
   function loadImage(url){
@@ -6082,7 +6125,7 @@ function _paintLightBasemap(ctx,zoom,pb,S){
         // enough — no second pass needed.
         tasks.push(loadImage(p.base).then(function(im){
           if(im){got.n++;ctx.drawImage(im,p.sx,p.sy,p.sw,p.sh,x,y,w,h);}
-          return loadImage(p.ref);
+          return p.ref?loadImage(p.ref):null;
         }).then(function(im){
           if(im)ctx.drawImage(im,p.sx,p.sy,p.sw,p.sh,x,y,w,h);
         }));
@@ -6103,6 +6146,10 @@ function _paintLightBasemap(ctx,zoom,pb,S){
 // producing the misaligned tracts-vs-basemap output we used to ship.
 function _captureStudyAreaMap(opts){
   opts=opts||{};
+  // A scoped export cuts the tracts to a set of jurisdictions and outlines only
+  // those: the map PDF's selection (opts.scope, from _pdfSelectedScope) or the
+  // city-focus PDF's one city (opts.jurisName).
+  var scope=opts.scope||(opts.jurisName?{cities:[opts.jurisName],unincorp:false,tribal:[],names:[opts.jurisName]}:null);
   return new Promise(function(resolve,reject){
     // Logical figure size; canvas is rendered at 2x for retina-print output.
     // opts.width widens the frame to fit a caller's page.
@@ -6156,40 +6203,48 @@ function _captureStudyAreaMap(opts){
     }
 
     // ── Basemap tiles ──────────────────────────────────────────
-    var tileTasks=[_paintLightBasemap(ctx,zoom,pixelBounds,SCALE)];
+    // opts.basemap: 'light' (the default), 'satellite', or 'none' (plain white).
+    var bm=opts.basemap||'light';
+    var tileTasks=bm==='none'?[]:[_paintBasemap(ctx,zoom,pixelBounds,SCALE,bm)];
+    // The light map is meant to show faintly through the tracts. Imagery showing
+    // through would shift the fills off the legend's colors, and with no basemap
+    // there is nothing to see through to.
+    var TRACT_FILL=bm==='light'?0.85:1;
 
     // ── Vector overlays ────────────────────────────────────────
-    function addRings(rings){
+    // Both draw on `c`, the page canvas unless a caller passes a layer of its own.
+    function addRings(rings,c){
       rings.forEach(function(ring){
         for(var i=0;i<ring.length;i++){
           var pt=project(ring[i][1],ring[i][0]); // GeoJSON: [lng,lat]
-          if(i===0)ctx.moveTo(pt[0],pt[1]);
-          else ctx.lineTo(pt[0],pt[1]);
+          if(i===0)c.moveTo(pt[0],pt[1]);
+          else c.lineTo(pt[0],pt[1]);
         }
-        ctx.closePath();
+        c.closePath();
       });
     }
-    function drawFeature(feat,fillColor,strokeColor,strokeWidth,fillOpacity){
+    function drawFeature(feat,fillColor,strokeColor,strokeWidth,fillOpacity,c){
+      c=c||ctx;
       var g=feat.geometry;
       if(!g)return;
-      ctx.beginPath();
-      if(g.type==='Polygon')addRings(g.coordinates);
-      else if(g.type==='MultiPolygon')g.coordinates.forEach(addRings);
+      c.beginPath();
+      if(g.type==='Polygon')addRings(g.coordinates,c);
+      else if(g.type==='MultiPolygon')g.coordinates.forEach(function(p){addRings(p,c);});
       else return;
       if(fillColor){
-        ctx.globalAlpha=fillOpacity;
-        ctx.fillStyle=fillColor;
-        ctx.fill('evenodd');
+        c.globalAlpha=fillOpacity;
+        c.fillStyle=fillColor;
+        c.fill('evenodd');
       }
       if(strokeColor&&strokeWidth>0){
-        ctx.globalAlpha=1;
-        ctx.lineJoin='round';
-        ctx.lineCap='round';
-        ctx.strokeStyle=strokeColor;
-        ctx.lineWidth=strokeWidth;
-        ctx.stroke();
+        c.globalAlpha=1;
+        c.lineJoin='round';
+        c.lineCap='round';
+        c.strokeStyle=strokeColor;
+        c.lineWidth=strokeWidth;
+        c.stroke();
       }
-      ctx.globalAlpha=1;
+      c.globalAlpha=1;
     }
 
     // ── Decorations ────────────────────────────────────────────
@@ -6312,13 +6367,15 @@ function _captureStudyAreaMap(opts){
       }
       if(!title)return;
 
-      // City-scoped exports omit the tribal checklist entirely. Cities and the
-      // unincorporated county are named on the map instead (drawJurisLabels).
+      // A row per tribal land outlined on the map: the scope's when scoped, else
+      // the visible ones. Cities and the unincorporated county are named on the
+      // map instead (drawJurisLabels).
       var tribalRows=[];
-      if(!opts.jurisName&&typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalGroups!=='undefined'){
+      if(typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalGroups!=='undefined'){
         Object.keys(tribalGroups).sort(function(a,b){return a.localeCompare(b);}).forEach(function(gk){
-          var anyOn=tribalGroups[gk].some(function(name){return map.hasLayer(tribalLayers[name]);});
-          if(!anyOn)return;
+          var on=scope?scope.tribal.indexOf(gk)>=0:
+            tribalGroups[gk].some(function(name){return map.hasLayer(tribalLayers[name]);});
+          if(!on)return;
           tribalRows.push({label:gk,color:TRIBAL_COLORS.reservation,dashed:false});
         });
       }
@@ -6449,7 +6506,7 @@ function _captureStudyAreaMap(opts){
       ctx.restore();
     }
 
-    // Each visible city's name on its outline, at the live map's label point,
+    // Each outlined city's name on its outline, at the live map's label point,
     // and the unincorporated county's on its region, in place of a legend list
     // that couldn't say which outline was which. A name that would overprint one
     // already drawn moves up, down, left or right by its own size: at county scale
@@ -6457,9 +6514,10 @@ function _captureStudyAreaMap(opts){
     function drawJurisLabels(){
       var names=[];
       Object.keys(jurisLabels).forEach(function(k){
-        if(map.hasLayer(jurisLayers[k]))names.push({text:k,at:jurisLabels[k].getLatLng(),color:'#1a1a1a'});
+        if(scope?scope.cities.indexOf(k)>=0:map.hasLayer(jurisLayers[k]))
+          names.push({text:k,at:jurisLabels[k].getLatLng(),color:'#1a1a1a'});
       });
-      if(typeof UNINCORP!=='undefined'&&UNINCORP&&unincorpLayer&&map.hasLayer(unincorpLayer)){
+      if(typeof UNINCORP!=='undefined'&&UNINCORP&&(scope?scope.unincorp:unincorpLayer&&map.hasLayer(unincorpLayer))){
         var up=UNINCORP.features[0].properties;
         names.push({text:'Unincorporated county',at:{lat:up.label_lat,lng:up.label_lng},color:UNINCORP_COLOR});
       }
@@ -6486,7 +6544,8 @@ function _captureStudyAreaMap(opts){
     }
 
     function drawAttribution(){
-      var text='Esri, HERE, Garmin  © OpenStreetMap contributors';
+      if(bm==='none')return;   // no tiles, nobody to credit
+      var text=BASEMAPS[bm].opts.attribution;
       ctx.font=(10*SCALE)+'px -apple-system,Segoe UI,Roboto,sans-serif';
       var tw=ctx.measureText(text).width;
       var pad=6*SCALE;
@@ -6500,51 +6559,65 @@ function _captureStudyAreaMap(opts){
       ctx.fillText(text,bx,by);
     }
 
-    // When scoped to one city, clip tract drawing to that city's polygon so the
-    // whole municipal area is filled exactly. (Centroid-based tract assignment
-    // dropped boundary-straddling tracts, leaving gaps.) Tracts tile the county
-    // with no holes, so clipping + drawing all of them fills the city cleanly.
-    var clipFeats=null;
-    if(opts.jurisName&&typeof JURIS!=='undefined'&&JURIS){
-      clipFeats=JURIS.features.filter(function(f){return f.properties.NAME===opts.jurisName;});
+    // The scope's shapes: the tracts are cut to these. Tracts tile the county with
+    // no holes, so cutting all of them fills the scope exactly (picking tracts by
+    // centroid dropped the ones straddling its edge, leaving gaps).
+    var clipFeats=[];
+    if(scope){
+      if(typeof JURIS!=='undefined'&&JURIS)
+        clipFeats=JURIS.features.filter(function(f){return scope.cities.indexOf(f.properties.NAME)>=0;});
+      if(scope.unincorp&&typeof UNINCORP!=='undefined'&&UNINCORP)
+        clipFeats=clipFeats.concat(UNINCORP.features);
+      if(typeof TRIBAL!=='undefined'&&TRIBAL)
+        clipFeats=clipFeats.concat(TRIBAL.features.filter(function(f){
+          return scope.tribal.indexOf(tribalGroupKey(f.properties.NAME))>=0;}));
     }
-    function pathCity(){
-      ctx.beginPath();
-      clipFeats.forEach(function(f){
-        var g=f.geometry;if(!g)return;
-        if(g.type==='Polygon')addRings(g.coordinates);
-        else if(g.type==='MultiPolygon')g.coordinates.forEach(addRings);
+    // Tracts — colored using the live `fcolor()` against current pillar/var state
+    function drawTracts(c){
+      GJ.features.forEach(function(f){
+        var idx=window._gIdx[f.properties.GEOID]||0;
+        drawFeature(f,fcolor(f.properties,idx),'#ffffff',0.5*SCALE,TRACT_FILL,c);
       });
     }
 
     Promise.all(tileTasks).then(function(){
-      // Tracts — colored using the live `fcolor()` against current pillar/var state
       if(tLayer&&typeof GJ!=='undefined'&&GJ&&GJ.features){
-        if(clipFeats&&clipFeats.length){ctx.save();pathCity();ctx.clip('evenodd');}
-        GJ.features.forEach(function(f){
-          var idx=window._gIdx[f.properties.GEOID]||0;
-          drawFeature(f,fcolor(f.properties,idx),'#ffffff',0.5*SCALE,0.85);
-        });
-        if(clipFeats&&clipFeats.length)ctx.restore();
+        if(clipFeats.length){
+          // Cut with a mask, not ctx.clip(): one even-odd clip path over several
+          // shapes turns every overlap into a hole, and cities simplified one at a
+          // time overlap in slivers along shared borders. The tracts go on their
+          // own layer, the scope's shapes are unioned on a second, and the first
+          // keeps only what the second covers.
+          var tc=document.createElement('canvas'), mc=document.createElement('canvas');
+          tc.width=mc.width=canvas.width; tc.height=mc.height=canvas.height;
+          var tctx=tc.getContext('2d'), mctx=mc.getContext('2d');
+          drawTracts(tctx);
+          clipFeats.forEach(function(f){drawFeature(f,'#000',null,0,1,mctx);});
+          tctx.globalCompositeOperation='destination-in';
+          tctx.drawImage(mc,0,0);
+          ctx.drawImage(tc,0,0);
+          tc.width=mc.width=0;   // release both full-size buffers now
+        }else drawTracts(ctx);
       }
-      // Unincorporated region — above tracts, below city/tribal outlines (skipped on city-scoped exports).
-      // Outline only: the live map's tint would print the tracts under it off the legend's colors.
-      if(!opts.jurisName&&typeof UNINCORP!=='undefined'&&UNINCORP&&typeof unincorpLayer!=='undefined'&&unincorpLayer&&map.hasLayer(unincorpLayer)){
+      // Unincorporated region — above tracts, below city/tribal outlines: the
+      // scope's when scoped, else shown if it's on the map. Outline only: the
+      // live map's tint would print the tracts under it off the legend's colors.
+      if((scope?scope.unincorp:typeof unincorpLayer!=='undefined'&&unincorpLayer&&map.hasLayer(unincorpLayer))&&
+         typeof UNINCORP!=='undefined'&&UNINCORP){
         UNINCORP.features.forEach(function(f){drawFeature(f,null,UNINCORP_COLOR,2*SCALE,0);});
       }
-      // Jurisdiction outlines: just the focused city when scoped, else all visible
+      // Jurisdiction outlines: the scope's cities when scoped, else all visible
       if(typeof JURIS!=='undefined'&&JURIS){
         Object.keys(jurisLayers).forEach(function(k){
-          if(opts.jurisName){if(k!==opts.jurisName)return;}
-          else if(!map.hasLayer(jurisLayers[k]))return;
+          if(scope?scope.cities.indexOf(k)<0:!map.hasLayer(jurisLayers[k]))return;
           var feats=JURIS.features.filter(function(f){return f.properties.NAME===k;});
           feats.forEach(function(f){drawFeature(f,null,JURIS_COLOR,1.8*SCALE,0);});
         });
       }
-      // Replicate visible tribal land outlines (skipped on city-scoped exports)
-      if(!opts.jurisName&&typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalLayers!=='undefined'){
+      // Tribal land outlines: the scope's tribes when scoped, else all visible
+      if(typeof TRIBAL!=='undefined'&&TRIBAL&&typeof tribalLayers!=='undefined'){
         Object.keys(tribalLayers).forEach(function(k){
-          if(!map.hasLayer(tribalLayers[k]))return;
+          if(scope?scope.tribal.indexOf(tribalGroupKey(k))<0:!map.hasLayer(tribalLayers[k]))return;
           var f=TRIBAL.features.filter(function(x){return x.properties.NAME===k;})[0];
           if(!f)return;
           var t=f.properties.TYPE||'reservation';
@@ -6555,7 +6628,8 @@ function _captureStudyAreaMap(opts){
           if(dashed)ctx.restore();
         });
       }
-      if(!opts.jurisName)drawJurisLabels();
+      // One jurisdiction is named in the title, where a label can't cover its tracts.
+      if(!scope||scope.names.length>1)drawJurisLabels();
       if(!opts.minimal){drawLegend();drawScaleBar();}
       drawAttribution();
       cleanup();
@@ -6581,10 +6655,17 @@ function _heroPdf(canvas,opts){
   pdf.setFillColor(37,99,235); // accent line
   pdf.rect(0,72,pw,2.4,'F');
 
-  // No layer/scenario subtitle: the in-map legend already names both.
+  // No layer/scenario subtitle: the in-map legend already names both. A clipped
+  // map names its jurisdictions there instead.
   pdf.setFont('helvetica','bold');
   pdf.setFontSize(20);pdf.setTextColor(15,23,42);
-  pdf.text('San Diego Heat Risk Explorer',M,43);
+  if(opts.clipNames){
+    pdf.text('San Diego Heat Risk Explorer',M,36);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(11);pdf.setTextColor(71,85,105);
+    pdf.text(_pdfNameList(pdf,opts.clipNames,pw-2*M),M,55);
+  }else{
+    pdf.text('San Diego Heat Risk Explorer',M,43);
+  }
 
   // ── Map figure ─────────────────────────────────────────────
   var top=92;
@@ -6642,8 +6723,20 @@ function _heroPdf(canvas,opts){
   pdf.text(url,pw-M-urlW,ph-18);
 
   var ts=dt.toISOString().replace(/[:.]/g,'-').slice(0,19);
-  var slug=opts.jurisName?('_'+opts.jurisName.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')):'';
+  var cn=opts.clipNames, slug='';
+  if(cn)slug='_'+(cn.length===1?cn[0].toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''):
+                  cn.length+'-jurisdictions');
   pdf.save('san_diego_heat_risk'+slug+'_'+ts+'.pdf');
+}
+
+// "A, B, C", or as many names as fit in maxW followed by "+ N more"; never cut
+// mid-name. Measures in the PDF's current font.
+function _pdfNameList(pdf,names,maxW){
+  for(var k=names.length;k>1;k--){
+    var s=names.slice(0,k).join(', ')+(k<names.length?' + '+(names.length-k)+' more':'');
+    if(pdf.getTextWidth(s)<=maxW)return s;
+  }
+  return names[0]+(names.length>1?' + '+(names.length-1)+' more':'');
 }
 
 // The map PDF's variable box: the inputs behind the build, by pillar, sized to
@@ -6709,18 +6802,119 @@ function _pdfVarBox(pdf,x,bottom,maxW,maxH){
   layout(fs,cap,top);
 }
 
-function downloadMapPdf(){
+// ── "Download Map as PDF" dialog: the whole county, or the map clipped to the
+// jurisdictions ticked here (cities, the unincorporated county, tribal lands),
+// over the basemap picked here.
+function openPdfModal(){
+  _pdfRenderJurisList();
+  _pdfSyncScope();
+  document.getElementById('pdf-modal').classList.add('open');
+}
+function closePdfModal(){
+  document.getElementById('pdf-modal').classList.remove('open');
+}
+function _pdfScopeMode(){
+  var r=document.querySelector('input[name=pdf-scope]:checked');
+  return r?r.value:'all';
+}
+// Built on first open and kept after, so a run of exports for one area doesn't
+// mean re-ticking it. The first open ticks whatever is on the map. One row per
+// tribe covers its reservation and its trust land, as in the sidebar.
+var _pdfJurisBuilt=false;
+function _pdfRenderJurisList(){
+  var list=document.getElementById('pdf-juris-list');
+  if(!list||_pdfJurisBuilt)return;
+  _pdfJurisBuilt=true;
+  function row(kind,key,label,on){
+    return '<div class="exp-juris-row"><label><input type="checkbox" value="'+
+      (kind+':'+key).replace(/"/g,'&quot;')+'"'+(on?' checked':'')+'>'+label+'</label></div>';
+  }
+  var html='';
+  if(typeof JURIS!=='undefined'&&JURIS){
+    html+='<div class="exp-juris-group">Cities</div>';
+    Object.keys(jurisLayers).forEach(function(n){html+=row('city',n,n,map.hasLayer(jurisLayers[n]));});
+  }
+  if(typeof UNINCORP!=='undefined'&&UNINCORP&&unincorpLayer){
+    html+='<div class="exp-juris-group">County</div>'+
+      row('unincorp','','Unincorporated county',map.hasLayer(unincorpLayer));
+  }
+  var gks=(typeof tribalGroups!=='undefined')?Object.keys(tribalGroups).sort(function(a,b){return a.localeCompare(b);}):[];
+  if(gks.length){
+    html+='<div class="exp-juris-group">Tribal lands</div>';
+    gks.forEach(function(gk){
+      html+=row('tribal',gk,gk,tribalGroups[gk].some(function(n){return map.hasLayer(tribalLayers[n]);}));
+    });
+  }
+  list.innerHTML=html||'<div style="font-style:italic;color:#999;font-size:11px">No jurisdiction boundaries available.</div>';
+}
+function _pdfSyncScope(){
+  var clip=_pdfScopeMode()==='juris';
+  document.getElementById('pdf-juris-list').classList.toggle('disabled',!clip);
+  document.getElementById('pdf-juris-all').disabled=!clip;
+  document.getElementById('pdf-juris-none').disabled=!clip;
+  // Clipping to nothing would print a map with no tracts on it.
+  document.getElementById('pdf-download-btn').disabled=
+    clip&&!document.querySelector('#pdf-juris-list input:checked');
+}
+function _pdfJurisSelectAll(checked){
+  var boxes=document.querySelectorAll('#pdf-juris-list input[type=checkbox]');
+  for(var i=0;i<boxes.length;i++)boxes[i].checked=!!checked;
+  _pdfSyncScope();
+}
+// The ticked jurisdictions as the scope _captureStudyAreaMap frames and cuts to.
+function _pdfSelectedScope(){
+  var s={cities:[],unincorp:false,tribal:[],names:[],bounds:new L.LatLngBounds()};
+  var boxes=document.querySelectorAll('#pdf-juris-list input:checked');
+  for(var i=0;i<boxes.length;i++){
+    var v=boxes[i].value, j=v.indexOf(':'), kind=v.slice(0,j), key=v.slice(j+1);
+    if(kind==='city'&&jurisLayers[key]){
+      s.cities.push(key);s.names.push(key);s.bounds.extend(jurisLayers[key].getBounds());
+    }else if(kind==='unincorp'&&unincorpLayer){
+      s.unincorp=true;s.names.push('Unincorporated county');s.bounds.extend(unincorpLayer.getBounds());
+    }else if(kind==='tribal'&&tribalGroups[key]){
+      s.tribal.push(key);s.names.push(key);
+      tribalGroups[key].forEach(function(n){s.bounds.extend(tribalLayers[n].getBounds());});
+    }
+  }
+  return s;
+}
+function doPdfDownload(){
+  var scope=null;
+  if(_pdfScopeMode()==='juris'){
+    scope=_pdfSelectedScope();
+    if(!scope.names.length)return;
+  }
+  var bm=document.querySelector('input[name=pdf-basemap]:checked');
+  closePdfModal();
+  downloadMapPdf(scope,bm?bm.value:'light');
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&document.getElementById('pdf-modal').classList.contains('open'))closePdfModal();
+});
+
+// scope: null for the whole county, else _pdfSelectedScope()'s selection.
+// basemap: 'light', 'satellite' or 'none'.
+function downloadMapPdf(scope,basemap){
   var btn=document.getElementById('dl-pdf-btn');
   btn.disabled=true;
   _pdfShow('Loading PDF library\\u2026');
   _ensurePdfLibs().then(function(){
-    _pdfShow('Rendering study-area map\\u2026');
-    // width fills _heroPdf's 720x462pt map area (1200*720/462). padLeft pushes
-    // the coastline clear of its variable box, over the ocean in the lower-left.
-    return _captureStudyAreaMap({width:1870,padLeft:140});
+    // width fills _heroPdf's 720x462pt map area (1200*720/462).
+    if(!scope){
+      _pdfShow('Rendering study-area map\\u2026');
+      // padLeft pushes the coastline clear of the variable box, over the ocean
+      // in the lower-left.
+      return _captureStudyAreaMap({width:1870,padLeft:140,basemap:basemap});
+    }
+    _pdfShow('Rendering '+(scope.names.length===1?scope.names[0]:scope.names.length+' jurisdictions')+'\\u2026');
+    // A clipped frame has no ocean to spare, so the lower-left furniture gets
+    // its own column: the variable box (<=170pt, ~440 px of this frame, set in
+    // 18 px) when _heroPdf draws one, else just the scale bar (<=228 px).
+    var box=results&&!rawVar&&curLayer!=='heatmode';
+    return _captureStudyAreaMap({width:1870,padLeft:box?480:260,scope:scope,bounds:scope.bounds,basemap:basemap});
   }).then(function(canvas){
     _pdfShow('Building PDF\\u2026');
-    _heroPdf(canvas);
+    _heroPdf(canvas,scope?{clipNames:scope.names}:undefined);
     _pdfHide();
     btn.disabled=false;
   }).catch(function(err){
@@ -7060,9 +7254,9 @@ function _captureTractInset(feat,mode){
     }
     var tasks=[], got={n:0};
     if(mode==='lu'){
-      // Two rasters and a native-zoom ceiling to respect — _paintLightBasemap
+      // Two rasters and a native-zoom ceiling to respect — _paintBasemap
       // owns that math for both PDF blitters.
-      tasks.push(_paintLightBasemap(ctx,z,pb,S).then(function(n){got.n+=n;}));
+      tasks.push(_paintBasemap(ctx,z,pb,S,'light').then(function(n){got.n+=n;}));
     }else{
       var minTX=Math.floor(pb.min.x/TILE),maxTX=Math.floor(pb.max.x/TILE);
       var minTY=Math.floor(pb.min.y/TILE),maxTY=Math.floor(pb.max.y/TILE);

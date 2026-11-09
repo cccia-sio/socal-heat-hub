@@ -84,9 +84,9 @@ def test_map_fit_is_not_snapped_to_a_whole_zoom(js_fn):
 
 def test_basemap_tiles_are_requested_at_a_whole_zoom(js_code):
     """A fractional z in a tile URL 404s, and the export ships a blank basemap."""
-    src = js_code("_paintLightBasemap")
+    src = js_code("_paintBasemap")
     assert re.search(r"var rz=Math\.round\(zoom\)", src), (
-        "_paintLightBasemap() must fetch tiles at a whole zoom level and scale them "
+        "_paintBasemap() must fetch tiles at a whole zoom level and scale them "
         "onto the (possibly fractional) display zoom."
     )
 
@@ -134,9 +134,16 @@ def test_map_names_the_visible_jurisdictions(js_fn):
     )
 
 
-def test_city_scoped_export_draws_no_names(js_fn):
-    """The city PDF names its city in the title; a label would cover its tracts."""
-    assert "if(!opts.jurisName)drawJurisLabels();" in js_fn("_captureStudyAreaMap")
+def test_one_jurisdiction_export_draws_no_name(js_fn):
+    """A one-jurisdiction PDF names it in the title; a label would cover its tracts.
+
+    The city-focus PDF is the one-city case of the same scope.
+    """
+    src = js_fn("_captureStudyAreaMap")
+    assert "if(!scope||scope.names.length>1)drawJurisLabels();" in src
+    assert "opts.jurisName?{cities:[opts.jurisName]" in src, (
+        "The city-focus PDF no longer runs through the scoped export."
+    )
 
 
 def test_names_dont_overprint(js_fn):
@@ -179,3 +186,92 @@ def test_label_points_are_inside_their_shape(viewer_html_text, var, key):
         )
     ]
     assert not outside, f"Labels placed outside their shape: {outside}"
+
+
+# ── Clipping to jurisdictions ───────────────────────────────────────────────
+# "Download Map as PDF" opens a dialog: the whole county (the regional snapshot)
+# or the map cut to the jurisdictions ticked there, any mix of cities, the
+# unincorporated county and tribal lands.
+
+
+def test_sidebar_button_opens_the_pdf_dialog(viewer_html_text):
+    btn = re.search(r'<button id="dl-pdf-btn"[^>]*>', viewer_html_text).group(0)
+    assert 'onclick="openPdfModal()"' in btn, (
+        "The sidebar PDF button exports straight away again; it should open the "
+        "dialog that offers the clipped map."
+    )
+
+
+@pytest.mark.parametrize("source", ["JURIS", "UNINCORP", "tribalGroups"])
+def test_dialog_lists_every_kind_of_jurisdiction(js_fn, source):
+    assert source in js_fn("_pdfRenderJurisList"), f"The PDF dialog no longer lists {source}."
+
+
+def test_clipping_to_nothing_is_blocked(js_code):
+    """An empty selection would print a map with no tracts on it."""
+    assert "pdf-download-btn" in js_code("_pdfSyncScope")
+
+
+def test_clip_is_a_mask_not_one_evenodd_path(js_code):
+    """One even-odd clip path over several shapes turns every overlap into a hole.
+
+    Cities are simplified one at a time, so neighbours overlap in slivers along
+    their shared border; ticking both would print a strip of basemap between them.
+    """
+    src = js_code("_captureStudyAreaMap")
+    assert "destination-in" in src, "The scoped export no longer masks the tracts."
+    assert ".clip(" not in src, "The scoped export clips with a single path again."
+
+
+def test_scoped_export_outlines_only_the_selection(js_code):
+    src = js_code("_captureStudyAreaMap")
+    for check in ("scope.cities.indexOf(k)", "scope.unincorp", "scope.tribal.indexOf(tribalGroupKey(k))"):
+        assert check in src, f"The scoped export no longer filters its outlines with {check}."
+
+
+def test_clipped_map_reserves_a_column_for_the_box(js_code):
+    """The county framing parks the variable box over open ocean; a city has none."""
+    assert "padLeft:box?" in js_code("downloadMapPdf"), (
+        "The clipped map no longer reserves the left column, so the variable box "
+        "and scale bar cover the selection."
+    )
+
+
+def test_clipped_pdf_names_its_jurisdictions(js_code):
+    assert "opts.clipNames" in js_code("_heroPdf"), "The clipped PDF's title no longer names the selection."
+    assert " more" in js_code("_pdfNameList"), (
+        "A selection too long for the title must say how many it left out."
+    )
+
+
+def test_escape_closes_the_pdf_dialog(viewer_html_text):
+    assert re.search(r"e\.key==='Escape'&&document\.getElementById\('pdf-modal'\)", viewer_html_text)
+
+
+# ── Basemap ─────────────────────────────────────────────────────────────────
+# The dialog also picks the PDF's basemap: the light map (the default, and what
+# every export printed before), satellite imagery, or none.
+
+
+@pytest.mark.parametrize("name", ["light", "satellite", "none"])
+def test_dialog_offers_the_basemap(viewer_html_text, name):
+    assert f'name="pdf-basemap" value="{name}"' in viewer_html_text, (
+        f"The PDF dialog no longer offers the {name} basemap."
+    )
+
+
+def test_chosen_basemap_reaches_the_render(js_code):
+    assert "pdf-basemap" in js_code("doPdfDownload"), "doPdfDownload() ignores the basemap choice."
+    assert "basemap:basemap" in js_code("downloadMapPdf"), "downloadMapPdf() drops the basemap choice."
+
+
+def test_attribution_follows_the_basemap(js_code):
+    """Satellite tiles are Maxar/Earthstar imagery; printing the light map's credit under them is wrong."""
+    src = js_code("_captureStudyAreaMap")
+    assert "BASEMAPS[bm].opts.attribution" in src
+    assert "HERE, Garmin" not in src, "The export's attribution is hardcoded to the light basemap again."
+
+
+def test_tracts_are_opaque_off_the_light_basemap(js_code):
+    """Imagery showing through the fills would shift them off the legend's colors."""
+    assert "bm==='light'?0.85:1" in js_code("_captureStudyAreaMap")

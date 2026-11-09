@@ -27,6 +27,7 @@ REQUIRED_DOM_IDS = [
     "wlc-close-btn",
     "compare-modal",
     "export-modal",
+    "pdf-modal",
     "error-bar",
 ]
 

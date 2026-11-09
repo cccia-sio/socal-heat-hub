@@ -138,6 +138,33 @@ def test_welcome_modal_shows_every_load(viewer_html_text):
     )
 
 
+def test_compare_modal_ordinals_come_from_ord(js_code):
+    """The compare modal hardcoded the suffix and printed '83th' and '82th'."""
+    src = js_code("openCompareModal")
+    assert "'th percentile'" not in src, "openCompareModal() hardcodes 'th' again; use _ord()."
+    assert "_ord(pA)" in src and "_ord(pB)" in src
+
+
+def test_address_popup_is_the_tract_popup_read_on_open(js_code):
+    """The address marker copied the tract popup at search time and appended a second
+    "Show more info", so it showed the button twice and kept the scores from before
+    any later rebuild, scenario switch or layer change.
+    """
+    src = js_code("_addrApplyHit")
+    assert "Show more info" not in src, (
+        "_addrApplyHit() adds its own 'Show more info'; the tract popup already has one."
+    )
+    assert "getContent()" not in src, "_addrApplyHit() snapshots the tract popup at search time."
+    assert "bindPopup(function" in src.replace(" ", ""), (
+        "The address marker's popup must be built when it opens, so it matches the map."
+    )
+    assert "getContent()" in js_code("_addrPopupContent")
+    assert src.index("once('moveend'") < src.index("flyTo("), (
+        "The address popup opens during the flight again; flyTo overrides its autopan "
+        "and the top of the popup lands above the map."
+    )
+
+
 def test_copy_citation_copies_the_citation_shown(viewer_html_text, js_fn):
     """The sidebar's Copy button must copy the citation on screen, not a second hand-kept copy."""
     assert 'id="cite-text"' in viewer_html_text

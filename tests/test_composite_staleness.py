@@ -172,6 +172,23 @@ def test_build_clears_the_previous_builds_pillar_fields(js_code):
     )
 
 
+def test_build_drops_a_layer_it_no_longer_produces(js_code):
+    """Viewing Sensitivity Pattern 3, then rebuilding with fewer variables, drew every tract grey.
+
+    The new build had fewer patterns, but curLayer still pointed at the old one and
+    fcolor() found no `_sensitivity_pc3` to color by.
+    """
+    src = js_code("compute")
+    fallback = [ln for ln in src.splitlines() if "pcs.length" in ln and 'curLayer="composite"' in ln]
+    assert fallback, (
+        "compute() no longer falls back to the composite when the active pillar "
+        "layer isn't in the new build, so the map draws every tract grey."
+    )
+    assert src.index(fallback[0]) < src.index("drawTracts()"), (
+        "compute() resets the layer after drawing; the grey map is already on screen."
+    )
+
+
 def test_scenario_switch_rescores_the_committed_build(js_code):
     src = js_code("setScenario")
     assert not re.search(r"\bcompute\(\s*\)", src), (

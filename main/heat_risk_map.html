@@ -2774,6 +2774,20 @@ function _addrFindTract(lon, lat){
   return null;
 }
 
+// The address marker shows the tract's own popup, read from the tract layer each
+// time it opens so it matches the map as drawn now. Before any build or preview
+// there's no tract layer; the detail drawer still has the per-variable percentiles.
+function _addrPopupContent(gid){
+  var html = null;
+  if(tLayer) tLayer.eachLayer(function(lyr){
+    if(!html && lyr.feature && lyr.feature.properties.GEOID === gid && lyr.getPopup())
+      html = lyr.getPopup().getContent();
+  });
+  return html || ('<div style="font-family:sans-serif;font-size:13px;line-height:1.6">'+
+    '<b>Tract '+gid.slice(-6)+'</b><br>'+
+    '<button class="popup-more-btn" onclick="map.closePopup();openDetailDrawer(\''+gid+'\')">Show more info \u25b8</button></div>');
+}
+
 // Given a Nominatim row, drop the marker, fly the map, find the containing
 // tract, and open the tract popup. Used by both the Go button and the
 // autocomplete dropdown so we don't double-geocode.
@@ -2784,7 +2798,6 @@ function _addrApplyHit(hit, fallbackLabel){
                 lon>=ADDR_BBOX.minLon && lon<=ADDR_BBOX.maxLon);
   if(addrMarker) map.removeLayer(addrMarker);
   addrMarker = L.marker([lat, lon], {title: hit.display_name || fallbackLabel || ''}).addTo(map);
-  map.flyTo([lat, lon], inBbox ? 14 : 11, {duration:0.6});
   var feat = _addrFindTract(lon, lat);
   var dn = hit.display_name || fallbackLabel || '';
   var dnShort = dn.length>80 ? dn.slice(0,77)+'\u2026' : dn;
@@ -2794,37 +2807,32 @@ function _addrApplyHit(hit, fallbackLabel){
   if(feat){
     var gid = feat.properties.GEOID;
     html += '<span class="addr-tract">Census tract '+gid.slice(-6)+'</span>';
-    var moreBtn = '<button class="popup-more-btn" onclick="map.closePopup();openDetailDrawer(\''+gid+'\')">Show more info \u25b8</button>';
-    if(tLayer){
-      _addrSetStatus(html, false);
-      tLayer.eachLayer(function(lyr){
-        if(lyr.feature && lyr.feature.properties.GEOID === gid){
-          var content = lyr.getPopup() ? lyr.getPopup().getContent() : null;
-          if(content){
-            // Insert the more-info button just before the popup's closing </div>
-            var enhanced = content.replace(/<\/div>\s*$/, '') + moreBtn + '</div>';
-            addrMarker.bindPopup(enhanced).openPopup();
-          }
-          try{
-            lyr.setStyle({weight:2.5, color:'#1d4ed8'});
-            setTimeout(function(){if(tLayer) tLayer.resetStyle(lyr);}, 2500);
-          }catch(_){}
-        }
-      });
-    }else{
-      html += '<span class="addr-tract" style="color:#b45309">Click <b>Build Composite Risk Map</b> to see this tract\'s risk info.</span>';
-      _addrSetStatus(html, false);
-      // Even without the composite map, let the user open the detail drawer
-      // (it will show "build the composite map" hint at the top, plus the
-      // mini-map and per-variable percentiles which are computed at load).
-      var basic = '<div style="font-family:sans-serif;font-size:13px;line-height:1.6">'+
-        '<b>Tract '+gid.slice(-6)+'</b><br>'+moreBtn+'</div>';
-      addrMarker.bindPopup(basic).openPopup();
-    }
+    if(!tLayer) html += '<span class="addr-tract" style="color:#b45309">Click <b>Build Composite Risk Map</b> to see this tract\'s risk info.</span>';
+    _addrSetStatus(html, false);
+    // Registered before bindPopup() so the phone padding is set before it opens.
+    addrMarker.on('click', function(){_fitPopupToMobileMap(addrMarker.getPopup());});
+    addrMarker.bindPopup(function(){return _addrPopupContent(gid);}, {maxWidth:360, minWidth:344});
+    if(tLayer) tLayer.eachLayer(function(lyr){
+      if(lyr.feature && lyr.feature.properties.GEOID === gid){
+        try{
+          lyr.setStyle({weight:2.5, color:'#1d4ed8'});
+          setTimeout(function(){if(tLayer) tLayer.resetStyle(lyr);}, 2500);
+        }catch(_){}
+      }
+    });
   }else{
     html += '<span class="addr-tract">No San Diego County census tract at this location.</span>';
     _addrSetStatus(html, !inBbox);
   }
+  // Open the popup once the flight lands: flyTo overrides the popup's autopan,
+  // which left the top of the popup above the map.
+  var mk = addrMarker;
+  if(feat) map.once('moveend', function(){
+    if(mk !== addrMarker) return;   // searched again, or cleared, mid-flight
+    _fitPopupToMobileMap(mk.getPopup());
+    mk.openPopup();
+  });
+  map.flyTo([lat, lon], inBbox ? 14 : 11, {duration:0.6});
   var cb = document.getElementById('addr-clear'); if(cb) cb.style.display = 'block';
 }
 
@@ -3953,6 +3961,10 @@ function compute(settings){
     res.settings=settings;
     results=res;
     if(!rescore)compositeStale=false;   // the panel and the map now agree again
+    // A pillar layer this build doesn't produce (fewer patterns, or the pillar
+    // left out) would draw every tract grey; fall back to the composite.
+    var lm=curLayer.match(/^(exposure|sensitivity|adaptive)(?:_pc(\d+))?$/);
+    if(lm&&(!res[lm[1]]||(lm[2]&&+lm[2]>res[lm[1]].pcs.length)))curLayer="composite";
     syncBuildBtn();
     drawTracts();
     showResults();
@@ -4307,6 +4319,32 @@ function setRadarMode(m){
   if(b) b.style.cssText=_hvtgStyle(m==='abs','r');
 }
 
+// Phone layout: the drawer CSS breakpoint (sidebar off-canvas, controls in the drawer).
+function _isMobileLayout(){
+  return window.matchMedia('(max-width:768px),(max-height:500px) and (orientation:landscape)').matches;
+}
+// On a phone the hamburger, zoom buttons, legend and logos overlap the top of
+// the map, and Leaflet's controls stack above its popup pane, so a tract popup
+// opened under them loses its title, pill and Percentile/Value toggle. Called
+// before the popup opens: autopan it into the band between the top controls and
+// the bottom ones (scale bar, attribution), and cap its height to that band so
+// a short screen scrolls the popup instead of cutting it off. Desktop keeps
+// Leaflet's defaults.
+function _fitPopupToMobileMap(popup){
+  if(!popup)return;
+  var o=popup.options;
+  if(!_isMobileLayout()){o.autoPanPaddingTopLeft=o.autoPanPaddingBottomRight=o.maxHeight=null;return;}
+  var mc=map.getContainer(),mr=mc.getBoundingClientRect(),top=0,bot=mr.height,gap=6;
+  function each(list,fn){Array.prototype.forEach.call(list,function(el){var r=el.getBoundingClientRect();if(r.height)fn(r);});}
+  each(document.querySelectorAll('#menu-toggle,#logos,#legend,#city-focus-bar,#compare-banner'),function(r){top=Math.max(top,r.bottom-mr.top);});
+  each(mc.querySelectorAll('.leaflet-top .leaflet-control'),function(r){top=Math.max(top,r.bottom-mr.top);});
+  each(mc.querySelectorAll('.leaflet-bottom .leaflet-control'),function(r){bot=Math.min(bot,r.top-mr.top);});
+  o.autoPanPaddingTopLeft=[5,top+gap];
+  o.autoPanPaddingBottomRight=[5,mr.height-bot+gap];
+  // 68 px of a Leaflet popup is chrome: content margins, tip, bottom margin.
+  o.maxHeight=Math.max(120,bot-top-2*gap-68);
+}
+
 /* ================================================================
    MAP DRAW
    ================================================================ */
@@ -4321,8 +4359,11 @@ function drawTracts(){
       lyr.on("mouseout",function(e){if(tLayer)tLayer.resetStyle(e.target)});
       var p=f.properties;
       var fi=window._gIdx[p.GEOID]||0;
-      // In compare-awaiting mode, intercept clicks before the popup opens
+      // In compare-awaiting mode, intercept clicks before the popup opens.
+      // Registered before bindPopup(), so it also runs before the popup
+      // opens and autopans, which is when its phone padding has to be set.
       lyr.on("click",function(e){
+        _fitPopupToMobileMap(lyr.getPopup());
         if(compareMode==='awaiting'){
           L.DomEvent.stopPropagation(e);
           if(p.GEOID===compareFirst){return;} // ignore re-click of the same tract
@@ -4950,8 +4991,8 @@ function openCompareModal(geoidA,geoidB){
         // approximately preserved under uniform-ish CMIP6 deltas.
         var pA=(rawPct[v.key]&&rawPct[v.key][idxA]!=null)?rawPct[v.key][idxA]:null;
         var pB=(rawPct[v.key]&&rawPct[v.key][idxB]!=null)?rawPct[v.key][idxB]:null;
-        var dispPctA=(pA!=null)?(Math.round(pA)+'th percentile'):'';
-        var dispPctB=(pB!=null)?(Math.round(pB)+'th percentile'):'';
+        var dispPctA=(pA!=null)?(_ord(pA)+' percentile'):'';
+        var dispPctB=(pB!=null)?(_ord(pB)+' percentile'):'';
         // Highlight which is higher RISK (red) vs lower RISK (green) using
         // per-variable polarity. POLARITY[key]===false means higher value =
         // lower risk (e.g. tree canopy, AC prevalence).
@@ -7943,7 +7984,7 @@ var TOUR_STEPS=[
    prompt:null},
   {key:"done",target:null,side:"center",
    title:"Done",
-   body:"Click any tract for its scores and dominant driver. Use <b>Find address</b> (bottom-left) to jump to a place. Reload to retake the tour.",
+   body:"Click any tract for its scores and dominant driver. Use <b>Find address</b> (bottom-left; on a phone, under Map Tools in the menu) to jump to a place. Reload to retake the tour.",
    prompt:null}
 ];
 /* ----------------------------------------------------------------
@@ -8071,22 +8112,51 @@ function _showTourStep(i){
   // Position card + spotlight
   if(step.target){
     var el=document.querySelector(step.target);
+    var slid=_tourSyncDrawer(el);
     if(!el){_positionCenter();}
     else{
-      try{el.scrollIntoView({behavior:'instant',block:'nearest'});}catch(e){el.scrollIntoView();}
-      // Double-rAF so the sidebar scroll + layout fully settle before
-      // we read getBoundingClientRect — a single setTimeout occasionally
-      // measured stale coords and left the spotlight a few px off.
-      requestAnimationFrame(function(){
+      var show=function(){
+        try{el.scrollIntoView({behavior:'instant',block:'nearest'});}catch(e){el.scrollIntoView();}
+        // Double-rAF so the sidebar scroll + layout fully settle before
+        // we read getBoundingClientRect — a single setTimeout occasionally
+        // measured stale coords and left the spotlight a few px off.
         requestAnimationFrame(function(){
-          _positionAtTarget(el,step.side);
-          _attachTourResizeObs(el,step.side);
+          requestAnimationFrame(function(){
+            if(_currentSteps()[_tourIdx]!==step||!ov.classList.contains('open'))return;   // user moved on
+            _positionAtTarget(el,step.side);
+            _attachTourResizeObs(el,step.side);
+          });
         });
-      });
+      };
+      // Mid-slide, the drawer's transform puts its controls left of the screen.
+      if(slid)_afterDrawerSlide(show);else show();
     }
   }else{
+    _tourSyncDrawer(null);
     _positionCenter();
   }
+}
+
+// Phone layout: the sidebar is an off-canvas drawer. Open it when the step's
+// target is inside it and close it otherwise, so the spotlight is on-screen and
+// a map or centered step isn't covered. Returns true while the drawer slides,
+// including a slide the previous step started (Next tapped mid-slide).
+function _tourSyncDrawer(el){
+  if(!_isMobileLayout())return false;
+  var sb=document.getElementById('sidebar');
+  var want=!!(el&&sb&&sb.contains(el));
+  var moved=document.body.classList.contains('sidebar-open')!==want;
+  if(moved)toggleSidebar(want);
+  return moved||!!(sb.getAnimations&&sb.getAnimations().length);
+}
+// Run fn once the drawer's slide ends; the timer covers a slide that fires no
+// transitionend (reduced motion, or interrupted).
+function _afterDrawerSlide(fn){
+  var sb=document.getElementById('sidebar'),done=false;
+  function go(){if(done)return;done=true;sb.removeEventListener('transitionend',onEnd);fn();}
+  function onEnd(e){if(e.target===sb)go();}
+  sb.addEventListener('transitionend',onEnd);
+  setTimeout(go,400);
 }
 
 function _positionCenter(){

@@ -6,3 +6,4 @@ Repo map: `ARCHITECTURE.md`. Python: `/opt/anaconda3/envs/socal-heat/bin/python`
 - Scoring math is mirrored in `scripts/build_hero_figure.py`; change both.
 - Repo is private, Pages is public. Deploy is the allow-list in `pages.yml`; new runtime assets also go in `MUST_DEPLOY`. Tracking a script also needs `.gitignore` and `ALLOWED_SCRIPT_FILES`.
 - Escape geocoder output with `_addrEsc()`. CDN scripts need SRI. No analytics.
+- Commit messages: no `Co-Authored-By` trailer.

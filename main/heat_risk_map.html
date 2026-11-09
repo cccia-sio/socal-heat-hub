@@ -4987,6 +4987,8 @@ function openCompareModal(geoidA,geoidB){
     [['_comp','Composite Risk'],['_exposure','Heat Exposure'],['_sensitivity','Population Sensitivity'],['_adaptive','Adaptive Capacity']].forEach(function(p){
       var aV=fA.properties[p[0]],bV=fB.properties[p[0]];
       if(aV==null||bV==null)return;
+      // _adaptive is stored capacity-side; show the capacity gap, as the rose plot does.
+      if(p[0]==='_adaptive'){aV=100-aV;bV=100-bV;}
       var clsA='cmp-row',clsB='cmp-row';
       if(aV>bV){clsA+=' cmp-higher';clsB+=' cmp-lower';}
       else if(bV>aV){clsB+=' cmp-higher';clsA+=' cmp-lower';}

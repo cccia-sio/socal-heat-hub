@@ -190,6 +190,15 @@ def test_adaptive_summary_card_shows_the_capacity_gap(js_code, fn_name):
     )
 
 
+def test_compare_modal_pillar_scores_show_the_capacity_gap(js_code):
+    """The compare modal printed _adaptive raw: the best-capacity tract read 100 in red."""
+    src = js_code("openCompareModal").replace(" ", "")
+    assert "aV=100-aV" in src and "bV=100-bV" in src, (
+        "openCompareModal() prints the Adaptive Capacity pillar score raw. It must show "
+        "100 - _adaptive, like the rose plot, the drawer and the tract PDF."
+    )
+
+
 def test_compute_inverts_adaptive_into_the_composite(js_code):
     """The premise the two cards above rely on: adaptive enters the composite inverted."""
     compute = js_code("compute")

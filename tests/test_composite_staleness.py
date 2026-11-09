@@ -201,6 +201,15 @@ def test_scenario_switch_rescores_the_committed_build(js_code):
     )
 
 
+def test_scenario_switch_redraws_the_heat_mode_preview(js_code):
+    """Before any Build, a scenario switch during a heat-mode preview left the old scenario on the map."""
+    lines = [ln for ln in js_code("setScenario").splitlines() if "drawTracts()" in ln]
+    assert any("heatmode" in ln for ln in lines), (
+        "setScenario() doesn't redraw the heat-mode preview, so the scenario "
+        "buttons change while the map stays on the previous scenario."
+    )
+
+
 def test_rescoring_leaves_the_stale_flag_alone(js_code):
     """Re-scoring for a new scenario doesn't apply the panel, so it isn't a Build."""
     src = js_code("compute")

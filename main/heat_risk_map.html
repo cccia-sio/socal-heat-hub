@@ -2125,7 +2125,7 @@ function setScenario(ssp,period){
   // Re-score the committed build under the new scenario. A bare compute() is a
   // Build: it would apply pending panel changes and clear the stale flag.
   if(results){compute(results.settings);}
-  else if(rawVar){drawTracts();}
+  else if(rawVar||curLayer==="heatmode"){drawTracts();}   // previews before any Build
 }
 
 function updateFixedBadges(){

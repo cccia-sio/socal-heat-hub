@@ -165,6 +165,18 @@ def test_address_popup_is_the_tract_popup_read_on_open(js_code):
     )
 
 
+def test_sio_logo_clears_the_scale_bar(viewer_html_text):
+    """At bottom:30px the SIO logo sat on the scale bar at every desktop size.
+
+    The scale bar's top is 56 px above the map's bottom, 73 px when the satellite
+    attribution wraps at 800 px. The logo card is 46 px tall, then a 10 px gap.
+    """
+    logo = int(re.search(r"#logo-sio\{position:absolute;bottom:(\d+)px", viewer_html_text).group(1))
+    stack = int(re.search(r"#map-controls-br\{position:absolute;right:14px;bottom:(\d+)px", viewer_html_text).group(1))
+    assert logo >= 73, f"#logo-sio sits at bottom:{logo}px, on top of the scale bar."
+    assert stack >= logo + 56, f"#map-controls-br (bottom:{stack}px) overlaps the SIO logo."
+
+
 def test_copy_citation_copies_the_citation_shown(viewer_html_text, js_fn):
     """The sidebar's Copy button must copy the citation on screen, not a second hand-kept copy."""
     assert 'id="cite-text"' in viewer_html_text

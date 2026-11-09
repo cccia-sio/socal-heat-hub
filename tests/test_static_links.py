@@ -81,6 +81,15 @@ def test_no_placeholder_anchors(project_root, page):
     )
 
 
+@pytest.mark.parametrize("page", _DEPLOYED_PAGES + ("main/heat_risk_map.html",))
+def test_license_links_open_on_github(project_root, page):
+    """Pages serves LICENSE as application/octet-stream, so a relative link downloads it."""
+    text = (project_root / page).read_text(encoding="utf-8")
+    hrefs = re.findall(r'href="([^"]*(?:LICENSE|DATA_LICENSE\.md)[^"]*)"', text)
+    raw = [h for h in hrefs if not h.startswith("https://github.com/cccia-sio/socal-heat-hub/blob/main/")]
+    assert not raw, f"{page} links to the raw license file(s) {raw}; link to the file on GitHub."
+
+
 def test_readme_local_links_resolve(project_root):
     """README is mostly external links; iterate inline so an all-external
     README isn't reported as a misleading "empty parametrize" skip.
